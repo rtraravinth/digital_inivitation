@@ -1,0 +1,285 @@
+import {
+  normalize,
+  type Portfolio,
+  type PortfolioHeader,
+  type Section,
+} from "./types";
+
+/** Optional fields fall back to the defaults in normalize(). */
+type Opt = "numbers" | "dates" | "image" | "file" | "quote";
+type SeedSection = Omit<Section, Opt> & Partial<Pick<Section, Opt>>;
+
+type SeedHeader = Omit<PortfolioHeader, "portrait"> &
+  Partial<Pick<PortfolioHeader, "portrait">>;
+
+type SeedPortfolio = Omit<
+  Portfolio,
+  "theme" | "accent" | "ground" | "font" | "sections" | "header"
+> &
+  Partial<Pick<Portfolio, "theme" | "accent" | "ground" | "font">> & {
+    sections: SeedSection[];
+    header: SeedHeader;
+  };
+
+/**
+ * Seed content. Every line here is lifted from, or built to match, the
+ * Rohan Mehta persona the design canvas is written around.
+ */
+const RAW: SeedPortfolio[] = [
+  {
+    id: "full",
+    name: "Rohan Mehta — Full portfolio",
+    slug: "rohan",
+    status: "live",
+    summary:
+      "Everything: both businesses, the advisory practice, the letter and the clinic.",
+    meta: "6 sections · updated 2 days ago",
+    header: {
+      name: "Rohan Mehta",
+      current:
+        "Founder, Northwell Kitchens · SEBI-registered investment adviser · Bengaluru",
+      description:
+        "I run two operating businesses and advise sixty households on their money. I write a fortnightly letter about household finance, and on Sundays I teach a free clinic for gig workers.",
+      tags: ["Founder", "Financial adviser", "Writer", "Trustee"],
+      links: [
+        { id: "h1", label: "Email", url: "rohan@northwell.in" },
+        { id: "h2", label: "LinkedIn", url: "/in/rohanmehta" },
+        { id: "h3", label: "Newsletter", url: "slowcompounding.in" },
+      ],
+    },
+    sections: [
+      {
+        id: "s1",
+        title: "Northwell Kitchens",
+        description:
+          "A cloud-kitchen company running eleven brands out of four Bengaluru facilities. Founded 2019, profitable since 2022, forty-two people on payroll.",
+        tags: ["Founder", "Food", "Since 2019"],
+        links: [
+          { id: "s1l1", label: "Company", url: "northwell.in" },
+          { id: "s1l2", label: "Press", url: "northwell.in/press" },
+        ],
+        numbers: [
+          { id: "s1n1", value: "11", label: "Brands" },
+          { id: "s1n2", value: "42", label: "People" },
+        ],
+        dates: [
+          { id: "s1d1", year: "2019", text: "Northwell Kitchens founded" },
+          { id: "s1d2", year: "2022", text: "First profitable year" },
+        ],
+      },
+      {
+        id: "s2",
+        title: "Meridian Supply Co.",
+        description:
+          "Cold-chain logistics for small food businesses that cannot afford their own fleet. Started as Northwell's own supply arm and spun out in 2023.",
+        tags: ["Co-founder", "Logistics", "Since 2023"],
+        links: [{ id: "s2l1", label: "Company", url: "meridiansupply.in" }],
+      },
+      {
+        id: "s3",
+        title: "The Slow Compounding letter",
+        description:
+          "A fortnightly letter on household finance for people who don't work in finance. Eighty-two issues, 14,200 subscribers, no advertising.",
+        tags: ["Writing", "Newsletter", "Since 2021"],
+        links: [
+          { id: "s3l1", label: "Read the letter", url: "slowcompounding.in" },
+          { id: "s3l2", label: "Subscribe", url: "slowcompounding.in/join" },
+        ],
+        numbers: [
+          { id: "s3n1", value: "82", label: "Issues" },
+          { id: "s3n2", value: "14,200", label: "Subscribers" },
+        ],
+        quote: {
+          text: "The only letter about money my parents actually finish.",
+          attribution: "A subscriber, unprompted",
+        },
+        dates: [{ id: "s3d1", year: "2021", text: "The Slow Compounding letter begins" }],
+      },
+      {
+        id: "s4",
+        title: "Advisory practice",
+        description:
+          "SEBI-registered investment adviser to sixty households, fee-only, no commissions and no product sales. Taking four new families a year.",
+        tags: ["SEBI RIA", "Advisory", "Fee-only"],
+        links: [
+          { id: "s4l1", label: "How it works", url: "slowcompounding.in/advisory" },
+          { id: "s4l2", label: "Book an intro call", url: "cal.com/rohanmehta" },
+        ],
+        numbers: [{ id: "s4n1", value: "60", label: "Households advised" }],
+        dates: [{ id: "s4d1", year: "2020", text: "SEBI registration granted" }],
+      },
+      {
+        id: "s5",
+        title: "The Sunday clinic",
+        description:
+          "A free money clinic for gig workers, every Sunday morning in Indiranagar. Two hours, no appointment, whatever you want to ask. Running since 2022.",
+        tags: ["Teaching", "Free", "Bengaluru"],
+        links: [{ id: "s5l1", label: "Where and when", url: "slowcompounding.in/clinic" }],
+      },
+      {
+        id: "s6",
+        title: "Trustee, Sanjeevani Schools Trust",
+        description:
+          "On the board of a trust running three low-fee schools in north Karnataka. I chair the finance committee.",
+        tags: ["Trustee", "Education", "Since 2020"],
+        links: [{ id: "s6l1", label: "Trust", url: "sanjeevanitrust.org" }],
+      },
+    ],
+  },
+  {
+    id: "investors",
+    name: "Investor one-pager",
+    slug: "rohan/investors",
+    status: "draft",
+    summary: "Just the two businesses, the numbers, and how to reach me.",
+    meta: "3 sections · updated 6 days ago",
+    header: {
+      name: "Rohan Mehta",
+      current: "Founder, Northwell Kitchens · Co-founder, Meridian Supply Co.",
+      description:
+        "Two operating businesses in food and cold-chain logistics, both in Bengaluru.",
+      tags: ["Founder", "Food", "Logistics"],
+      links: [{ id: "ih1", label: "Email", url: "rohan@northwell.in" }],
+    },
+    sections: [
+      {
+        id: "i1",
+        title: "Northwell Kitchens",
+        description:
+          "Eleven brands, four facilities, profitable since 2022. ₹18 Cr revenue run rate.",
+        tags: ["Founder", "Since 2019"],
+        links: [{ id: "i1l1", label: "Deck", url: "northwell.in/deck" }],
+      },
+      {
+        id: "i2",
+        title: "Meridian Supply Co.",
+        description:
+          "Cold-chain logistics, spun out of Northwell in 2023. Two hundred and forty customers.",
+        tags: ["Co-founder", "Since 2023"],
+        links: [{ id: "i2l1", label: "Deck", url: "meridiansupply.in/deck" }],
+      },
+      {
+        id: "i3",
+        title: "How I work",
+        description:
+          "Operator first. I stay close to the kitchens and the trucks, and I do not raise for the sake of raising.",
+        tags: ["Operating"],
+        links: [{ id: "i3l1", label: "Book a call", url: "cal.com/rohanmehta" }],
+      },
+    ],
+  },
+  {
+    id: "advisory",
+    name: "Advisory clients",
+    slug: "rohan/advisory",
+    status: "live",
+    summary: "The practice, the fee, the clinic. Nothing about the businesses.",
+    meta: "3 sections · updated 12 days ago",
+    header: {
+      name: "Rohan Mehta",
+      current: "SEBI-registered investment adviser · Bengaluru",
+      description:
+        "Fee-only advice to sixty households. No commissions, no product sales, no minimum portfolio.",
+      tags: ["SEBI RIA", "Fee-only", "Writer"],
+      links: [
+        { id: "ah1", label: "Email", url: "rohan@slowcompounding.in" },
+        { id: "ah2", label: "Newsletter", url: "slowcompounding.in" },
+      ],
+    },
+    sections: [
+      {
+        id: "a1",
+        title: "Advisory practice",
+        description:
+          "Fee-only, SEBI-registered, sixty households. Taking four new families a year.",
+        tags: ["Advisory", "Fee-only"],
+        links: [{ id: "a1l1", label: "How it works", url: "slowcompounding.in/advisory" }],
+      },
+      {
+        id: "a2",
+        title: "The Slow Compounding letter",
+        description: "A fortnightly letter on household finance. Eighty-two issues.",
+        tags: ["Writing", "Newsletter"],
+        links: [{ id: "a2l1", label: "Read", url: "slowcompounding.in" }],
+      },
+      {
+        id: "a3",
+        title: "The Sunday clinic",
+        description: "Free, every Sunday morning in Indiranagar. No appointment.",
+        tags: ["Teaching", "Free"],
+        links: [{ id: "a3l1", label: "Where and when", url: "slowcompounding.in/clinic" }],
+      },
+    ],
+  },
+  {
+    id: "writing",
+    name: "Writing only",
+    slug: "rohan/writing",
+    status: "live",
+    summary: "For editors and podcast bookers. The letter and nothing else.",
+    meta: "2 sections · updated 1 month ago",
+    theme: "poster",
+    header: {
+      name: "Rohan Mehta",
+      current: "Writer of The Slow Compounding letter",
+      description:
+        "I write a fortnightly letter about household finance for people who don't work in finance.",
+      tags: ["Writer", "Newsletter"],
+      links: [{ id: "wh1", label: "Newsletter", url: "slowcompounding.in" }],
+    },
+    sections: [
+      {
+        id: "w1",
+        title: "The Slow Compounding letter",
+        description: "Eighty-two issues, 14,200 subscribers, no advertising.",
+        tags: ["Writing", "Since 2021"],
+        links: [{ id: "w1l1", label: "Archive", url: "slowcompounding.in/archive" }],
+      },
+      {
+        id: "w2",
+        title: "Elsewhere",
+        description:
+          "Occasional columns on household finance, and a standing offer to come on your podcast and argue about index funds.",
+        tags: ["Press", "Podcasts"],
+        links: [{ id: "w2l1", label: "Email", url: "rohan@slowcompounding.in" }],
+      },
+    ],
+  },
+  {
+    id: "board",
+    name: "Board & trustee",
+    slug: "rohan/board",
+    status: "draft",
+    summary: "Governance work only — for trusts and boards doing diligence.",
+    meta: "2 sections · updated 1 month ago",
+    theme: "index",
+    header: {
+      name: "Rohan Mehta",
+      current: "Trustee, Sanjeevani Schools Trust · Chair, finance committee",
+      description:
+        "I sit on one board and chair its finance committee. I take governance work seriously and I take very little of it.",
+      tags: ["Trustee", "Governance"],
+      links: [{ id: "bh1", label: "Email", url: "rohan@northwell.in" }],
+    },
+    sections: [
+      {
+        id: "b1",
+        title: "Sanjeevani Schools Trust",
+        description:
+          "Three low-fee schools in north Karnataka. Trustee since 2020, chair of the finance committee since 2022.",
+        tags: ["Trustee", "Education"],
+        links: [{ id: "b1l1", label: "Trust", url: "sanjeevanitrust.org" }],
+      },
+      {
+        id: "b2",
+        title: "What I bring",
+        description:
+          "Operating experience in a low-margin business, and a reasonable tolerance for reading an audit file end to end.",
+        tags: ["Finance", "Audit"],
+        links: [],
+      },
+    ],
+  },
+];
+
+export const SEED_PORTFOLIOS: Portfolio[] = RAW.map((p) => normalize(p as Portfolio));

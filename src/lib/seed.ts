@@ -6,7 +6,7 @@ import {
 } from "./types";
 
 /** Optional fields fall back to the defaults in normalize(). */
-type Opt = "numbers" | "dates" | "image" | "file" | "quote";
+type Opt = "numbers" | "dates" | "image" | "file" | "quote" | "hidden" | "kind";
 type SeedSection = Omit<Section, Opt> & Partial<Pick<Section, Opt>>;
 
 type SeedHeader = Omit<PortfolioHeader, "portrait"> &
@@ -14,9 +14,9 @@ type SeedHeader = Omit<PortfolioHeader, "portrait"> &
 
 type SeedPortfolio = Omit<
   Portfolio,
-  "theme" | "accent" | "ground" | "font" | "sections" | "header"
+  "theme" | "accent" | "ground" | "font" | "layout" | "sections" | "header"
 > &
-  Partial<Pick<Portfolio, "theme" | "accent" | "ground" | "font">> & {
+  Partial<Pick<Portfolio, "theme" | "accent" | "ground" | "font" | "layout">> & {
     sections: SeedSection[];
     header: SeedHeader;
   };

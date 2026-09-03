@@ -251,3 +251,32 @@ async def test_every_route_requires_a_token(client, portfolio):
     client.headers.pop("Authorization", None)
     assert (await client.get("/api/v1/portfolios")).status_code == 401
     assert (await client.get(f"/api/v1/portfolios/{portfolio['id']}")).status_code == 401
+
+
+async def test_expand_sections_returns_full_documents(auth_client):
+    await auth_client.post(
+        "/api/v1/portfolios",
+        json={"name": "F", "slug": "expanded", "startFrom": {"kind": "founder"}},
+    )
+
+    summaries = (await auth_client.get("/api/v1/portfolios")).json()
+    assert "sections" not in summaries[0]
+    assert summaries[0]["sectionCount"] == 3
+
+    full = (await auth_client.get("/api/v1/portfolios", params={"expand": "sections"})).json()
+    assert len(full[0]["sections"]) == 3
+    assert full[0]["header"]["name"] == ""
+
+
+async def test_expand_with_an_unknown_value_is_422(auth_client):
+    response = await auth_client.get("/api/v1/portfolios", params={"expand": "everything"})
+    assert response.status_code == 422
+
+
+async def test_expand_only_returns_my_portfolios(auth_client, other_auth_client, portfolio):
+    await other_auth_client.post(
+        "/api/v1/portfolios",
+        json={"name": "T", "slug": "theirs-expand", "startFrom": {"kind": "blank"}},
+    )
+    full = (await auth_client.get("/api/v1/portfolios", params={"expand": "sections"})).json()
+    assert [row["slug"] for row in full] == ["rohan"]

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Literal
+
 from fastapi import APIRouter, Query, status
 
 from app.api.deps import CurrentUser, OwnedPortfolio, SessionDep
@@ -20,9 +22,24 @@ from app.services.portfolio import PortfolioService
 router = APIRouter(prefix="/portfolios", tags=["portfolios"], responses=ERROR_RESPONSES)
 
 
-@router.get("", response_model=list[PortfolioSummaryOut], summary="Your portfolios")
-async def list_portfolios(session: SessionDep, user: CurrentUser) -> list[PortfolioSummaryOut]:
-    return await PortfolioService(session).list_for(user)
+@router.get(
+    "",
+    response_model=None,
+    summary="Your portfolios",
+    description=(
+        "Summaries by default. Pass `expand=sections` for the full documents "
+        "— what /print and /stats need, in one request rather than one per row."
+    ),
+)
+async def list_portfolios(
+    session: SessionDep,
+    user: CurrentUser,
+    expand: Literal["sections"] | None = Query(default=None),
+) -> list[PortfolioOut] | list[PortfolioSummaryOut]:
+    service = PortfolioService(session)
+    if expand == "sections":
+        return await service.list_full_for(user)
+    return await service.list_for(user)
 
 
 # Registered before /{portfolio_id} so this literal path is not swallowed by

@@ -115,6 +115,21 @@ class PortfolioService:
 
     # ── reads ───────────────────────────────────────────────────────────
 
+    async def list_full_for(self, user: User) -> list[PortfolioOut]:
+        """Every portfolio with its sections.
+
+        /print stacks every published page and /stats labels clicks by
+        section, and both would otherwise have to fetch each portfolio
+        separately. The relationships are eager-loaded, so this is a bounded
+        number of queries rather than one per row.
+        """
+        rows = await self.session.scalars(
+            select(Portfolio)
+            .where(Portfolio.user_id == user.id)
+            .order_by(Portfolio.created_at.desc())
+        )
+        return [self.to_out(portfolio) for portfolio in rows]
+
     async def list_for(self, user: User) -> list[PortfolioSummaryOut]:
         counts = (
             select(Section.portfolio_id, func.count(Section.id).label("total"))

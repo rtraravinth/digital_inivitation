@@ -1,30 +1,50 @@
 "use client";
 
-import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { useEffect } from "react";
 import { recordView } from "@/lib/analytics";
-import { usePortfolios } from "@/lib/store";
-import { PublishedBody } from "./themes";
+import type { PublishedPrivacy } from "@/lib/published";
+import type { Portfolio } from "@/lib/types";
+import { PrivacyProvider, PublishedBody, SectionDetail } from "./themes";
 
-export function PublishedPage({ slug }: { slug: string }) {
-  const { getBySlug, ready } = usePortfolios();
-  const p = getBySlug(slug);
-  const exists = Boolean(p);
+/**
+ * The client half of a published page.
+ *
+ * The content itself is fetched and rendered on the server — this exists for
+ * the two things that genuinely need a browser: counting the visit, and the
+ * ?section= entry view.
+ */
+export function PublishedPage({
+  slug,
+  portfolio,
+  privacy,
+}: {
+  slug: string;
+  portfolio: Portfolio;
+  privacy: PublishedPrivacy;
+}) {
+  const params = useSearchParams();
+  const sectionId = params.get("section");
 
-  // A visit to a real page is one view. recordView de-dupes per page load, so
-  // StrictMode's double effect in development does not count twice.
+  // One view per page load. The server collapses repeats of the same key, so
+  // StrictMode's double effect in development does not count twice — and the
+  // owner's "count visits" switch is checked there, not here.
   useEffect(() => {
-    if (exists) recordView(slug);
-  }, [exists, slug]);
+    recordView(slug);
+  }, [slug]);
 
-  if (!p) {
-    return (
-      <div className="p-10">
-        <h2>{ready ? `No page at facet.page/${slug}` : "Loading…"}</h2>
-        {ready && <Link href="/">← Back to portfolios</Link>}
-      </div>
-    );
-  }
+  // Artboard 1d: one entry on its own page, reached from any theme's title.
+  const section = sectionId
+    ? portfolio.sections.find((s) => s.id === sectionId)
+    : undefined;
 
-  return <PublishedBody p={p} />;
+  return (
+    <PrivacyProvider value={privacy}>
+      {section ? (
+        <SectionDetail p={portfolio} section={section} />
+      ) : (
+        <PublishedBody p={portfolio} />
+      )}
+    </PrivacyProvider>
+  );
 }

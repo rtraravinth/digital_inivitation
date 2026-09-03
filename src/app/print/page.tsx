@@ -1,13 +1,13 @@
 import { Suspense } from "react";
 import { AuthGuard } from "@/components/AuthGuard";
-import { Stats } from "@/components/Stats";
+import { PrintAll } from "@/components/PrintAll";
 
-export default function StatsPage() {
+export default function PrintPage() {
   return (
-    // ?p= deep-links one page's stats, and useSearchParams needs a boundary.
+    // ?p= and ?auto= are read on the client, so this needs a boundary.
     <Suspense fallback={<div className="p-10">Loading…</div>}>
       <AuthGuard>
-        <Stats />
+        <PrintAll />
       </AuthGuard>
     </Suspense>
   );

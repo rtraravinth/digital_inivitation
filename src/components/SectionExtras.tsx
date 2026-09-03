@@ -4,7 +4,7 @@ import { useState } from "react";
 import { UploadButton } from "./UploadButton";
 import { formatBytes, readFileAsset, readImageAsset } from "@/lib/assets";
 import { newId } from "@/lib/store";
-import type { Asset, Section } from "@/lib/types";
+import { assetSrc, type Asset, type Section } from "@/lib/types";
 
 type Change = (recipe: (s: Section) => Section) => void;
 
@@ -23,7 +23,7 @@ function AssetChip({
         // A data URI out of localStorage — next/image has nothing to optimise here.
         // eslint-disable-next-line @next/next/no-img-element
         <img
-          src={asset.dataUrl}
+          src={assetSrc(asset)}
           alt={asset.name}
           className="grayscale-photo h-16 w-16 flex-none object-cover"
         />

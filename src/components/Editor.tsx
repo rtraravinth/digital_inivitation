@@ -210,7 +210,7 @@ export function Editor({ id }: { id: string }) {
     getPortfolio,
     updatePortfolio,
     updateSection,
-    addSection,
+    addBlockAsync,
     deleteSection,
     moveSection,
   } = usePortfolios();
@@ -260,8 +260,11 @@ export function Editor({ id }: { id: string }) {
   const publish = () =>
     updatePortfolio(p.id, (prev) => ({ ...prev, status: "live" }));
 
-  function addAndEdit() {
-    const added = addSection(p.id);
+  async function addAndEdit() {
+    // The server mints the id, so the new section can only be focused once
+    // it answers.
+    const added = await addBlockAsync(p.id);
+    if (!added) return;
     justAddedRef.current = added;
     setEditingId(added);
   }
@@ -292,6 +295,9 @@ export function Editor({ id }: { id: string }) {
         <span className="tag tag-neutral mr-auto">
           {p.status === "live" ? "Live" : "Saved"}
         </span>
+        <Link href={`/builder/${p.id}`} className="btn btn-secondary hidden sm:inline-flex">
+          Builder
+        </Link>
         <Link href={`/p/${p.slug}`} className="btn btn-secondary">
           Preview
         </Link>
@@ -361,6 +367,8 @@ export function Editor({ id }: { id: string }) {
           </button>
           <span className="mono-label ml-auto">
             1 header · {p.sections.length} section{p.sections.length === 1 ? "" : "s"}
+            {p.sections.some((s) => s.hidden) &&
+              ` · ${p.sections.filter((s) => s.hidden).length} hidden`}
           </span>
         </div>
 
@@ -728,7 +736,7 @@ export function Editor({ id }: { id: string }) {
               <button
                 type="button"
                 className="btn btn-primary btn-block"
-                onClick={() => setMobileOpen(addSection(p.id))}
+                onClick={async () => setMobileOpen(await addBlockAsync(p.id))}
               >
                 + Add section
               </button>

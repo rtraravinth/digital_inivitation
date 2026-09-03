@@ -99,15 +99,20 @@ def seed(
 
 @app.command()
 def routes() -> None:
-    """List every route, so the API surface can be checked at a glance."""
+    """List every route, so the API surface can be checked at a glance.
+
+    Read off the OpenAPI schema rather than walking ``app.routes``: this
+    FastAPI version nests included routers inside a wrapper object, so a flat
+    walk shows only the handful of routes declared on the app itself.
+    """
     from app.main import create_app
 
-    application = create_app()
-    for route in sorted(application.routes, key=lambda r: getattr(r, "path", "")):
-        methods = getattr(route, "methods", None)
-        path = getattr(route, "path", None)
-        if methods and path:
-            typer.echo(f"{','.join(sorted(methods - {'HEAD'})):22} {path}")
+    schema = create_app().openapi()
+    for path, operations in sorted(schema["paths"].items()):
+        for method in sorted(operations):
+            typer.echo(f"{method.upper():7} {path}")
+
+    typer.echo(f"\n{sum(len(ops) for ops in schema['paths'].values())} operations")
 
 
 if __name__ == "__main__":

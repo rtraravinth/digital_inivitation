@@ -10,6 +10,7 @@ from app.api.v1 import (
     portfolios,
     publish,
     sections,
+    transfer,
 )
 
 api_router = APIRouter(prefix="/api/v1")
@@ -21,3 +22,4 @@ api_router.include_router(sections.router)
 api_router.include_router(assets.router)
 api_router.include_router(publish.router)
 api_router.include_router(analytics.router)
+api_router.include_router(transfer.router)

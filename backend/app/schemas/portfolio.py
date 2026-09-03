@@ -24,10 +24,14 @@ from app.schemas.asset import AssetOut
 from app.schemas.common import CamelModel, StrictCamelModel
 from app.schemas.section import SectionOut
 
-#: Lowercase, digits and hyphens; must start and end alphanumeric. The address
-#: is facet.page/<slug>, so it has to survive being typed and read aloud.
-SLUG_PATTERN = r"^[a-z0-9][a-z0-9-]{0,62}[a-z0-9]$"
-SlugField = Annotated[str, Field(pattern=SLUG_PATTERN, min_length=2, max_length=64)]
+#: Lowercase, digits and hyphens, in one or more "/"-separated segments; each
+#: segment starts and ends alphanumeric. The address is facet.page/<slug>, so
+#: it has to survive being typed and read aloud — and it is nested, because
+#: the published route is a catch-all and the seeded pages use
+#: "rohan/investors" style addresses for role-specific versions of a page.
+_SEGMENT = r"[a-z0-9](?:[a-z0-9-]*[a-z0-9])?"
+SLUG_PATTERN = rf"^{_SEGMENT}(?:/{_SEGMENT})*$"
+SlugField = Annotated[str, Field(pattern=SLUG_PATTERN, min_length=2, max_length=120)]
 
 #: Any CSS colour the swatch row can produce.
 ACCENT_PATTERN = r"^#[0-9a-fA-F]{6}$"

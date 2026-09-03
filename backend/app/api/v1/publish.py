@@ -57,7 +57,7 @@ async def _load_published(session: SessionDep, slug: str) -> tuple[Portfolio, di
 
 
 @router.get(
-    "/p/{slug}",
+    "/p/{slug:path}",
     response_model=PublicPortfolioOut,
     summary="Read a published page",
 )
@@ -97,7 +97,7 @@ async def read_published(slug: str, session: SessionDep, response: Response):
 
 
 @router.post(
-    "/p/{slug}/views",
+    "/p/{slug:path}/views",
     status_code=status.HTTP_202_ACCEPTED,
     summary="Record a page view",
 )
@@ -114,7 +114,7 @@ async def record_view(
 
 
 @router.post(
-    "/p/{slug}/clicks",
+    "/p/{slug:path}/clicks",
     status_code=status.HTTP_202_ACCEPTED,
     summary="Record a click on a section link",
 )

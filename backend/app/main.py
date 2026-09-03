@@ -7,17 +7,15 @@ portfolio is.
 from __future__ import annotations
 
 import logging
-import time
-from collections.abc import Awaitable, Callable
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, Request, Response
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import get_settings
 from app.core.errors import install_error_handlers
-from app.core.ids import new_request_id, request_id_var
 from app.core.logging import configure_logging
+from app.core.middleware import RequestContextMiddleware
 
 logger = logging.getLogger("app.request")
 
@@ -65,33 +63,7 @@ def create_app() -> FastAPI:
         openapi_url=None if settings.is_prod else "/openapi.json",
     )
 
-    @app.middleware("http")
-    async def request_context(
-        request: Request, call_next: Callable[[Request], Awaitable[Response]]
-    ) -> Response:
-        request_id = request.headers.get("X-Request-ID") or new_request_id()
-        token = request_id_var.set(request_id)
-        started = time.perf_counter()
-        try:
-            response = await call_next(request)
-        finally:
-            request_id_var.reset(token)
-        response.headers["X-Request-ID"] = request_id
-        logger.info(
-            "%s %s %s",
-            request.method,
-            request.url.path,
-            response.status_code,
-            extra={
-                "method": request.method,
-                "path": request.url.path,
-                "status": response.status_code,
-                "duration_ms": round((time.perf_counter() - started) * 1000, 2),
-                "request_id": request_id,
-            },
-        )
-        return response
-
+    app.add_middleware(RequestContextMiddleware)
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_origins,

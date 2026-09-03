@@ -68,7 +68,8 @@ class Portfolio(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     )
     name: Mapped[str] = mapped_column(String(200), nullable=False)
     # Global, because the address is facet.page/<slug> with nothing in front.
-    slug: Mapped[str] = mapped_column(String(64), unique=True, nullable=False, index=True)
+    # Nested ("rohan/investors") is normal: the published route is a catch-all.
+    slug: Mapped[str] = mapped_column(String(120), unique=True, nullable=False, index=True)
     status: Mapped[str] = mapped_column(String(16), nullable=False, default="empty")
     summary: Mapped[str] = mapped_column(Text, nullable=False, default="")
 

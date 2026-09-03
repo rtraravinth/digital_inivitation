@@ -248,6 +248,7 @@ class PortfolioService:
         if patch.links is not None:
             header.links = [link.model_dump(by_alias=True) for link in patch.links]
 
+        portrait_changed = patch.clear_portrait or patch.portrait_asset_id is not None
         if patch.clear_portrait:
             header.portrait_asset_id = None
         elif patch.portrait_asset_id is not None:
@@ -255,6 +256,13 @@ class PortfolioService:
             header.portrait_asset_id = patch.portrait_asset_id
 
         await self._touch(portfolio)
+
+        if portrait_changed:
+            # The relationship was loaded before the foreign key changed.
+            # Reload it here, where awaiting is allowed — reading it during
+            # response serialisation would lazy-load outside the greenlet.
+            await self.session.refresh(header, ["portrait"])
+
         return portfolio
 
     async def _assert_owns_asset(self, user_id: uuid.UUID, asset_id: uuid.UUID) -> Asset:

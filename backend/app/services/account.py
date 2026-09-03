@@ -83,6 +83,7 @@ class AccountService:
         if patch.links is not None:
             profile.links = [link.model_dump(by_alias=True) for link in patch.links]
 
+        portrait_changed = patch.clear_portrait or patch.portrait_asset_id is not None
         if patch.clear_portrait:
             profile.portrait_asset_id = None
         elif patch.portrait_asset_id is not None:
@@ -90,7 +91,9 @@ class AccountService:
             profile.portrait_asset_id = patch.portrait_asset_id
 
         await self.session.flush()
-        await self.session.refresh(profile)
+        # Reload the relationship here rather than letting it lazy-load during
+        # response serialisation, where awaiting is not possible.
+        await self.session.refresh(profile, ["portrait"] if portrait_changed else None)
         return await self.get(user)
 
     async def _assert_handle_free(self, handle: str, user_id: uuid.UUID) -> None:

@@ -17,11 +17,13 @@ import json
 from pathlib import Path
 
 import typer
+from pydantic import ValidationError
 from sqlalchemy import select
 
 from app.core.security import hash_password
 from app.db.session import dispose_engine, get_sessionmaker
 from app.models import AccountProfile, AccountSettings, User
+from app.schemas.auth import RegisterRequest
 from app.services.transfer import TransferService
 
 app = typer.Typer(help="FACET backend development commands.", no_args_is_help=True)
@@ -62,6 +64,14 @@ def create_user(
     """Create an account without going through the API."""
     if len(password) < 12:
         raise typer.BadParameter("Use at least 12 characters.")
+
+    # Validate exactly as the API does, or this can mint an account that
+    # cannot sign in — a reserved TLD like .test gets past a naive check and
+    # is then refused at login.
+    try:
+        email = str(RegisterRequest(email=email, password=password, name=name).email)
+    except ValidationError as exc:
+        raise typer.BadParameter(exc.errors()[0]["msg"]) from exc
 
     user_id = _run(_create_user(email, password, name))
     typer.echo(f"created {email} ({user_id})")

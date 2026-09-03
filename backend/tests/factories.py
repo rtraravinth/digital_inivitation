@@ -64,6 +64,37 @@ async def other_auth_client(app) -> AsyncIterator[AsyncClient]:
 
 
 @pytest.fixture
+async def portfolio(auth_client: AsyncClient) -> dict:
+    """A blank portfolio, as the create dialog's first option makes it."""
+    response = await auth_client.post(
+        "/api/v1/portfolios",
+        json={"name": "Rohan Mehta", "slug": "rohan", "startFrom": {"kind": "blank"}},
+    )
+    assert response.status_code == 201, response.text
+    return response.json()
+
+
+@pytest.fixture
+async def three_sections(auth_client: AsyncClient, portfolio: dict) -> tuple[str, list[str]]:
+    """A portfolio with exactly three sections, in a known order."""
+    ids = [portfolio["sections"][0]["id"]]
+    for _ in range(2):
+        response = await auth_client.post(
+            f"/api/v1/portfolios/{portfolio['id']}/sections", json={}
+        )
+        assert response.status_code == 201, response.text
+        ids.append(response.json()["id"])
+    return portfolio["id"], ids
+
+
+@pytest.fixture
+async def published(auth_client: AsyncClient, portfolio: dict) -> dict:
+    response = await auth_client.post(f"/api/v1/portfolios/{portfolio['id']}/publish")
+    assert response.status_code == 200, response.text
+    return response.json()
+
+
+@pytest.fixture
 async def second_login(app, registered: dict) -> AsyncIterator[AsyncClient]:
     """The *same* user signed in again from another device."""
     transport = ASGITransport(app=app)

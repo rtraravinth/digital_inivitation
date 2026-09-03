@@ -25,7 +25,7 @@ from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.pool import NullPool
 
-from tests.factories import *  # noqa: F401,F403 - fixture registration
+from tests.factories import *  # noqa: F403 - fixture registration
 
 TEST_PASSWORD = "correct horse battery"
 
@@ -92,8 +92,9 @@ def _drop_database(maintenance_url: str, name: str) -> None:
 
 
 def _run_migrations() -> None:
-    from alembic import command
     from alembic.config import Config
+
+    from alembic import command
 
     backend_dir = Path(__file__).resolve().parents[1]
     config = Config(str(backend_dir / "alembic.ini"))

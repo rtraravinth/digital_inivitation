@@ -305,7 +305,14 @@ class AuthService:
         secret = user.settings.two_step_secret
         candidate = code.strip().upper().replace(" ", "")
 
-        if secret and candidate.isdigit() and pyotp.TOTP(secret).verify(code.strip(), valid_window=1):
+        # valid_window=1 tolerates one 30-second step of clock skew between
+        # the server and the authenticator app.
+        totp_ok = (
+            secret is not None
+            and candidate.isdigit()
+            and pyotp.TOTP(secret).verify(code.strip(), valid_window=1)
+        )
+        if totp_ok:
             return True
 
         return await self._consume_recovery_code(user, candidate)

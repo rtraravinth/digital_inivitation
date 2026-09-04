@@ -19,7 +19,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.errors import NotFound, PayloadTooLarge, UnsupportedMedia
-from app.models import Asset, User
+from app.models import AccountProfile, Asset, PortfolioHeader, Section, User
 from app.models.enums import AssetKind
 from app.services.storage import build_key, get_storage
 
@@ -34,6 +34,15 @@ FILE_MAX_BYTES = 800 * 1024
 UPLOAD_HARD_CAP = 15 * 1024 * 1024
 
 JPEG_QUALITY_STEPS = (82, 72, 60, 48, 36, 25)
+
+#: Every column that can point at an upload. An asset reachable from none
+#: of these is unreachable, full stop — there is no other reference.
+ASSET_REFERENCES = (
+    AccountProfile.portrait_asset_id,
+    PortfolioHeader.portrait_asset_id,
+    Section.image_asset_id,
+    Section.file_asset_id,
+)
 
 #: Non-image types worth attaching to a section — a PDF one-pager, mostly.
 FILE_SIGNATURES: tuple[tuple[bytes, str, str], ...] = (
@@ -235,7 +244,37 @@ class AssetService:
         return asset
 
     async def delete(self, user: User, asset_id) -> None:
-        asset = await self.get_owned(user, asset_id)
+        await self._drop(await self.get_owned(user, asset_id))
+
+    async def release(self, asset_id) -> None:
+        """Drop an upload that has just lost its last reference.
+
+        Called with the id a row *used* to hold, after the row has been
+        pointed somewhere else. Replacing a portrait or clearing a section
+        image would otherwise leave the old row and its bytes behind with
+        nothing able to reach them: the API has a delete endpoint, but the
+        editor has no "manage uploads" screen to call it from.
+
+        Only ever an id that was attached, never a sweep of everything
+        unreferenced — an upload lives unattached between ``POST /assets``
+        and the PATCH that attaches it, and a sweep would collect it there.
+        """
+        if asset_id is None:
+            return
+
+        # The caller has just reassigned the column; autoflush is off, so the
+        # reference check below would still see the old value without this.
+        await self.session.flush()
+
+        for column in ASSET_REFERENCES:
+            if await self.session.scalar(select(column).where(column == asset_id).limit(1)):
+                return
+
+        asset = await self.session.get(Asset, asset_id)
+        if asset is not None:
+            await self._drop(asset)
+
+    async def _drop(self, asset: Asset) -> None:
         key = asset.storage_key
 
         await self.session.delete(asset)

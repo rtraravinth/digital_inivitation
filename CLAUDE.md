@@ -20,7 +20,7 @@ npm run dev                                                          # :3000
 ```
 npm run build
 npm run lint
-cd backend && .venv/Scripts/python -m pytest    # 196 tests
+cd backend && .venv/Scripts/python -m pytest    # 208 tests
 ```
 
 `NEXT_PUBLIC_API_URL` points the frontend at the API; see
@@ -199,6 +199,6 @@ a signed-in one had their own settings applied to somebody else's page.
 - **Slugs are global.** Two accounts cannot both hold `rohan`, because the
   address is `facet.page/<slug>` with nothing in front of it. The create
   dialog surfaces the 409 as a message.
-- **The frontend has no test runner.** The backend has 196 pytest tests;
+- **The frontend has no test runner.** The backend has 208 pytest tests;
   changes here are checked with `npm run lint`, `npm run build` and by
   actually opening the app.

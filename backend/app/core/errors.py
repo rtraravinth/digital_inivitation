@@ -110,6 +110,61 @@ _HTTP_CODES = {
 }
 
 
+#: Pydantic writes for developers — "value is not a valid email address: An
+#: email address must have an @-sign." The UI shows these strings to a person,
+#: next to the field, so they have to read like the rest of the envelope's
+#: messages. Anything not covered falls through to pydantic's own text, which
+#: is more use than a generic sentence that says nothing about what is wrong.
+_FIELD_MESSAGES: dict[str, str] = {
+    "missing": "This is required.",
+    "extra_forbidden": "That is not a field this accepts.",
+    "string_type": "This has to be text.",
+    "bool_type": "This has to be true or false.",
+    "int_type": "This has to be a whole number.",
+    "int_parsing": "This has to be a whole number.",
+    "float_parsing": "This has to be a number.",
+    "uuid_parsing": "That is not a valid id.",
+    "uuid_type": "That is not a valid id.",
+    "datetime_parsing": "That is not a valid date.",
+    "list_type": "This has to be a list.",
+    "dict_type": "This has to be an object.",
+    "model_attributes_type": "This has to be an object.",
+    "json_invalid": "That is not valid JSON.",
+    "string_pattern_mismatch": "That format is not allowed.",
+}
+
+
+def _field_message(error: dict[str, Any]) -> str:
+    """Pydantic's complaint, in the register the rest of the API answers in."""
+    kind = str(error.get("type", ""))
+    if kind in _FIELD_MESSAGES:
+        return _FIELD_MESSAGES[kind]
+
+    ctx = error.get("ctx") or {}
+    match kind:
+        case "string_too_short":
+            return f"Use at least {ctx.get('min_length')} characters."
+        case "string_too_long":
+            return f"Use at most {ctx.get('max_length')} characters."
+        case "too_short":
+            return f"Give at least {ctx.get('min_length')}."
+        case "too_long":
+            return f"Give at most {ctx.get('max_length')}."
+        case "greater_than_equal":
+            return f"This has to be {ctx.get('ge')} or more."
+        case "less_than_equal":
+            return f"This has to be {ctx.get('le')} or less."
+        case "literal_error":
+            return f"Pick one of: {ctx.get('expected')}."
+
+    message = str(error.get("msg", "That value is not valid."))
+    if message.startswith("value is not a valid email address"):
+        return "Enter an email address in the form name@example.com."
+    # A validator in app/schemas writes its own wording, and it is already
+    # written for a person. Keep it, without the prefix pydantic adds.
+    return message.removeprefix("Value error, ")
+
+
 def _render(error: AppError) -> JSONResponse:
     response = JSONResponse(status_code=error.status_code, content=error.envelope())
     if error.status_code == 401:
@@ -132,7 +187,7 @@ def install_error_handlers(app: FastAPI) -> None:
                 # Drop the "body"/"query" prefix: the client knows where it
                 # put the value, it needs the path within it.
                 "field": ".".join(str(part) for part in error["loc"][1:]) or "body",
-                "message": error["msg"],
+                "message": _field_message(error),
                 "type": error["type"],
             }
             for error in exc.errors()

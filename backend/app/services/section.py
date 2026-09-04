@@ -15,6 +15,7 @@ from app.core.errors import NotFound, ValidationFailed
 from app.models import Asset, Portfolio, Section
 from app.models.enums import BlockKind
 from app.schemas.section import SectionOrder, SectionPatch
+from app.services.asset import AssetService
 
 #: The add-block picker's starting titles, matching KIND_TITLE in
 #: src/lib/store.tsx. A kind only chooses the glyph and this first line —
@@ -100,8 +101,11 @@ class SectionService:
         asset_id: uuid.UUID | None,
         clear: bool,
     ) -> None:
+        replaced = getattr(section, field)
+
         if clear:
             setattr(section, field, None)
+            await AssetService(self.session).release(replaced)
             return
         if asset_id is None:
             return
@@ -113,6 +117,8 @@ class SectionService:
             # Another user's asset id is "not found", never "forbidden".
             raise NotFound("That upload does not exist.", code="asset_not_found")
         setattr(section, field, asset_id)
+        if replaced is not None and replaced != asset_id:
+            await AssetService(self.session).release(replaced)
 
     async def delete(self, portfolio: Portfolio, section_id: uuid.UUID) -> None:
         section = await self.get(portfolio, section_id)

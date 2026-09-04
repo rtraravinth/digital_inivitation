@@ -21,6 +21,7 @@ from app.schemas.account import (
     SecurityPatch,
 )
 from app.schemas.asset import asset_out
+from app.services.asset import AssetService
 
 
 class AccountService:
@@ -84,6 +85,7 @@ class AccountService:
             profile.links = [link.model_dump(by_alias=True) for link in patch.links]
 
         portrait_changed = patch.clear_portrait or patch.portrait_asset_id is not None
+        replaced = profile.portrait_asset_id if portrait_changed else None
         if patch.clear_portrait:
             profile.portrait_asset_id = None
         elif patch.portrait_asset_id is not None:
@@ -91,6 +93,8 @@ class AccountService:
             profile.portrait_asset_id = patch.portrait_asset_id
 
         await self.session.flush()
+        if replaced is not None and replaced != profile.portrait_asset_id:
+            await AssetService(self.session).release(replaced)
         # Reload the relationship here rather than letting it lazy-load during
         # response serialisation, where awaiting is not possible.
         await self.session.refresh(profile, ["portrait"] if portrait_changed else None)

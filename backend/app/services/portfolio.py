@@ -22,6 +22,7 @@ from app.schemas.portfolio import (
     PortfolioSummaryOut,
 )
 from app.schemas.section import SectionOut
+from app.services.asset import AssetService
 
 #: The third option in the create dialog, matching FOUNDER_TEMPLATE in
 #: src/lib/store.tsx.
@@ -264,6 +265,7 @@ class PortfolioService:
             header.links = [link.model_dump(by_alias=True) for link in patch.links]
 
         portrait_changed = patch.clear_portrait or patch.portrait_asset_id is not None
+        replaced = header.portrait_asset_id if portrait_changed else None
         if patch.clear_portrait:
             header.portrait_asset_id = None
         elif patch.portrait_asset_id is not None:
@@ -271,6 +273,8 @@ class PortfolioService:
             header.portrait_asset_id = patch.portrait_asset_id
 
         await self._touch(portfolio)
+        if replaced is not None and replaced != header.portrait_asset_id:
+            await AssetService(self.session).release(replaced)
 
         if portrait_changed:
             # The relationship was loaded before the foreign key changed.

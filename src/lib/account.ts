@@ -2,7 +2,18 @@
 
 import { useSyncExternalStore } from "react";
 import { ApiError, api, messageFor } from "./api";
-import { defaultAccount, type AccountSettings } from "./types";
+import { defaultAccount, type AccountProfile, type AccountSettings } from "./types";
+
+/**
+ * What the API actually sends, as opposed to what the UI holds.
+ *
+ * The two are the same shape but for `handle`: the API sends null until the
+ * account has one, while every reader here wants a string. Declaring that
+ * difference is what stops the null being spread in unnoticed — see adopt().
+ */
+type AccountPayload = Partial<Omit<AccountSettings, "profile">> & {
+  profile?: Partial<Omit<AccountProfile, "handle">> & { handle?: string | null };
+};
 
 /* ══════════════════════════════════════════════════════════════════════════
    The same external-store shape as lib/store.tsx, for the same reason.
@@ -29,11 +40,19 @@ function notify() {
   for (const listener of listeners) listener();
 }
 
-/** The API's shape is the UI's shape, so this is a merge, not a translation. */
-function adopt(payload: Partial<AccountSettings>) {
+/**
+ * The API's shape is the UI's shape, so this is a merge, not a translation —
+ * with one exception. `handle` is `string | null` on the wire and empty-string
+ * here, because an account that has never set one sends null: spreading that
+ * straight in would put null into a controlled `<input value>`, which React
+ * turns into an uncontrolled field, and would throw the first time anything
+ * called `handle.trim()`. Coerce it once, here, rather than in every reader.
+ */
+function adopt(payload: AccountPayload) {
   const base = defaultAccount();
+  const profile = { ...base.profile, ...(payload.profile ?? {}) };
   state = {
-    profile: { ...base.profile, ...(payload.profile ?? {}) },
+    profile: { ...profile, handle: profile.handle ?? "" },
     security: { ...base.security, ...(payload.security ?? {}) },
     plan: payload.plan ?? base.plan,
     customDomain: payload.customDomain ?? base.customDomain,
@@ -47,7 +66,7 @@ let loadStarted = false;
 
 async function load() {
   try {
-    adopt(await api.get<Partial<AccountSettings>>("/account"));
+    adopt(await api.get<AccountPayload>("/account"));
     syncError = null;
   } catch (error) {
     if (!(error instanceof ApiError && error.status === 401)) {
@@ -83,7 +102,7 @@ const notReady = () => false;
  */
 async function save(
   optimistic: Partial<AccountSettings>,
-  request: () => Promise<Partial<AccountSettings>>,
+  request: () => Promise<AccountPayload>,
 ) {
   const previous = state;
   syncError = null;
@@ -108,7 +127,7 @@ type Security = AccountSettings["security"];
 
 export async function updateProfile(patch: Partial<Profile>) {
   await save({ profile: { ...state.profile, ...patch } }, () =>
-    api.patch<AccountSettings>("/account/profile", {
+    api.patch<AccountPayload>("/account/profile", {
       name: patch.name,
       handle: patch.handle || undefined,
       current: patch.current,
@@ -126,17 +145,17 @@ export async function updateProfile(patch: Partial<Profile>) {
 
 export async function updateSecurity(patch: { phone?: string; google?: boolean }) {
   await save({ security: { ...state.security, ...patch } as Security }, () =>
-    api.patch<AccountSettings>("/account/security", patch),
+    api.patch<AccountPayload>("/account/security", patch),
   );
 }
 
 export async function setPlan(plan: AccountSettings["plan"]) {
-  await save({ plan }, () => api.patch<AccountSettings>("/account/plan", { plan }));
+  await save({ plan }, () => api.patch<AccountPayload>("/account/plan", { plan }));
 }
 
 export async function setCustomDomain(customDomain: string) {
   await save({ customDomain }, () =>
-    api.patch<AccountSettings>("/account/domain", { customDomain }),
+    api.patch<AccountPayload>("/account/domain", { customDomain }),
   );
 }
 
@@ -144,13 +163,13 @@ export async function updateNotifications(
   patch: Partial<AccountSettings["notifications"]>,
 ) {
   await save({ notifications: { ...state.notifications, ...patch } }, () =>
-    api.patch<AccountSettings>("/account/notifications", patch),
+    api.patch<AccountPayload>("/account/notifications", patch),
   );
 }
 
 export async function updatePrivacy(patch: Partial<AccountSettings["privacy"]>) {
   await save({ privacy: { ...state.privacy, ...patch } }, () =>
-    api.patch<AccountSettings>("/account/privacy", patch),
+    api.patch<AccountPayload>("/account/privacy", patch),
   );
 }
 

@@ -36,6 +36,42 @@ async def test_validation_failure_names_the_field(client):
     assert "password" in fields
 
 
+async def test_field_messages_are_written_for_a_person(client):
+    """The UI prints these next to the field, so they cannot be pydantic's.
+
+    "value is not a valid email address: An email address must have an
+    @-sign." is a developer's sentence; the envelope promises a person's.
+    """
+    response = await client.post("/api/v1/auth/register", json={"email": "not-an-email"})
+    messages = {item["field"]: item["message"] for item in response.json()["error"]["details"]["fields"]}
+
+    assert messages["email"] == "Enter an email address in the form name@example.com."
+    assert messages["password"] == "This is required."
+    for message in messages.values():
+        assert not message.startswith("value is not")
+        assert not message.startswith("Value error,")
+
+
+async def test_an_unknown_field_says_so_plainly(auth_client, portfolio):
+    response = await auth_client.patch(
+        f"/api/v1/portfolios/{portfolio['id']}/header", json={"role": "Tester"}
+    )
+    assert response.status_code == 422
+    message = response.json()["error"]["details"]["fields"][0]["message"]
+    assert message == "That is not a field this accepts."
+
+
+async def test_a_validator_keeps_its_own_wording(auth_client):
+    """Messages written in app/schemas are already for a person — keep them."""
+    response = await auth_client.post(
+        "/api/v1/portfolios", json={"name": "X", "slug": "Not A Slug!", "startFrom": {"kind": "blank"}}
+    )
+    assert response.status_code == 422
+    message = response.json()["error"]["details"]["fields"][0]["message"]
+    assert not message.startswith("Value error,")
+    assert message
+
+
 async def test_a_401_carries_the_authenticate_header(client):
     response = await client.get("/api/v1/auth/sessions")
     assert response.status_code == 401

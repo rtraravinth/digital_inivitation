@@ -11,6 +11,7 @@ import uuid
 from fastapi import APIRouter, status
 
 from app.api.deps import OwnedPortfolio, SessionDep
+from app.api.route import TransactionRoute
 from app.schemas.common import ERROR_RESPONSES
 from app.schemas.portfolio import PortfolioOut
 from app.schemas.section import (
@@ -24,7 +25,10 @@ from app.services.portfolio import PortfolioService, section_out
 from app.services.section import SectionService
 
 router = APIRouter(
-    prefix="/portfolios/{portfolio_id}/sections", tags=["sections"], responses=ERROR_RESPONSES
+    prefix="/portfolios/{portfolio_id}/sections",
+    tags=["sections"],
+    responses=ERROR_RESPONSES,
+    route_class=TransactionRoute,
 )
 
 

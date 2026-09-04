@@ -5,11 +5,17 @@ from __future__ import annotations
 from fastapi import APIRouter, Query, status
 
 from app.api.deps import CurrentUser, SessionDep
+from app.api.route import TransactionRoute
 from app.schemas.analytics import SummaryOut
 from app.schemas.common import ERROR_RESPONSES
 from app.services.analytics import AnalyticsService
 
-router = APIRouter(prefix="/analytics", tags=["analytics"], responses=ERROR_RESPONSES)
+router = APIRouter(
+    prefix="/analytics",
+    tags=["analytics"],
+    responses=ERROR_RESPONSES,
+    route_class=TransactionRoute,
+)
 
 
 @router.get(

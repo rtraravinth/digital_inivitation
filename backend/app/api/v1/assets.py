@@ -8,6 +8,7 @@ from fastapi import APIRouter, File, Form, UploadFile, status
 from fastapi.responses import FileResponse, Response
 
 from app.api.deps import CurrentUser, SessionDep
+from app.api.route import TransactionRoute
 from app.core.errors import NotFound
 from app.models import Asset
 from app.models.enums import AssetKind
@@ -16,7 +17,12 @@ from app.schemas.common import ERROR_RESPONSES
 from app.services.asset import AssetService
 from app.services.storage import get_storage
 
-router = APIRouter(prefix="/assets", tags=["assets"], responses=ERROR_RESPONSES)
+router = APIRouter(
+    prefix="/assets",
+    tags=["assets"],
+    responses=ERROR_RESPONSES,
+    route_class=TransactionRoute,
+)
 
 
 @router.post(

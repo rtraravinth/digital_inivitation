@@ -14,6 +14,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
 from app.api.deps import SessionDep
+from app.api.route import TransactionRoute
 from app.api.v1.assets import serve
 from app.core.errors import NotFound
 from app.models import AccountSettings, Asset, Portfolio, PortfolioHeader, Section
@@ -27,7 +28,12 @@ from app.schemas.publish import (
 from app.services.analytics import AnalyticsService
 from app.services.portfolio import header_out, section_out
 
-router = APIRouter(prefix="/public", tags=["public"], responses=ERROR_RESPONSES)
+router = APIRouter(
+    prefix="/public",
+    tags=["public"],
+    responses=ERROR_RESPONSES,
+    route_class=TransactionRoute,
+)
 
 
 async def _load_published(session: SessionDep, slug: str) -> tuple[Portfolio, dict]:

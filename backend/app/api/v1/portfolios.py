@@ -7,6 +7,7 @@ from typing import Literal
 from fastapi import APIRouter, Query, status
 
 from app.api.deps import CurrentUser, OwnedPortfolio, SessionDep
+from app.api.route import TransactionRoute
 from app.schemas.common import ERROR_RESPONSES
 from app.schemas.portfolio import (
     HeaderPatch,
@@ -19,7 +20,12 @@ from app.schemas.portfolio import (
 )
 from app.services.portfolio import PortfolioService
 
-router = APIRouter(prefix="/portfolios", tags=["portfolios"], responses=ERROR_RESPONSES)
+router = APIRouter(
+    prefix="/portfolios",
+    tags=["portfolios"],
+    responses=ERROR_RESPONSES,
+    route_class=TransactionRoute,
+)
 
 
 @router.get(

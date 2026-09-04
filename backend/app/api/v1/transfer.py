@@ -7,11 +7,14 @@ from typing import Any
 from fastapi import APIRouter
 
 from app.api.deps import CurrentUser, SessionDep
+from app.api.route import TransactionRoute
 from app.schemas.common import ERROR_RESPONSES
 from app.schemas.transfer import ImportRequest, ImportResultOut
 from app.services.transfer import TransferService
 
-router = APIRouter(tags=["transfer"], responses=ERROR_RESPONSES)
+router = APIRouter(
+    tags=["transfer"], responses=ERROR_RESPONSES, route_class=TransactionRoute
+)
 
 
 @router.get(

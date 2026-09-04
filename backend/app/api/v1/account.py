@@ -11,6 +11,7 @@ from __future__ import annotations
 from fastapi import APIRouter, status
 
 from app.api.deps import CurrentUser, SessionDep
+from app.api.route import TransactionRoute
 from app.schemas.account import (
     AccountOut,
     DomainPatch,
@@ -24,7 +25,9 @@ from app.schemas.common import ERROR_RESPONSES
 from app.services.account import AccountService
 from app.services.storage import get_storage
 
-router = APIRouter(tags=["account"], responses=ERROR_RESPONSES)
+router = APIRouter(
+    tags=["account"], responses=ERROR_RESPONSES, route_class=TransactionRoute
+)
 
 
 @router.get("/account", response_model=AccountOut, summary="Everything on /account")

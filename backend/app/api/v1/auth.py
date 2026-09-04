@@ -13,6 +13,7 @@ from app.api.deps import (
     DeviceDep,
     SessionDep,
 )
+from app.api.route import TransactionRoute
 from app.core.config import get_settings
 from app.core.errors import Unauthenticated
 from app.models import User
@@ -33,7 +34,9 @@ from app.schemas.auth import (
 from app.schemas.common import ERROR_RESPONSES
 from app.services.auth import AuthService, IssuedTokens
 
-router = APIRouter(prefix="/auth", tags=["auth"], responses=ERROR_RESPONSES)
+router = APIRouter(
+    prefix="/auth", tags=["auth"], responses=ERROR_RESPONSES, route_class=TransactionRoute
+)
 
 
 def _set_refresh_cookie(response: Response, token: str) -> None:

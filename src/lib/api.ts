@@ -63,6 +63,17 @@ export function onUnauthenticated(handler: () => void) {
 /** Codes that mean "try refreshing", as opposed to "you are not allowed". */
 const RETRYABLE = new Set(["token_expired", "invalid_token", "session_revoked"]);
 
+/**
+ * Codes where the 401 is about credentials *in the request*, not the session
+ * carrying it. Changing your password with the wrong current one answers 401
+ * `invalid_credentials` while your session is perfectly valid — treating that
+ * as "you are signed out" threw the user to /signin over a typo.
+ *
+ * Anything not listed here still signs out, which is the safe default: an
+ * unrecognised 401 is more likely to be a dead session than a bad field.
+ */
+const CREDENTIAL_ERRORS = new Set(["invalid_credentials"]);
+
 async function toApiError(response: Response): Promise<ApiError> {
   const requestId = response.headers.get("X-Request-ID") ?? "";
   try {
@@ -124,6 +135,10 @@ async function request<T>(method: string, path: string, init: RequestInit = {}):
 
   if (response.status === 401) {
     const error = await toApiError(response.clone());
+    if (CREDENTIAL_ERRORS.has(error.code)) {
+      // The session is fine; the caller shows this next to the field.
+      throw error;
+    }
     if (RETRYABLE.has(error.code) && (await refreshSession())) {
       response = await send(path, { ...init, method });
     } else {

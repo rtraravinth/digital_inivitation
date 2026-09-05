@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { GROUPS, groupFlag, type GroupId } from "./account/panels";
 import { useAccount } from "@/lib/account";
+import { signOut } from "@/lib/session";
 import { useAnalytics } from "@/lib/analytics";
 import { usePortfolios } from "@/lib/store";
 import { PLANS,
@@ -36,7 +37,6 @@ export function Account() {
         <Link href="/account" aria-current="page">
           Account
         </Link>
-        <span className="tag tag-neutral ml-auto">{planName} plan</span>
       </div>
 
       {storageError && (
@@ -52,7 +52,19 @@ export function Account() {
       {/* ══ desktop — rail beside one panel ═════════════════════════ */}
       <div className="hidden lg:block">
         <div className="border-divider border-b-2 px-10 pb-6 pt-7">
-          <h1 className="mb-2 text-[38px]">Account</h1>
+          {/* The plan sits with the heading, not in the nav: an `ml-auto` tag
+              there met .nav-brand's own `margin-right: auto` and the pair of
+              them split the free space, centring the links — which no other
+              page does. */}
+          <div className="mb-2 flex flex-wrap items-center gap-3">
+            <h1 className="m-0 text-[38px]">Account</h1>
+            {/* Outlined rather than filled: the accent fill is what a primary
+                action looks like here, and this is a label, not a button. The
+                2px rule is the one the dividers use. */}
+            <span className="tag tag-outline font-heading border-2 text-[10px] font-extrabold uppercase tracking-[0.08em]">
+              {planName} plan
+            </span>
+          </div>
           <p className="text-neutral-700 m-0 max-w-[56ch] text-[15px]">
             Who you are, how people reach your pages, and what this build can and
             cannot actually do. Anything about one portfolio lives in that
@@ -102,6 +114,19 @@ export function Account() {
                 </button>
               );
             })}
+
+            {/* Ending your own session. Every control in the device table
+                signs out somebody else — your own row is "This device" — so
+                without this there is no way to sign yourself out at all. */}
+            <div className="p-4">
+              <button
+                type="button"
+                className="btn btn-secondary btn-block"
+                onClick={() => void signOut()}
+              >
+                Sign out
+              </button>
+            </div>
           </div>
 
           <div>
@@ -199,17 +224,20 @@ export function Account() {
               );
             })}
 
-            {/* The canvas puts Sign out here. There is no session to end, and
-                a button that looks like it works would be the one thing worse
-                than not drawing it — so it is present and plainly inert. */}
+            {/* Real since the API arrived. It was drawn inert when there was
+                no session to end; leaving it that way — and leaving the copy
+                claiming this build has no accounts — outlasted the truth. */}
             <div className="p-4">
-              <button type="button" className="btn btn-secondary btn-block" disabled>
+              <button
+                type="button"
+                className="btn btn-secondary btn-block"
+                onClick={() => void signOut()}
+              >
                 Sign out
               </button>
               <p className="text-neutral-700 m-0 mt-2 text-[11px]">
-                Nothing to sign out of — this build has no accounts and no server.
-                Your pages live in this browser. Use{" "}
-                <strong>Privacy &amp; data</strong> to export or erase them.
+                Ends this device&rsquo;s session straight away. Your pages stay on
+                your account — sign back in from anywhere to reach them.
               </p>
             </div>
 

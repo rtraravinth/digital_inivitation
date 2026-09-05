@@ -348,6 +348,10 @@ export function emptySection(id: string): Section {
  * server this build doesn't have — see NEEDS_SERVER below and the notice the
  * Account page renders. It is stored, and honest about what it can't do.
  */
+/** Mirrors PASSWORD_MIN in backend/app/schemas/auth.py. The server is what
+ * enforces it; this is so the UI can say so before the round trip. */
+export const PASSWORD_MIN = 12;
+
 export type AccountProfile = {
   name: string;
   handle: string;

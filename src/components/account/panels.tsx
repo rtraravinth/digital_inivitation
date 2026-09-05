@@ -25,6 +25,7 @@ import {
   type TwoStepSetup,
 } from "@/lib/account";
 import { signOut } from "@/lib/session";
+import { PasswordField } from "../PasswordField";
 import { QrCode } from "../QrCode";
 import { resetAnalytics, type Analytics } from "@/lib/analytics";
 import { messageFor } from "@/lib/api";
@@ -33,6 +34,7 @@ import { usePortfolios } from "@/lib/store";
 import {
   NEEDS_SERVER,
   NOTIFICATIONS,
+  PASSWORD_MIN,
   PLANS,
   PRIVACY_SETTINGS,
   type AccountProfile,
@@ -40,7 +42,6 @@ import {
   type Portfolio,
   assetSrc,
 } from "@/lib/types";
-
 
 export type PanelProps = {
   account: AccountSettings;
@@ -106,7 +107,14 @@ function SettingRow({
         <span className="font-heading text-sm font-extrabold">{title}</span>
         <span className="text-neutral-700 text-xs">{desc}</span>
       </span>
-      {children}
+      {/* Pushed right explicitly. Without this the controls sit wherever the
+          description happens to end — the label block is capped at 52ch but
+          never told to grow, so a long desc filled the row and a short one
+          ("Never changed.") left the button stranded mid-row. Alignment is
+          not the copy's business. */}
+      {children && (
+        <span className="ml-auto flex flex-none items-center gap-4">{children}</span>
+      )}
     </div>
   );
 }
@@ -329,6 +337,22 @@ export function SecurityPanel({ account }: PanelProps) {
   const [changingPassword, setChangingPassword] = useState(false);
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+
+  /* The only two things worth checking before the request goes out: that the
+     new one is long enough, and that it was typed the same way twice. Whether
+     the *current* password is right is not knowable here — that is the
+     server's answer, and it gives it against the stored hash. */
+  const mismatch = confirmPassword.length > 0 && newPassword !== confirmPassword;
+  const newPasswordUsable =
+    newPassword.length >= PASSWORD_MIN && newPassword === confirmPassword;
+
+  function closePasswordForm() {
+    setChangingPassword(false);
+    setCurrentPassword("");
+    setNewPassword("");
+    setConfirmPassword("");
+  }
 
   // `setup` holds an enrolment in progress. An empty otpauthUri means the
   // opposite direction: a code is being collected to turn two-step off.
@@ -395,7 +419,9 @@ export function SecurityPanel({ account }: PanelProps) {
         <button
           type="button"
           className="btn btn-secondary flex-none"
-          onClick={() => setChangingPassword((open) => !open)}
+          onClick={() =>
+            changingPassword ? closePasswordForm() : setChangingPassword(true)
+          }
         >
           {changingPassword ? "Cancel" : "Change password"}
         </button>
@@ -405,10 +431,12 @@ export function SecurityPanel({ account }: PanelProps) {
         <div className="border-divider mb-4 grid gap-3 border-2 p-4 sm:grid-cols-2">
           <div className="field">
             <label htmlFor="ac-current">Current password</label>
-            <input
+            {/* Starts empty and stays the user's to type. Nothing here knows
+                the stored password — it is an Argon2 hash on the server and
+                cannot be read back — so the only check that means anything is
+                the one POST /auth/password does against that hash. */}
+            <PasswordField
               id="ac-current"
-              className="input"
-              type="password"
               autoComplete="current-password"
               value={currentPassword}
               onChange={(e) => setCurrentPassword(e.target.value)}
@@ -416,27 +444,43 @@ export function SecurityPanel({ account }: PanelProps) {
           </div>
           <div className="field">
             <label htmlFor="ac-new">New password</label>
-            <input
+            <PasswordField
               id="ac-new"
-              className="input"
-              type="password"
               autoComplete="new-password"
               value={newPassword}
               onChange={(e) => setNewPassword(e.target.value)}
             />
-            <p className="text-neutral-700 mt-1 text-[12px]">At least twelve characters.</p>
+            <p className="text-neutral-700 mt-1 text-[12px]">
+              At least {PASSWORD_MIN} characters. A passphrase is easier to remember
+              and harder to guess.
+            </p>
+          </div>
+          <div className="field">
+            <label htmlFor="ac-confirm">Confirm new password</label>
+            <PasswordField
+              id="ac-confirm"
+              autoComplete="new-password"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              aria-invalid={mismatch || undefined}
+            />
+            {/* Only once they have typed enough to mean it — an alarm on the
+                first keystroke of a field they are still filling is noise. */}
+            {mismatch && (
+              <p className="mt-1 text-[12px]" style={{ color: "var(--color-accent)" }}>
+                Those two do not match.
+              </p>
+            )}
           </div>
           <div className="sm:col-span-2">
             <button
               type="button"
               className="btn btn-primary"
-              disabled={busy || !currentPassword || newPassword.length < 12}
+              disabled={busy || !currentPassword || !newPasswordUsable}
               onClick={() =>
                 run(async () => {
                   await changePassword(currentPassword, newPassword);
-                  setChangingPassword(false);
-                  setCurrentPassword("");
-                  setNewPassword("");
+                  closePasswordForm();
                   setSessions(null);
                   // The server signs every other device out on a change, so
                   // say so rather than leaving it to be discovered.
@@ -616,7 +660,16 @@ export function SecurityPanel({ account }: PanelProps) {
                     <td>{new Date(session.when).toLocaleString()}</td>
                     <td>
                       {session.current ? (
-                        <span className="text-neutral-600 text-xs">This device</span>
+                        // Signing out the row you are sitting on is a sign-out,
+                        // not a revoke: the local token and session state have
+                        // to go too, which is what signOut() does.
+                        <button
+                          type="button"
+                          className="btn btn-ghost text-xs"
+                          onClick={() => void signOut()}
+                        >
+                          Sign out (this device)
+                        </button>
                       ) : (
                         <button
                           type="button"

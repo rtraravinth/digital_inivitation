@@ -4,6 +4,8 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { ApiError, messageFor } from "@/lib/api";
 import { completeTwoStep, register, signIn } from "@/lib/session";
+import { PASSWORD_MIN } from "@/lib/types";
+import { PasswordField } from "./PasswordField";
 
 type Mode = "in" | "up";
 
@@ -138,10 +140,8 @@ export function SignIn() {
 
             <div className="field">
               <label htmlFor="password">Password</label>
-              <input
+              <PasswordField
                 id="password"
-                className="input"
-                type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 autoComplete={mode === "in" ? "current-password" : "new-password"}
@@ -149,8 +149,8 @@ export function SignIn() {
               />
               {mode === "up" && !fieldError("password") && (
                 <p className="text-muted mt-1 text-[12px]">
-                  At least twelve characters. A passphrase is easier to remember and
-                  harder to guess.
+                  At least {PASSWORD_MIN} characters. A passphrase is easier to
+                  remember and harder to guess.
                 </p>
               )}
               {fieldError("password") && (

@@ -163,31 +163,40 @@ class PortfolioService:
             for portfolio, total in rows.all()
         ]
 
-    async def slug_available(self, slug: str, *, exclude_id: uuid.UUID | None = None) -> bool:
-        query = select(Portfolio.id).where(Portfolio.slug == slug)
+    async def slug_available(
+        self, user_id: uuid.UUID, slug: str, *, exclude_id: uuid.UUID | None = None
+    ) -> bool:
+        query = select(Portfolio.id).where(
+            Portfolio.user_id == user_id, Portfolio.slug == slug
+        )
         if exclude_id is not None:
             query = query.where(Portfolio.id != exclude_id)
         return await self.session.scalar(query) is None
 
-    async def _assert_slug_free(self, slug: str, *, exclude_id: uuid.UUID | None = None) -> None:
-        if not await self.slug_available(slug, exclude_id=exclude_id):
-            # Slugs are global: facet.page/<slug> has nothing in front of it,
-            # so two accounts cannot both hold one.
+    async def _assert_slug_free(
+        self, user_id: uuid.UUID, slug: str, *, exclude_id: uuid.UUID | None = None
+    ) -> None:
+        if not await self.slug_available(user_id, slug, exclude_id=exclude_id):
+            # Only within this account: the address is facet.page/<handle>/<slug>,
+            # so the handle in front is what separates one person's "freelancer"
+            # from another's.
             raise Conflict(
-                "That address is already in use.", code="slug_taken", details={"slug": slug}
+                "You already have a page at that address.",
+                code="slug_taken",
+                details={"slug": slug},
             )
 
     # ── writes ──────────────────────────────────────────────────────────
 
     async def create(self, user: User, payload: PortfolioCreate) -> Portfolio:
-        await self._assert_slug_free(payload.slug)
+        await self._assert_slug_free(user.id, payload.slug)
 
         portfolio = Portfolio(
             user_id=user.id,
             name=payload.name,
             slug=payload.slug,
             status="empty",
-            summary="Not published yet.",
+            summary=payload.summary,
             layout=default_layout(),
         )
         portfolio.header = PortfolioHeader(tags=[], links=[])
@@ -239,7 +248,9 @@ class PortfolioService:
         changes = patch.model_dump(exclude_unset=True, exclude_none=True)
 
         if "slug" in changes:
-            await self._assert_slug_free(changes["slug"], exclude_id=portfolio.id)
+            await self._assert_slug_free(
+                portfolio.user_id, changes["slug"], exclude_id=portfolio.id
+            )
 
         for field in ("name", "slug", "summary", "theme", "accent", "ground", "font"):
             if field in changes:
@@ -292,17 +303,19 @@ class PortfolioService:
             raise NotFound("That upload does not exist.", code="asset_not_found")
         return asset
 
+    # `summary` is the author's own line about the page, so publishing does
+    # not touch it. It used to be overwritten with "Live." / "Not published.",
+    # which threw the sentence away and then said on the card what the status
+    # tag beside it already said.
     async def publish(self, portfolio: Portfolio) -> Portfolio:
         portfolio.status = "live"
         portfolio.published_at = datetime.now(UTC)
-        portfolio.summary = "Live."
         await self._touch(portfolio)
         return portfolio
 
     async def unpublish(self, portfolio: Portfolio) -> Portfolio:
         portfolio.status = "draft"
         portfolio.published_at = None
-        portfolio.summary = "Not published."
         await self._touch(portfolio)
         return portfolio
 

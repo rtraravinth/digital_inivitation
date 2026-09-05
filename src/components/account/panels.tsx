@@ -34,6 +34,7 @@ import { usePortfolios } from "@/lib/store";
 import {
   NEEDS_SERVER,
   NOTIFICATIONS,
+  pageAddress,
   PASSWORD_MIN,
   PLANS,
   PRIVACY_SETTINGS,
@@ -737,7 +738,7 @@ export function AddressesPanel({ account, portfolios, analytics }: PanelProps) {
 
   async function copy(slug: string) {
     try {
-      await navigator.clipboard.writeText(`https://facet.page/${slug}`);
+      await navigator.clipboard.writeText(`https://${pageAddress(handle, slug)}`);
       setCopied(slug);
       window.setTimeout(() => setCopied(null), 1600);
     } catch {
@@ -800,7 +801,7 @@ export function AddressesPanel({ account, portfolios, analytics }: PanelProps) {
             {portfolios.map((p) => (
               <tr key={p.id}>
                 <td className="font-extrabold">{p.name}</td>
-                <td className="font-mono text-xs">facet.page/{p.slug}</td>
+                <td className="font-mono text-xs">{pageAddress(handle, p.slug)}</td>
                 <td>
                   <span
                     className={`tag ${p.status === "live" ? "tag-accent" : "tag-neutral"}`}

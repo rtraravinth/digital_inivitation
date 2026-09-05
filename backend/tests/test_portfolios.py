@@ -75,18 +75,30 @@ async def test_copying_another_users_portfolio_is_404(auth_client, other_auth_cl
     assert response.status_code == 404
 
 
-async def test_a_taken_slug_is_409_even_across_users(auth_client, other_auth_client):
+async def test_a_taken_slug_is_409_within_one_account(auth_client):
+    """Scoped to the owner: the handle in front of it separates accounts."""
     await auth_client.post(
         "/api/v1/portfolios",
         json={"name": "A", "slug": "shared-slug", "startFrom": {"kind": "blank"}},
     )
-    response = await other_auth_client.post(
+    response = await auth_client.post(
         "/api/v1/portfolios",
         json={"name": "B", "slug": "shared-slug", "startFrom": {"kind": "blank"}},
     )
     assert response.status_code == 409
     assert response.json()["error"]["code"] == "slug_taken"
     assert response.json()["error"]["details"] == {"slug": "shared-slug"}
+
+
+async def test_the_same_slug_across_accounts_is_fine(auth_client, other_auth_client):
+    """facet.page/rohan/investors and facet.page/priya/investors are two pages."""
+    for owner in (auth_client, other_auth_client):
+        response = await owner.post(
+            "/api/v1/portfolios",
+            json={"name": "Investors", "slug": "shared-slug",
+                  "startFrom": {"kind": "blank"}},
+        )
+        assert response.status_code == 201, response.text
 
 
 async def test_an_invalid_slug_is_422(auth_client):
@@ -280,3 +292,77 @@ async def test_expand_only_returns_my_portfolios(auth_client, other_auth_client,
     )
     full = (await auth_client.get("/api/v1/portfolios", params={"expand": "sections"})).json()
     assert [row["slug"] for row in full] == ["rohan"]
+
+
+async def test_editing_a_published_portfolio_is_409(auth_client, published):
+    response = await auth_client.patch(
+        f"/api/v1/portfolios/{published['id']}", json={"name": "Renamed"}
+    )
+    assert response.status_code == 409
+    assert response.json()["error"]["code"] == "portfolio_published"
+
+
+async def test_editing_a_published_header_is_409(auth_client, published):
+    response = await auth_client.patch(
+        f"/api/v1/portfolios/{published['id']}/header", json={"name": "Rohan"}
+    )
+    assert response.status_code == 409
+    assert response.json()["error"]["code"] == "portfolio_published"
+
+
+async def test_deleting_a_published_portfolio_is_409(auth_client, published):
+    response = await auth_client.delete(f"/api/v1/portfolios/{published['id']}")
+    assert response.status_code == 409
+    assert response.json()["error"]["code"] == "portfolio_published"
+    assert len((await auth_client.get("/api/v1/portfolios")).json()) == 1
+
+
+async def test_unpublishing_reopens_editing_and_deleting(auth_client, published):
+    await auth_client.post(f"/api/v1/portfolios/{published['id']}/unpublish")
+
+    edit = await auth_client.patch(
+        f"/api/v1/portfolios/{published['id']}", json={"name": "Renamed"}
+    )
+    assert edit.status_code == 200
+    assert edit.json()["name"] == "Renamed"
+
+    assert (
+        await auth_client.delete(f"/api/v1/portfolios/{published['id']}")
+    ).status_code == 204
+
+
+async def test_publishing_an_already_live_portfolio_still_works(auth_client, published):
+    again = await auth_client.post(f"/api/v1/portfolios/{published['id']}/publish")
+    assert again.status_code == 200
+    assert again.json()["status"] == "live"
+
+
+async def test_publishing_leaves_the_authors_summary_alone(auth_client, portfolio):
+    await auth_client.patch(
+        f"/api/v1/portfolios/{portfolio['id']}",
+        json={"summary": "For investors, and nobody else."},
+    )
+
+    live = await auth_client.post(f"/api/v1/portfolios/{portfolio['id']}/publish")
+    assert live.json()["summary"] == "For investors, and nobody else."
+
+    draft = await auth_client.post(f"/api/v1/portfolios/{portfolio['id']}/unpublish")
+    assert draft.json()["summary"] == "For investors, and nobody else."
+
+
+async def test_a_new_portfolio_has_no_summary(auth_client, portfolio):
+    assert portfolio["summary"] == ""
+
+
+async def test_create_accepts_a_card_note(auth_client):
+    response = await auth_client.post(
+        "/api/v1/portfolios",
+        json={
+            "name": "Investor one-pager",
+            "slug": "investors-note",
+            "summary": "For investors, and nobody else.",
+            "startFrom": {"kind": "blank"},
+        },
+    )
+    assert response.status_code == 201
+    assert response.json()["summary"] == "For investors, and nobody else."

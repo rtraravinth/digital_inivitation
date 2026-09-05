@@ -84,15 +84,16 @@ function dedupeKeyFor(slug: string): string {
 }
 
 /** Recording must never surface to a visitor, so failures are swallowed. */
-export function recordView(slug: string) {
+export function recordView(handle: string, slug: string) {
   const referrer = typeof document === "undefined" ? "" : document.referrer;
+  const key = `${handle}/${slug}`;
   void api
-    .post(`/public/p/${slug}/views`, { referrer, dedupeKey: dedupeKeyFor(slug) })
+    .post(`/public/p/${handle}/${slug}/views`, { referrer, dedupeKey: dedupeKeyFor(key) })
     .catch(() => {});
 }
 
-export function recordClick(slug: string, sectionId: string, url = "") {
-  void api.post(`/public/p/${slug}/clicks`, { sectionId, url }).catch(() => {});
+export function recordClick(handle: string, slug: string, sectionId: string, url = "") {
+  void api.post(`/public/p/${handle}/${slug}/clicks`, { sectionId, url }).catch(() => {});
 }
 
 export async function resetAnalytics() {

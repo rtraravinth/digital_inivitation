@@ -17,6 +17,8 @@ import {
   type Portfolio,
   type Section,
   assetSrc,
+  pageAddress,
+  pagePath,
 } from "@/lib/types";
 
 const HATCH =
@@ -345,6 +347,8 @@ function href(url: string) {
 }
 
 function SectionLinks({ p, section }: { p: Portfolio; section: Section }) {
+  const handle = usePublishedHandle();
+  const record = useRecordClick();
   if (section.links.length === 0) return null;
   return (
     <div className="flex flex-wrap gap-x-4 gap-y-1 text-[13px]">
@@ -354,7 +358,7 @@ function SectionLinks({ p, section }: { p: Portfolio; section: Section }) {
           href={href(l.url)}
           target="_blank"
           rel="noopener noreferrer"
-          onClick={() => recordClick(p.slug, section.id)}
+          onClick={() => record(handle, p.slug, section.id)}
           style={{ color: "var(--color-accent)" }}
         >
           {l.label || l.url} ↗
@@ -397,6 +401,8 @@ function Media({
 
 /** The pull quote and the downloadable attachment, when a section has them. */
 function SectionAside({ p, section }: { p: Portfolio; section: Section }) {
+  const handle = usePublishedHandle();
+  const record = useRecordClick();
   return (
     <>
       {section.quote?.text && (
@@ -419,7 +425,7 @@ function SectionAside({ p, section }: { p: Portfolio; section: Section }) {
         <a
           href={assetSrc(section.file)}
           download={section.file.name}
-          onClick={() => recordClick(p.slug, section.id)}
+          onClick={() => record(handle, p.slug, section.id)}
           className="btn btn-secondary self-start"
           style={{ fontSize: 12, padding: "4px 10px" }}
         >
@@ -457,20 +463,53 @@ export function usePublishedPrivacy() {
   return useContext(PrivacyContext);
 }
 
-function ClaimBar() {
-  const privacy = usePublishedPrivacy();
-  if (!privacy.badge) return null;
-  return (
-    <div className="nav" style={{ background: "var(--color-bg)" }}>
-      <span className="nav-brand">FACET</span>
-      <span className="text-[13px] opacity-70">Explore</span>
-      <span className="text-[13px] opacity-70">Log in</span>
-      <button type="button" className="btn btn-primary">
-        Claim your page
-      </button>
-    </div>
-  );
+/**
+ * The owner's handle, from the address that served this page.
+ *
+ * Click recording posts to /public/p/<handle>/<slug>/clicks, and a slug alone
+ * no longer identifies a page — two accounts can both have "investors".
+ */
+const HandleContext = createContext<string>("");
+
+export function PublishedHandleProvider({
+  value,
+  children,
+}: {
+  value: string;
+  children: React.ReactNode;
+}) {
+  return <HandleContext.Provider value={value}>{children}</HandleContext.Provider>;
 }
+
+export function usePublishedHandle() {
+  return useContext(HandleContext);
+}
+
+/**
+ * True while the owner is looking at their own page from inside the app.
+ *
+ * Analytics are counted from real visitors, so a preview must not add to
+ * them: click recording goes through `useRecordClick`, which is a no-op here.
+ */
+const PreviewContext = createContext(false);
+
+export function PreviewProvider({
+  value,
+  children,
+}: {
+  value: boolean;
+  children: React.ReactNode;
+}) {
+  return <PreviewContext.Provider value={value}>{children}</PreviewContext.Provider>;
+}
+
+function noRecord() {}
+
+function useRecordClick() {
+  return useContext(PreviewContext) ? noRecord : recordClick;
+}
+
+
 
 /** The header's links, unless the owner has hidden them from strangers. */
 function HeaderLinks({ p, block }: { p: Portfolio; block?: boolean }) {
@@ -505,7 +544,7 @@ function HeaderLinks({ p, block }: { p: Portfolio; block?: boolean }) {
  * it files the page's owner in the address book. No server, no library: the
  * card is assembled here and handed over as a blob.
  */
-function saveContact(p: Portfolio) {
+function saveContact(p: Portfolio, handle: string) {
   const esc = (v: string) => v.replace(/[\\;,]/g, (c) => `\\${c}`).replace(/\n/g, "\\n");
   const emails = p.header.links.filter((l) => l.url.includes("@") && !l.url.includes("/"));
   const urls = p.header.links.filter((l) => !emails.includes(l));
@@ -518,7 +557,7 @@ function saveContact(p: Portfolio) {
     p.header.description && `NOTE:${esc(p.header.description)}`,
     ...emails.map((l) => `EMAIL;TYPE=INTERNET:${esc(l.url.trim())}`),
     ...urls.map((l) => `URL:${esc(href(l.url))}`),
-    `URL:https://facet.page/${esc(p.slug)}`,
+    `URL:https://${esc(pageAddress(handle, p.slug))}`,
     "END:VCARD",
   ].filter(Boolean);
 
@@ -541,9 +580,10 @@ function SectionTitleLink({
   section: Section;
   className: string;
 }) {
+  const handle = usePublishedHandle();
   return (
     <Link
-      href={`/p/${p.slug}?section=${section.id}`}
+      href={`${pagePath(handle, p.slug)}?section=${section.id}`}
       className={className}
       style={{ color: "inherit", textDecoration: "none" }}
     >
@@ -580,6 +620,7 @@ function SectionCard({ p, section }: { p: Portfolio; section: Section }) {
 }
 
 export function Editorial({ p }: { p: Portfolio }) {
+  const handle = usePublishedHandle();
   const { role, setRole, shown, nav, chapters, gated } = useRoleFilter(p);
   const cta = p.header.links[0];
   const numbers = allNumbers(p);
@@ -590,7 +631,6 @@ export function Editorial({ p }: { p: Portfolio }) {
   if (gated) {
     return (
       <div style={groundStyle(p)}>
-        <ClaimBar />
         <LensGate p={p} setRole={setRole} />
       </div>
     );
@@ -609,7 +649,6 @@ export function Editorial({ p }: { p: Portfolio }) {
 
   return (
     <div style={groundStyle(p)}>
-      <ClaimBar />
 
       <div className="grid gap-12 px-6 pb-8 pt-10 md:grid-cols-[1fr_380px] md:px-10">
         <div>
@@ -809,7 +848,7 @@ export function Editorial({ p }: { p: Portfolio }) {
           className={`btn ${cta && showContact ? "" : "md:ml-auto"}`}
           style={{ borderColor: "var(--color-bg)", color: "var(--color-bg)" }}
         >
-          facet.page/{p.slug}
+          {pageAddress(handle, p.slug)}
         </span>
       </div>
     </div>
@@ -824,7 +863,6 @@ export function IndexRail({ p }: { p: Portfolio }) {
 
   return (
     <div style={groundStyle(p)}>
-      <ClaimBar />
 
       <div className="grid md:grid-cols-[300px_1fr]">
         <div
@@ -944,17 +982,6 @@ export function Poster({ p }: { p: Portfolio }) {
         className="px-6 pt-8 md:px-11 md:pt-11"
         style={{ background: "var(--color-accent)", color: "var(--color-bg)" }}
       >
-        <div className="mb-9 flex items-baseline gap-4">
-          <span className="font-heading text-lg font-extrabold">FACET</span>
-          <span className="text-xs opacity-75">facet.page/{p.slug}</span>
-          <button
-            type="button"
-            className="btn ml-auto"
-            style={{ background: "var(--color-bg)", color: "var(--color-ink)" }}
-          >
-            Claim your page
-          </button>
-        </div>
 
         <h1 className="m-0 mb-5 leading-[0.92] tracking-[-0.03em]" style={headline("clamp(56px, 10vw, 104px)")}>
           {p.header.name.split(" ").map((w, i) => (
@@ -1033,6 +1060,8 @@ export function Poster({ p }: { p: Portfolio }) {
 /* ── 3a Links — role tabs over a stack of tappable rows ───────────────── */
 
 export function Links({ p }: { p: Portfolio }) {
+  const handle = usePublishedHandle();
+  const record = useRecordClick();
   const { role, setRole, shown, nav, gated } = useRoleFilter(p);
   const showContact = usePublishedPrivacy().showContact;
   const cta = p.header.links[0];
@@ -1040,7 +1069,6 @@ export function Links({ p }: { p: Portfolio }) {
   if (gated) {
     return (
       <div style={groundStyle(p)}>
-        <ClaimBar />
         <LensGate p={p} setRole={setRole} />
       </div>
     );
@@ -1048,7 +1076,6 @@ export function Links({ p }: { p: Portfolio }) {
 
   return (
     <div style={groundStyle(p)}>
-      <ClaimBar />
 
       <div className="mx-auto w-full max-w-[560px]">
         <div
@@ -1130,7 +1157,7 @@ export function Links({ p }: { p: Portfolio }) {
               href={href(first.url)}
               target="_blank"
               rel="noopener noreferrer"
-              onClick={() => recordClick(p.slug, s.id)}
+              onClick={() => record(handle, p.slug, s.id)}
               className={rowClass}
               style={rowStyle}
             >
@@ -1139,7 +1166,7 @@ export function Links({ p }: { p: Portfolio }) {
           ) : (
             <Link
               key={s.id}
-              href={`/p/${p.slug}?section=${s.id}`}
+              href={`${pagePath(handle, p.slug)}?section=${s.id}`}
               className={rowClass}
               style={rowStyle}
             >
@@ -1166,7 +1193,7 @@ export function Links({ p }: { p: Portfolio }) {
             <button
               type="button"
               className={`btn btn-secondary ${cta ? "" : "flex-1"}`}
-              onClick={() => saveContact(p)}
+              onClick={() => saveContact(p, handle)}
             >
               Save contact
             </button>
@@ -1175,7 +1202,7 @@ export function Links({ p }: { p: Portfolio }) {
 
         <div className="flex items-center gap-2 px-[18px] py-3.5">
           <span className="text-[11px]" style={{ color: "var(--color-neutral-700)" }}>
-            facet.page/{p.slug}
+            {pageAddress(handle, p.slug)}
           </span>
         </div>
       </div>
@@ -1192,7 +1219,6 @@ export function Ledger({ p }: { p: Portfolio }) {
   if (gated) {
     return (
       <div style={groundStyle(p)}>
-        <ClaimBar />
         <LensGate p={p} setRole={setRole} />
       </div>
     );
@@ -1204,7 +1230,6 @@ export function Ledger({ p }: { p: Portfolio }) {
 
   return (
     <div style={groundStyle(p)}>
-      <ClaimBar />
 
       <div
         className={pad(p).page}
@@ -1306,7 +1331,6 @@ export function Dossier({ p }: { p: Portfolio }) {
   if (!answered) {
     return (
       <div style={groundStyle(p)}>
-        <ClaimBar />
         <LensGate
           p={p}
           setRole={(r) => {
@@ -1320,7 +1344,6 @@ export function Dossier({ p }: { p: Portfolio }) {
 
   return (
     <div style={groundStyle(p)}>
-      <ClaimBar />
 
       <div
         className="flex flex-wrap items-center gap-2 px-6 py-3 md:px-10"
@@ -1411,7 +1434,6 @@ export function Broadsheet({ p }: { p: Portfolio }) {
   if (gated) {
     return (
       <div style={groundStyle(p)}>
-        <ClaimBar />
         <LensGate p={p} setRole={setRole} />
       </div>
     );
@@ -1419,7 +1441,6 @@ export function Broadsheet({ p }: { p: Portfolio }) {
 
   return (
     <div style={groundStyle(p)}>
-      <ClaimBar />
 
       {/* Masthead */}
       <div
@@ -1508,6 +1529,7 @@ export function Broadsheet({ p }: { p: Portfolio }) {
 /* ── 1d Section detail — one entry on its own page ────────────────────── */
 
 export function SectionDetail({ p, section }: { p: Portfolio; section: Section }) {
+  const handle = usePublishedHandle();
   const index = visibleSections(p).findIndex((s) => s.id === section.id);
   const total = visibleSections(p).length;
 
@@ -1517,7 +1539,7 @@ export function SectionDetail({ p, section }: { p: Portfolio; section: Section }
         className="flex items-center gap-2.5 px-4 py-3"
         style={{ borderBottom: "2px solid var(--color-divider)" }}
       >
-        <Link href={`/p/${p.slug}`} className="btn btn-secondary">
+        <Link href={pagePath(handle, p.slug)} className="btn btn-secondary">
           ← Back
         </Link>
         <span

@@ -4,13 +4,15 @@ import { notFound } from "next/navigation";
 import { fetchPublished } from "@/lib/published";
 import { PublishedPage } from "@/components/published/PublishedPage";
 
-// Catch-all: page addresses nest, e.g. facet.page/rohan/investors.
+// facet.page/<handle>/<slug>. Nothing is drawn around the page — the owner
+// previewing it opens this in a new tab and sees exactly what a visitor
+// sees, which is the only preview worth having.
 
 export async function generateMetadata({
   params,
-}: PageProps<"/p/[...slug]">): Promise<Metadata> {
-  const { slug } = await params;
-  const published = await fetchPublished(slug.join("/"));
+}: PageProps<"/p/[handle]/[slug]">): Promise<Metadata> {
+  const { handle, slug } = await params;
+  const published = await fetchPublished(handle, slug);
 
   if (!published) return { title: "No page here · FACET" };
 
@@ -24,9 +26,9 @@ export async function generateMetadata({
   };
 }
 
-export default async function Page({ params }: PageProps<"/p/[...slug]">) {
-  const { slug } = await params;
-  const published = await fetchPublished(slug.join("/"));
+export default async function Page({ params }: PageProps<"/p/[handle]/[slug]">) {
+  const { handle, slug } = await params;
+  const published = await fetchPublished(handle, slug);
 
   if (!published) notFound();
 
@@ -35,7 +37,8 @@ export default async function Page({ params }: PageProps<"/p/[...slug]">) {
     // back to while the client bundle is still arriving.
     <Suspense fallback={<div className="p-10">Loading…</div>}>
       <PublishedPage
-        slug={slug.join("/")}
+        handle={handle}
+        slug={slug}
         portfolio={published.portfolio}
         privacy={published.privacy}
       />

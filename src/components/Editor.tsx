@@ -5,9 +5,15 @@ import { useEffect, useRef, useState } from "react";
 import { LinkEditor } from "./LinkEditor";
 import { TagEditor } from "./TagEditor";
 import { PortraitField, SectionExtras } from "./SectionExtras";
-import { ThemePanel } from "./ThemePanel";
+import { PublishedLock } from "./PublishedLock";
 import { usePortfolios } from "@/lib/store";
-import type { LinkItem, Portfolio, PortfolioHeader, Section } from "@/lib/types";
+import {
+  previewPath,
+  type LinkItem,
+  type Portfolio,
+  type PortfolioHeader,
+  type Section,
+} from "@/lib/types";
 
 const HEADER_KEY = "header";
 
@@ -218,8 +224,6 @@ export function Editor({ id }: { id: string }) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [reordering, setReordering] = useState(false);
   const [mobileOpen, setMobileOpen] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
-  const [themeOpen, setThemeOpen] = useState(false);
 
   const editingRef = useRef<HTMLDivElement>(null);
   /** Refs, not state — this must not cause a render of its own. */
@@ -252,6 +256,13 @@ export function Editor({ id }: { id: string }) {
     );
   }
 
+  // A live page is frozen — the API refuses every write to it — so this
+  // screen steps aside for Preview and Unpublish rather than rendering
+  // controls that can only fail.
+  if (portfolio.status === "live") {
+    return <PublishedLock portfolio={portfolio} />;
+  }
+
   const p: Portfolio = portfolio;
 
   const setHeader = (recipe: (h: PortfolioHeader) => PortfolioHeader) =>
@@ -269,16 +280,6 @@ export function Editor({ id }: { id: string }) {
     setEditingId(added);
   }
 
-  async function share() {
-    try {
-      await navigator.clipboard.writeText(`https://facet.page/${p.slug}`);
-      setCopied(true);
-      window.setTimeout(() => setCopied(false), 1600);
-    } catch {
-      // Clipboard blocked — leave the button silent rather than lying about it.
-    }
-  }
-
   const openSection = mobileOpen
     ? p.sections.find((s) => s.id === mobileOpen)
     : undefined;
@@ -292,29 +293,20 @@ export function Editor({ id }: { id: string }) {
           ← Portfolios
         </Link>
         <span className="nav-brand mr-0 hidden text-[15px] sm:inline">{p.name}</span>
-        <span className="tag tag-neutral mr-auto">
-          {p.status === "live" ? "Live" : "Saved"}
-        </span>
-        <Link href={`/builder/${p.id}`} className="btn btn-secondary hidden sm:inline-flex">
+        <span className="status status-draft mr-auto">Not published — saved</span>
+        <Link href={`/builder/${p.id}`} className="btn btn-secondary">
           Builder
         </Link>
-        <Link href={`/p/${p.slug}`} className="btn btn-secondary">
+        <Link
+          href={previewPath(p.id)}
+          className="btn btn-secondary"
+          // A new tab, because the point of a preview is seeing the page
+          // with nothing of the app around it — exactly what a visitor gets.
+          target="_blank"
+          rel="noopener noreferrer"
+        >
           Preview
         </Link>
-        <button
-          type="button"
-          className="btn btn-secondary"
-          onClick={share}
-        >
-          {copied ? "Copied" : "Share"}
-        </button>
-        <button
-          type="button"
-          className={`btn lg:hidden ${themeOpen ? "btn-primary" : "btn-secondary"}`}
-          onClick={() => setThemeOpen((v) => !v)}
-        >
-          Theme
-        </button>
         <button type="button" className="btn btn-primary" onClick={publish}>
           Publish
         </button>
@@ -328,14 +320,6 @@ export function Editor({ id }: { id: string }) {
         >
           {storageError}
         </div>
-      )}
-
-      {themeOpen && (
-        <ThemePanel
-          portfolio={p}
-          onChange={(recipe) => updatePortfolio(p.id, recipe)}
-          onClose={() => setThemeOpen(false)}
-        />
       )}
 
       {/* ══ desktop — the document ═══════════════════════════════════ */}
@@ -357,13 +341,6 @@ export function Editor({ id }: { id: string }) {
             }}
           >
             Reorder
-          </button>
-          <button
-            type="button"
-            className={`btn ${themeOpen ? "btn-primary" : "btn-ghost"}`}
-            onClick={() => setThemeOpen((v) => !v)}
-          >
-            Theme
           </button>
           <span className="mono-label ml-auto">
             1 header · {p.sections.length} section{p.sections.length === 1 ? "" : "s"}

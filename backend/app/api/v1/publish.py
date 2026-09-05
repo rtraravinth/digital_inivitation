@@ -17,7 +17,14 @@ from app.api.deps import SessionDep
 from app.api.route import TransactionRoute
 from app.api.v1.assets import serve
 from app.core.errors import NotFound
-from app.models import AccountSettings, Asset, Portfolio, PortfolioHeader, Section
+from app.models import (
+    AccountProfile,
+    AccountSettings,
+    Asset,
+    Portfolio,
+    PortfolioHeader,
+    Section,
+)
 from app.schemas.common import ERROR_RESPONSES
 from app.schemas.portfolio import Layout
 from app.schemas.publish import (
@@ -36,15 +43,23 @@ router = APIRouter(
 )
 
 
-async def _load_published(session: SessionDep, slug: str) -> tuple[Portfolio, dict]:
-    """The published portfolio and its owner's privacy switches.
+async def _load_published(
+    session: SessionDep, handle: str, slug: str
+) -> tuple[Portfolio, dict]:
+    """The published portfolio at ``<handle>/<slug>`` and its privacy switches.
 
     One query with eager loads: a published page must not issue a query per
-    section.
+    section. The handle is joined rather than looked up first, so a wrong
+    handle is the same 404 as a wrong slug — neither confirms the other.
     """
     portfolio = await session.scalar(
         select(Portfolio)
-        .where(Portfolio.slug == slug, Portfolio.status == "live")
+        .join(AccountProfile, AccountProfile.user_id == Portfolio.user_id)
+        .where(
+            AccountProfile.handle == handle.lower(),
+            Portfolio.slug == slug,
+            Portfolio.status == "live",
+        )
         .options(
             selectinload(Portfolio.header),
             selectinload(Portfolio.sections).selectinload(Section.image),
@@ -63,12 +78,14 @@ async def _load_published(session: SessionDep, slug: str) -> tuple[Portfolio, di
 
 
 @router.get(
-    "/p/{slug:path}",
+    "/p/{handle}/{slug}",
     response_model=PublicPortfolioOut,
     summary="Read a published page",
 )
-async def read_published(slug: str, session: SessionDep, response: Response):
-    portfolio, privacy = await _load_published(session, slug)
+async def read_published(
+    handle: str, slug: str, session: SessionDep, response: Response
+):
+    portfolio, privacy = await _load_published(session, handle, slug)
 
     indexable = privacy.get("indexable", True)
     show_contact = privacy.get("showContact", True)
@@ -103,14 +120,14 @@ async def read_published(slug: str, session: SessionDep, response: Response):
 
 
 @router.post(
-    "/p/{slug:path}/views",
+    "/p/{handle}/{slug}/views",
     status_code=status.HTTP_202_ACCEPTED,
     summary="Record a page view",
 )
 async def record_view(
-    slug: str, payload: RecordViewRequest, session: SessionDep
+    handle: str, slug: str, payload: RecordViewRequest, session: SessionDep
 ) -> dict[str, bool]:
-    portfolio, _ = await _load_published(session, slug)
+    portfolio, _ = await _load_published(session, handle, slug)
     counted = await AnalyticsService(session).record_view(
         portfolio, payload.referrer, payload.dedupe_key
     )
@@ -120,14 +137,14 @@ async def record_view(
 
 
 @router.post(
-    "/p/{slug:path}/clicks",
+    "/p/{handle}/{slug}/clicks",
     status_code=status.HTTP_202_ACCEPTED,
     summary="Record a click on a section link",
 )
 async def record_click(
-    slug: str, payload: RecordClickRequest, session: SessionDep
+    handle: str, slug: str, payload: RecordClickRequest, session: SessionDep
 ) -> dict[str, bool]:
-    portfolio, _ = await _load_published(session, slug)
+    portfolio, _ = await _load_published(session, handle, slug)
     counted = await AnalyticsService(session).record_click(
         portfolio, payload.section_id, payload.url
     )

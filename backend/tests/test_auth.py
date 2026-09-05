@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from tests.factories import TEST_PASSWORD
+from tests.factories import TEST_PASSWORD, bearer
 
 
 def _replace_refresh_cookie(client, value: str) -> None:
@@ -18,7 +18,12 @@ def _replace_refresh_cookie(client, value: str) -> None:
 async def test_register_returns_a_token_and_creates_the_account(client):
     response = await client.post(
         "/api/v1/auth/register",
-        json={"email": "New@Example.com", "password": TEST_PASSWORD, "name": "Rohan Mehta"},
+        json={
+            "email": "New@Example.com",
+            "password": TEST_PASSWORD,
+            "name": "Rohan Mehta",
+            "handle": "rohan-new",
+        },
     )
     assert response.status_code == 201
 
@@ -33,7 +38,12 @@ async def test_register_returns_a_token_and_creates_the_account(client):
 async def test_the_refresh_token_is_never_in_the_response_body(client):
     response = await client.post(
         "/api/v1/auth/register",
-        json={"email": "cookie@example.com", "password": TEST_PASSWORD, "name": "C"},
+        json={
+            "email": "cookie@example.com",
+            "password": TEST_PASSWORD,
+            "name": "C",
+            "handle": "cookie-person",
+        },
     )
     assert "refresh" not in response.text.lower()
 
@@ -43,7 +53,12 @@ async def test_the_refresh_token_is_never_in_the_response_body(client):
 
 
 async def test_register_rejects_a_duplicate_email_with_409(client):
-    payload = {"email": "dup@example.com", "password": TEST_PASSWORD, "name": "D"}
+    payload = {
+        "email": "dup@example.com",
+        "password": TEST_PASSWORD,
+        "name": "D",
+        "handle": "dup-person",
+    }
     assert (await client.post("/api/v1/auth/register", json=payload)).status_code == 201
 
     response = await client.post("/api/v1/auth/register", json=payload)
@@ -54,11 +69,21 @@ async def test_register_rejects_a_duplicate_email_with_409(client):
 async def test_register_is_case_insensitive_about_the_email(client):
     await client.post(
         "/api/v1/auth/register",
-        json={"email": "Case@example.com", "password": TEST_PASSWORD, "name": "C"},
+        json={
+            "email": "Case@example.com",
+            "password": TEST_PASSWORD,
+            "name": "C",
+            "handle": "case-one",
+        },
     )
     response = await client.post(
         "/api/v1/auth/register",
-        json={"email": "CASE@EXAMPLE.COM", "password": TEST_PASSWORD, "name": "C"},
+        json={
+            "email": "CASE@EXAMPLE.COM",
+            "password": TEST_PASSWORD,
+            "name": "C",
+            "handle": "case-two",
+        },
     )
     assert response.status_code == 409
 
@@ -153,3 +178,115 @@ async def test_logout_revokes_the_session_so_the_access_token_stops_working(auth
     assert (await auth_client.get("/api/v1/auth/sessions")).status_code == 200
     assert (await auth_client.post("/api/v1/auth/logout")).status_code == 204
     assert (await auth_client.get("/api/v1/auth/sessions")).status_code == 401
+
+
+# ── the handle claimed at sign-up ────────────────────────────────────────
+# It is the base of every address the account publishes
+# (facet.com/<handle>/<slug>), so it is claimed with the account rather than
+# left null until someone visits /account.
+
+
+async def test_register_stores_the_handle(client):
+    response = await client.post(
+        "/api/v1/auth/register",
+        json={
+            "email": "handled@example.com",
+            "password": TEST_PASSWORD,
+            "name": "H",
+            "handle": "aravinth",
+        },
+    )
+    assert response.status_code == 201
+
+    bearer(client, response.json()["token"]["accessToken"])
+    assert (await client.get("/api/v1/account")).json()["profile"]["handle"] == "aravinth"
+
+
+async def test_register_without_a_handle_is_422(client):
+    response = await client.post(
+        "/api/v1/auth/register",
+        json={"email": "nohandle@example.com", "password": TEST_PASSWORD, "name": "N"},
+    )
+    assert response.status_code == 422
+    assert "handle" in {f["field"] for f in response.json()["error"]["details"]["fields"]}
+
+
+async def test_a_handle_is_lowercased_not_rejected(client):
+    """"Aravinth" is a typo, not a format error — addresses are lowercase."""
+    response = await client.post(
+        "/api/v1/auth/register",
+        json={
+            "email": "caps@example.com",
+            "password": TEST_PASSWORD,
+            "name": "C",
+            "handle": "  Aravinth  ",
+        },
+    )
+    assert response.status_code == 201
+
+    bearer(client, response.json()["token"]["accessToken"])
+    assert (await client.get("/api/v1/account")).json()["profile"]["handle"] == "aravinth"
+
+
+async def test_a_taken_handle_is_409(client, registered):
+    response = await client.post(
+        "/api/v1/auth/register",
+        json={
+            "email": "second@example.com",
+            "password": TEST_PASSWORD,
+            "name": "S",
+            "handle": "rohan",
+        },
+    )
+    assert response.status_code == 409
+    assert response.json()["error"]["code"] == "handle_taken"
+
+
+async def test_a_reserved_handle_is_409(client):
+    """An app route at that position can never also be somebody's address."""
+    for reserved in ("account", "stats", "api", "www", "signin"):
+        response = await client.post(
+            "/api/v1/auth/register",
+            json={
+                "email": f"{reserved}@example.com",
+                "password": TEST_PASSWORD,
+                "name": "R",
+                "handle": reserved,
+            },
+        )
+        assert response.status_code == 409, reserved
+        assert response.json()["error"]["code"] == "handle_reserved", reserved
+
+
+async def test_a_rejected_handle_leaves_no_account_behind(client, registered, db_session):
+    """The handle is checked before the user row, not by the unique index."""
+    from sqlalchemy import select
+
+    from app.models import User
+
+    await client.post(
+        "/api/v1/auth/register",
+        json={
+            "email": "leftover@example.com",
+            "password": TEST_PASSWORD,
+            "name": "L",
+            "handle": "rohan",
+        },
+    )
+    assert await db_session.scalar(
+        select(User).where(User.email == "leftover@example.com")
+    ) is None
+
+
+async def test_a_bad_handle_shape_is_422(client):
+    for bad in ("a", "has space", "UPPER-ONLY-!", "-leading", "trailing-"):
+        response = await client.post(
+            "/api/v1/auth/register",
+            json={
+                "email": "shape@example.com",
+                "password": TEST_PASSWORD,
+                "name": "S",
+                "handle": bad,
+            },
+        )
+        assert response.status_code == 422, bad

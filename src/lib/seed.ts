@@ -29,7 +29,7 @@ const RAW: SeedPortfolio[] = [
   {
     id: "full",
     name: "Rohan Mehta — Full portfolio",
-    slug: "rohan",
+    slug: "full",
     status: "live",
     summary:
       "Everything: both businesses, the advisory practice, the letter and the clinic.",
@@ -129,7 +129,7 @@ const RAW: SeedPortfolio[] = [
   {
     id: "investors",
     name: "Investor one-pager",
-    slug: "rohan/investors",
+    slug: "investors",
     status: "draft",
     summary: "Just the two businesses, the numbers, and how to reach me.",
     meta: "3 sections · updated 6 days ago",
@@ -171,7 +171,7 @@ const RAW: SeedPortfolio[] = [
   {
     id: "advisory",
     name: "Advisory clients",
-    slug: "rohan/advisory",
+    slug: "advisory",
     status: "live",
     summary: "The practice, the fee, the clinic. Nothing about the businesses.",
     meta: "3 sections · updated 12 days ago",
@@ -214,7 +214,7 @@ const RAW: SeedPortfolio[] = [
   {
     id: "writing",
     name: "Writing only",
-    slug: "rohan/writing",
+    slug: "writing",
     status: "live",
     summary: "For editors and podcast bookers. The letter and nothing else.",
     meta: "2 sections · updated 1 month ago",
@@ -248,7 +248,7 @@ const RAW: SeedPortfolio[] = [
   {
     id: "board",
     name: "Board & trustee",
-    slug: "rohan/board",
+    slug: "board",
     status: "draft",
     summary: "Governance work only — for trusts and boards doing diligence.",
     meta: "2 sections · updated 1 month ago",

@@ -6,17 +6,21 @@ import { useState } from "react";
 import { useAnalytics } from "@/lib/analytics";
 import { usePortfolios } from "@/lib/store";
 import { roles } from "./published/themes";
+import { PublishedLock } from "./PublishedLock";
+import { useAccount } from "@/lib/account";
 import {
   BLOCK_ICON,
   BLOCK_TYPES,
   type BlockKind,
   type Portfolio,
+  pageAddress,
+  previewPath,
 } from "@/lib/types";
 
 /** The bottom bar of the phone-sized manage view. */
 function BottomNav({ p }: { p: Portfolio }) {
   const items = [
-    { label: "Page", href: `/p/${p.slug}` },
+    { label: "Page", href: previewPath(p.id) },
     { label: "Blocks", href: `/blocks/${p.id}` },
     { label: "Stats", href: `/stats?p=${p.id}` },
     { label: "Settings", href: `/builder/${p.id}` },
@@ -45,6 +49,7 @@ function BottomNav({ p }: { p: Portfolio }) {
 }
 
 export function BlockManager({ id }: { id: string }) {
+  const handle = useAccount().account.profile.handle;
   const {
     ready,
     storageError,
@@ -70,6 +75,13 @@ export function BlockManager({ id }: { id: string }) {
     );
   }
 
+  // A live page is frozen — the API refuses every write to it — so this
+  // screen steps aside for Preview and Unpublish rather than rendering
+  // controls that can only fail.
+  if (portfolio.status === "live") {
+    return <PublishedLock portfolio={portfolio} />;
+  }
+
   const p: Portfolio = portfolio;
   const clicks = analytics.clicks[p.slug] ?? {};
   const views = analytics.views[p.slug] ?? 0;
@@ -77,7 +89,7 @@ export function BlockManager({ id }: { id: string }) {
 
   async function copy() {
     try {
-      await navigator.clipboard.writeText(`https://facet.page/${p.slug}`);
+      await navigator.clipboard.writeText(`https://${pageAddress(handle, p.slug)}`);
       setCopied(true);
       window.setTimeout(() => setCopied(false), 1600);
     } catch {
@@ -99,7 +111,14 @@ export function BlockManager({ id }: { id: string }) {
           ← Portfolios
         </Link>
         <span className="nav-brand mr-auto text-[15px]">Blocks</span>
-        <Link href={`/p/${p.slug}`} className="btn btn-secondary">
+        <Link
+          href={previewPath(p.id)}
+          className="btn btn-secondary"
+          // A new tab, because the point of a preview is seeing the page
+          // with nothing of the app around it — exactly what a visitor gets.
+          target="_blank"
+          rel="noopener noreferrer"
+        >
           Preview
         </Link>
         <Link href={`/builder/${p.id}`} className="btn btn-secondary">
@@ -123,10 +142,10 @@ export function BlockManager({ id }: { id: string }) {
           <div className="border-divider bg-surface flex items-center gap-2.5 border-b-2 px-4 py-3.5">
             <div className="min-w-0 flex-1">
               <div className="font-heading truncate text-sm font-extrabold">
-                facet.page/{p.slug}
+                {pageAddress(handle, p.slug)}
               </div>
               <div className="text-neutral-700 text-[11px]">
-                {p.status === "live" ? "Live" : "Not published"} · {views}{" "}
+                Not published · {views}{" "}
                 {views === 1 ? "view" : "views"} counted here
               </div>
             </div>

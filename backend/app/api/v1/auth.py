@@ -89,7 +89,7 @@ async def register(
 ) -> AuthOut:
     service = AuthService(session)
     user, tokens = await service.register(
-        payload.email, payload.password, payload.name, device
+        payload.email, payload.password, payload.name, payload.handle, device
     )
     _set_refresh_cookie(response, tokens.refresh_token)
     return _auth_out(user, tokens)

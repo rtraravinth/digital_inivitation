@@ -24,6 +24,7 @@ from app.core.security import (
     verify_password,
 )
 from app.models import AccountProfile, AccountSettings, AuthSession, RecoveryCode, User
+from app.services.account import assert_handle_available
 
 logger = logging.getLogger("app.auth")
 
@@ -56,7 +57,7 @@ class AuthService:
     # ── registration ────────────────────────────────────────────────────
 
     async def register(
-        self, email: str, password: str, name: str, device: DeviceInfo
+        self, email: str, password: str, name: str, handle: str, device: DeviceInfo
     ) -> tuple[User, IssuedTokens]:
         existing = await self.session.scalar(select(User).where(User.email == email))
         if existing is not None:
@@ -66,8 +67,13 @@ class AuthService:
                 details={"email": email},
             )
 
+        # Before the user row, so a taken handle does not leave a half-made
+        # account behind — and checked here rather than trusted to the unique
+        # index, which cannot tell "taken" from "reserved".
+        await assert_handle_available(self.session, handle)
+
         user = User(email=email, password_hash=hash_password(password), is_active=True)
-        user.profile = AccountProfile(name=name, tags=[], links=[])
+        user.profile = AccountProfile(name=name, handle=handle, tags=[], links=[])
         user.settings = AccountSettings(password_changed_at=datetime.now(UTC))
 
         self.session.add(user)

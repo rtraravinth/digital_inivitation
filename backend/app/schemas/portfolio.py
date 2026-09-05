@@ -28,9 +28,11 @@ from app.schemas.section import SectionOut
 #: segment starts and ends alphanumeric. The address is facet.page/<slug>, so
 #: it has to survive being typed and read aloud — and it is nested, because
 #: the published route is a catch-all and the seeded pages use
-#: "rohan/investors" style addresses for role-specific versions of a page.
+#: One segment. The handle in front of it is what makes the address unique,
+#: so a slug has no reason to nest — "rohan/investors" only existed because a
+#: flat global namespace had nothing else to separate accounts with.
 _SEGMENT = r"[a-z0-9](?:[a-z0-9-]*[a-z0-9])?"
-SLUG_PATTERN = rf"^{_SEGMENT}(?:/{_SEGMENT})*$"
+SLUG_PATTERN = rf"^{_SEGMENT}$"
 SlugField = Annotated[str, Field(pattern=SLUG_PATTERN, min_length=2, max_length=120)]
 
 #: Any CSS colour the swatch row can produce.
@@ -123,6 +125,9 @@ StartFrom = Annotated[
 class PortfolioCreate(StrictCamelModel):
     name: str = Field(min_length=1, max_length=200)
     slug: SlugField
+    #: The line under the name on the portfolio card. Optional, and never
+    #: part of the published page.
+    summary: str = Field(default="", max_length=2000)
     start_from: StartFrom = StartFromBlank()
 
 

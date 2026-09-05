@@ -9,14 +9,22 @@ import {
   ThemeThumb,
   TypeControl,
 } from "./controls";
-import { QrCode } from "../QrCode";
 import { PublishedBody, roles } from "../published/themes";
+import { PublishedLock } from "../PublishedLock";
 import { usePortfolios } from "@/lib/store";
-import { FONTS, SWATCHES, THEMES, type Portfolio } from "@/lib/types";
+import {
+  FONTS,
+  SWATCHES,
+  THEMES,
+  pageAddress,
+  previewPath,
+  type Portfolio,
+} from "@/lib/types";
+import { useAccount } from "@/lib/account";
 
 type Device = "desktop" | "mobile";
 type InspectorTab = "theme" | "colour" | "type" | "layout";
-type SheetTab = "style" | "sections" | "content" | "share";
+type SheetTab = "style" | "sections" | "content";
 
 const DEVICE_WIDTH: Record<Device, number> = { desktop: 1440, mobile: 390 };
 
@@ -211,11 +219,11 @@ function SectionRail({ p }: { p: Portfolio }) {
 /* ── the builder ──────────────────────────────────────────────────────── */
 
 export function Builder({ id }: { id: string }) {
+  const handle = useAccount().account.profile.handle;
   const { ready, storageError, getPortfolio, updatePortfolio } = usePortfolios();
   const [device, setDevice] = useState<Device>("desktop");
   const [tab, setTab] = useState<InspectorTab>("theme");
   const [sheet, setSheet] = useState<SheetTab>("style");
-  const [copied, setCopied] = useState(false);
 
   const portfolio = getPortfolio(id);
 
@@ -228,21 +236,16 @@ export function Builder({ id }: { id: string }) {
     );
   }
 
+  // A live page is frozen — the API refuses every write to it — so this
+  // screen steps aside for Preview and Unpublish rather than rendering
+  // controls that can only fail.
+  if (portfolio.status === "live") {
+    return <PublishedLock portfolio={portfolio} />;
+  }
+
   const p: Portfolio = portfolio;
   const onChange = (recipe: (prev: Portfolio) => Portfolio) =>
     updatePortfolio(p.id, recipe);
-  const url = `https://facet.page/${p.slug}`;
-
-  async function copy() {
-    try {
-      await navigator.clipboard.writeText(url);
-      setCopied(true);
-      window.setTimeout(() => setCopied(false), 1600);
-    } catch {
-      // Clipboard blocked — stay silent rather than claim a copy that failed.
-    }
-  }
-
   const inspectorTabs: Array<{ id: InspectorTab; label: string }> = [
     { id: "theme", label: "Theme" },
     { id: "colour", label: "Colour" },
@@ -254,7 +257,6 @@ export function Builder({ id }: { id: string }) {
     { id: "style", label: "Style" },
     { id: "sections", label: "Sections" },
     { id: "content", label: "Content" },
-    { id: "share", label: "Share" },
   ];
 
   return (
@@ -266,11 +268,9 @@ export function Builder({ id }: { id: string }) {
         </Link>
         <span className="nav-brand mr-0 hidden text-[15px] sm:inline">{p.name}</span>
         <span className="text-neutral-700 hidden text-[13px] md:inline">
-          facet.page/{p.slug}
+          {pageAddress(handle, p.slug)}
         </span>
-        <span className="tag tag-neutral mr-auto">
-          {p.status === "live" ? "Live" : "Draft — saved"}
-        </span>
+        <span className="status status-draft mr-auto">Not published — saved</span>
 
         <div className="seg hidden lg:inline-flex">
           {(["desktop", "mobile"] as Device[]).map((d) => (
@@ -289,7 +289,19 @@ export function Builder({ id }: { id: string }) {
         <Link href={`/editor/${p.id}`} className="btn btn-secondary">
           Document
         </Link>
-        <Link href={`/p/${p.slug}`} className="btn btn-secondary">
+        {/* The mobile sheet has had this in its Content tab all along; the
+            desktop bar is where the same route belongs at this width. */}
+        <Link href={`/blocks/${p.id}`} className="btn btn-secondary">
+          Blocks
+        </Link>
+        <Link
+          href={previewPath(p.id)}
+          className="btn btn-secondary"
+          // A new tab, because the point of a preview is seeing the page
+          // with nothing of the app around it — exactly what a visitor gets.
+          target="_blank"
+          rel="noopener noreferrer"
+        >
           Preview
         </Link>
         <button
@@ -533,27 +545,6 @@ export function Builder({ id }: { id: string }) {
               </Link>
               <Link href={`/blocks/${p.id}`} className="btn btn-secondary btn-block">
                 Manage blocks
-              </Link>
-            </div>
-          )}
-
-          {sheet === "share" && (
-            <div className="flex flex-col gap-3.5 p-3.5">
-              <div className="border-divider flex items-center gap-2.5 border-2 px-3 py-2.5">
-                <span className="font-heading truncate text-[13px] font-extrabold">
-                  facet.page/{p.slug}
-                </span>
-                <button
-                  type="button"
-                  className="btn btn-primary ml-auto text-xs"
-                  onClick={copy}
-                >
-                  {copied ? "Copied" : "Copy"}
-                </button>
-              </div>
-              <QrCode text={url} size={120} downloadName={`facet-${p.slug}.png`} />
-              <Link href={`/stats?p=${p.id}`} className="btn btn-secondary btn-block">
-                Views and clicks
               </Link>
             </div>
           )}

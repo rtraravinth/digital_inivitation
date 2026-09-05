@@ -175,9 +175,12 @@ export async function createPortfolioAsync(
   name: string,
   slug: string,
   startFrom: StartFrom,
+  summary = "",
 ): Promise<Portfolio> {
   clearError();
-  const created = normalize(await api.post<Portfolio>("/portfolios", { name, slug, startFrom }));
+  const created = normalize(
+    await api.post<Portfolio>("/portfolios", { name, slug, summary, startFrom }),
+  );
   setState([created, ...state]);
   return created;
 }
@@ -204,9 +207,11 @@ function updatePortfolio(id: string, recipe: (p: Portfolio) => Portfolio) {
 
   schedule(`portfolio:${id}`, () =>
     persist(async () => {
-      if (after.status !== before.status) {
-        const verb = after.status === "live" ? "publish" : "unpublish";
-        replace(await api.post<Portfolio>(`/portfolios/${id}/${verb}`));
+      // A live portfolio refuses every edit, so the order of these calls is
+      // load-bearing: unpublish first to open the page up, publish last so
+      // the edits in the same batch land while it is still a draft.
+      if (before.status === "live" && after.status !== "live") {
+        replace(await api.post<Portfolio>(`/portfolios/${id}/unpublish`));
       }
 
       if (coreChanged(before, after)) {
@@ -214,6 +219,7 @@ function updatePortfolio(id: string, recipe: (p: Portfolio) => Portfolio) {
           await api.patch<Portfolio>(`/portfolios/${id}`, {
             name: after.name,
             slug: after.slug,
+            summary: after.summary,
             theme: after.theme,
             accent: after.accent,
             ground: after.ground,
@@ -236,6 +242,10 @@ function updatePortfolio(id: string, recipe: (p: Portfolio) => Portfolio) {
           }),
         );
       }
+
+      if (before.status !== "live" && after.status === "live") {
+        replace(await api.post<Portfolio>(`/portfolios/${id}/publish`));
+      }
     }),
   );
 }
@@ -244,6 +254,7 @@ function coreChanged(before: Portfolio, after: Portfolio): boolean {
   return (
     before.name !== after.name ||
     before.slug !== after.slug ||
+    before.summary !== after.summary ||
     before.theme !== after.theme ||
     before.accent !== after.accent ||
     before.ground !== after.ground ||

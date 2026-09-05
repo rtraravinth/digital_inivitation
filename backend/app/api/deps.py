@@ -15,7 +15,7 @@ from fastapi import Depends, Request
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.errors import NotFound, Unauthenticated
+from app.core.errors import Conflict, NotFound, Unauthenticated
 from app.core.security import decode_access_token
 from app.db.session import get_session
 from app.models import AuthSession, Portfolio, User
@@ -134,3 +134,22 @@ async def get_owned_portfolio(
 
 
 OwnedPortfolio = Annotated[Portfolio, Depends(get_owned_portfolio)]
+
+
+async def get_editable_portfolio(portfolio: OwnedPortfolio) -> Portfolio:
+    """The caller's portfolio, refused while it is live.
+
+    A published page is what a visitor is reading right now, so it is frozen:
+    every write to it answers 409 until the owner unpublishes. Publish and
+    unpublish ask for ``OwnedPortfolio`` instead, or there would be no way
+    back out.
+    """
+    if portfolio.status == "live":
+        raise Conflict(
+            "Unpublish this page before you edit or delete it.",
+            code="portfolio_published",
+        )
+    return portfolio
+
+
+EditablePortfolio = Annotated[Portfolio, Depends(get_editable_portfolio)]

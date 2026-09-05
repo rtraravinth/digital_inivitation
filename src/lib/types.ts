@@ -315,8 +315,10 @@ export function normalize(p: Portfolio): Portfolio {
 }
 
 export const STATUS_LABEL: Record<PortfolioStatus, string> = {
-  live: "Live",
-  draft: "Draft",
+  live: "Published",
+  draft: "Not published",
+  // Still its own word: an empty portfolio is not published either, but it
+  // has nothing on it yet, which is what the card is telling you.
   empty: "Empty",
 };
 
@@ -351,6 +353,35 @@ export function emptySection(id: string): Section {
 /** Mirrors PASSWORD_MIN in backend/app/schemas/auth.py. The server is what
  * enforces it; this is so the UI can say so before the round trip. */
 export const PASSWORD_MIN = 12;
+
+/** The public domain these pages are published under. */
+export const PAGE_DOMAIN = "facet.page";
+
+/**
+ * A page's address, which is `<handle>/<slug>` — the handle is the namespace,
+ * so a slug alone no longer identifies a page. One place for it, because it
+ * is printed on the dashboard, the builder, the block manager, /stats, and
+ * inside a QR code that has to match all of them.
+ */
+export function pageAddress(handle: string, slug: string): string {
+  return `${PAGE_DOMAIN}/${handle}/${slug}`;
+}
+
+/** The same page on this app: the route that actually serves it. */
+export function pagePath(handle: string, slug: string): string {
+  return `/p/${handle}/${slug}`;
+}
+
+/**
+ * The owner's own preview of a portfolio, published or not.
+ *
+ * `pagePath` is the visitor's address and only resolves while the portfolio
+ * is live; every Preview button inside the app uses this instead, so a draft
+ * previews rather than 404s.
+ */
+export function previewPath(id: string): string {
+  return `/preview/${id}`;
+}
 
 export type AccountProfile = {
   name: string;

@@ -12,10 +12,17 @@ export function QrCode({
   text,
   size = 104,
   downloadName,
+  downloadVariant = "label",
 }: {
   text: string;
   size?: number;
   downloadName?: string;
+  /**
+   * Where the download control goes. "label" is a plain button under the
+   * code; "attached" docks it inside the code's own frame, below the
+   * modules — never over them, so nothing a scanner reads is covered.
+   */
+  downloadVariant?: "label" | "attached";
 }) {
   // Encoding is pure, so the failure is a value rather than a state update —
   // setState during render is exactly what the React Compiler lint rejects.
@@ -90,26 +97,71 @@ export function QrCode({
     );
   }
 
+  const svg = (
+    <svg
+      width={size}
+      height={size}
+      viewBox={`0 0 ${code.span} ${code.span}`}
+      role="img"
+      aria-label={`QR code for ${text}`}
+      shapeRendering="crispEdges"
+      style={{ background: "#fff" }}
+    >
+      <g transform={`translate(${QUIET_ZONE} ${QUIET_ZONE})`}>
+        <path d={code.path} fill="#000" />
+      </g>
+    </svg>
+  );
+
+  if (downloadVariant === "attached") {
+    return (
+      // One framed block: the code, then its own action bar under it. The
+      // button never sits over the modules — a covered module is a code that
+      // may not scan, and the quiet zone around it is part of the code too.
+      <div
+        className="inline-flex flex-col"
+        style={{ boxShadow: "inset 0 0 0 2px var(--color-divider)" }}
+      >
+        <div className="p-2.5">{svg}</div>
+        {downloadName && (
+          <button
+            type="button"
+            aria-label="Download the code as a PNG"
+            title="Download PNG"
+            onClick={download}
+            className="hover:bg-accent hover:text-bg flex h-11 cursor-pointer items-center justify-center gap-2 text-[11px] font-extrabold uppercase tracking-[0.06em] transition-colors"
+            style={{ boxShadow: "inset 0 2px 0 var(--color-divider)" }}
+          >
+            <DownloadGlyph />
+            PNG
+          </button>
+        )}
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col items-start gap-2">
-      <svg
-        width={size}
-        height={size}
-        viewBox={`0 0 ${code.span} ${code.span}`}
-        role="img"
-        aria-label={`QR code for ${text}`}
-        shapeRendering="crispEdges"
-        style={{ background: "#fff" }}
-      >
-        <g transform={`translate(${QUIET_ZONE} ${QUIET_ZONE})`}>
-          <path d={code.path} fill="#000" />
-        </g>
-      </svg>
+      {svg}
       {downloadName && (
         <button type="button" className="btn btn-secondary text-xs" onClick={download}>
           Download PNG
         </button>
       )}
     </div>
+  );
+}
+
+/** A tray with an arrow into it. Drawn, not a font glyph, so it lines up. */
+function DownloadGlyph() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 14 14" aria-hidden focusable="false">
+      <path
+        d="M7 1v7.5M3.5 6L7 9.5 10.5 6M1.5 12.5h11"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+      />
+    </svg>
   );
 }

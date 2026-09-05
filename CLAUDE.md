@@ -13,14 +13,22 @@ code is under "Layout" below.
 Two processes. The frontend does nothing useful without the API.
 
 ```
-cd backend && .venv/Scripts/python -m uvicorn app.main:app --reload   # :8000
-npm run dev                                                          # :3000
+npm run api    # :8000 — uvicorn, bound to every interface
+npm run dev    # :3000
 ```
+
+`npm run api` exists because typing the uvicorn command by hand went wrong
+twice: the venv is at `.venv/bin` on Linux and macOS but `.venv/Scripts` on
+Windows, and uvicorn binds loopback by default. A loopback bind breaks every
+request the moment `NEXT_PUBLIC_API_URL` names a LAN address — opening the app
+from a phone — with `ERR_CONNECTION_REFUSED` and nothing in the API's log,
+because the connection never arrives. Pass flags through when you need them:
+`npm run api -- --host 127.0.0.1`.
 
 ```
 npm run build
 npm run lint
-cd backend && .venv/Scripts/python -m pytest    # 208 tests
+cd backend && .venv/bin/python -m pytest    # 229 tests (.venv/Scripts on Windows)
 ```
 
 `NEXT_PUBLIC_API_URL` points the frontend at the API; see
@@ -134,6 +142,15 @@ it, but two rules matter from this side:
 - **`src/lib/api.ts` is the only module that knows the API exists.** It owns
   the access token, one silent refresh-and-retry on a 401, and turning an
   error envelope into an `ApiError` with a `code` a caller can branch on.
+- **A live portfolio is frozen.** `EditablePortfolio` in `backend/app/api/deps.py`
+  answers 409 `portfolio_published` to every portfolio and section write while
+  `status == "live"`; publish and unpublish take `OwnedPortfolio`, or there
+  would be no way back out. The editor, builder, theme gallery and block
+  manager all render `PublishedLock` instead of themselves for a live
+  portfolio, and the list card offers Preview and Unpublish in place of Edit,
+  Builder and Delete. `updatePortfolio` in `src/lib/store.tsx` therefore
+  unpublishes *before* its patches and publishes *after* them — a batch that
+  published first would 409 on its own edits.
 
 The API is camelCase on the wire, so its responses drop straight into the
 types in `src/lib/types.ts` with no mapping layer. Keep it that way.
@@ -199,6 +216,6 @@ a signed-in one had their own settings applied to somebody else's page.
 - **Slugs are global.** Two accounts cannot both hold `rohan`, because the
   address is `facet.page/<slug>` with nothing in front of it. The create
   dialog surfaces the 409 as a message.
-- **The frontend has no test runner.** The backend has 208 pytest tests;
+- **The frontend has no test runner.** The backend has 229 pytest tests;
   changes here are checked with `npm run lint`, `npm run build` and by
   actually opening the app.

@@ -21,6 +21,7 @@ from sqlalchemy import (
     Integer,
     String,
     Text,
+    UniqueConstraint,
 )
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -61,15 +62,20 @@ class Portfolio(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         CheckConstraint(f"font IN ({sql_in(FONTS)})", name="font_is_known"),
         CheckConstraint(f"status IN ({sql_in(STATUSES)})", name="status_is_known"),
         Index("ix_portfolios_user_id_created_at", "user_id", "created_at"),
+        # The address is facet.page/<handle>/<slug>, so a slug only has to be
+        # unique within the account that owns it. Two people can both publish
+        # a page called "freelancer".
+        UniqueConstraint("user_id", "slug", name="uq_portfolios_user_id_slug"),
     )
 
     user_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
     )
     name: Mapped[str] = mapped_column(String(200), nullable=False)
-    # Global, because the address is facet.page/<slug> with nothing in front.
-    # Nested ("rohan/investors") is normal: the published route is a catch-all.
-    slug: Mapped[str] = mapped_column(String(120), unique=True, nullable=False, index=True)
+    # One segment, scoped to the owner: the handle in front of it is what
+    # makes the address unique. No slashes — nesting lived here only because
+    # there was nothing else in the path to namespace it.
+    slug: Mapped[str] = mapped_column(String(120), nullable=False, index=True)
     status: Mapped[str] = mapped_column(String(16), nullable=False, default="empty")
     summary: Mapped[str] = mapped_column(Text, nullable=False, default="")
 

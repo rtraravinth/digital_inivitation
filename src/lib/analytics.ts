@@ -1,34 +1,59 @@
 "use client";
 
 import { useSyncExternalStore } from "react";
+import { api } from "./api";
 
 /**
- * Real analytics, recorded in this browser. Not a backend — numbers reflect
- * visits made on this device only — but they are counted, never invented.
+ * Real analytics, counted by the server from real visits.
+ *
+ * They used to be per-browser, because there was nowhere else to put them.
+ * Now every visitor counts, wherever they are. What has not changed is that
+ * these are counted and never invented: when nothing has happened the result
+ * is empty, and /stats shows an empty state rather than a plausible number.
  */
 export type Analytics = {
+  /** slug -> view count */
   views: Record<string, number>;
+  /** slug -> section id -> click count */
   clicks: Record<string, Record<string, number>>;
+  /** slug -> source label -> view count */
   sources: Record<string, Record<string, number>>;
 };
 
-const STORAGE_KEY = "facet.analytics.v1";
+type Summary = Analytics & { totals: { views: number; clicks: number } };
+
 const EMPTY: Analytics = { views: {}, clicks: {}, sources: {} };
 
 let state: Analytics = EMPTY;
+let ready = false;
 const listeners = new Set<() => void>();
 
-if (typeof window !== "undefined") {
+function notify() {
+  for (const listener of listeners) listener();
+}
+
+let loadStarted = false;
+
+async function load() {
   try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (raw) state = { ...EMPTY, ...(JSON.parse(raw) as Analytics) };
+    const summary = await api.get<Summary>("/analytics/summary?days=30");
+    state = { views: summary.views, clicks: summary.clicks, sources: summary.sources };
   } catch {
-    // Corrupt storage: start from empty rather than throwing on every read.
+    // Signed out, or the API is down. An empty state is the honest answer;
+    // /stats says on screen that there is nothing to show.
+    state = EMPTY;
+  } finally {
+    ready = true;
+    notify();
   }
 }
 
 function subscribe(cb: () => void) {
   listeners.add(cb);
+  if (!loadStarted) {
+    loadStarted = true;
+    void load();
+  }
   return () => {
     listeners.delete(cb);
   };
@@ -36,72 +61,53 @@ function subscribe(cb: () => void) {
 
 const getSnapshot = () => state;
 const getServerSnapshot = () => EMPTY;
-
-function commit(next: Analytics) {
-  state = next;
-  try {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
-  } catch {
-    // Out of quota: keep counting in memory for this session.
-  }
-  for (const l of listeners) l();
-}
-
-/** Where a visit came from, read off the referrer. */
-function sourceFromReferrer(referrer: string): string {
-  if (!referrer) return "Direct";
-  let host = "";
-  try {
-    host = new URL(referrer).hostname.replace(/^www\./, "");
-  } catch {
-    return "Direct";
-  }
-  if (host.includes("whatsapp")) return "WhatsApp";
-  if (host.includes("linkedin")) return "LinkedIn";
-  if (host.includes("t.co") || host.includes("twitter") || host === "x.com") return "X";
-  if (host.includes("mail") || host.includes("gmail")) return "Email";
-  if (host.includes("localhost") || host.includes("facet.page")) return "Direct";
-  return host;
-}
+const getReady = () => ready;
+const notReady = () => false;
 
 /**
- * StrictMode mounts effects twice in development; this keeps one page load
- * from counting as two views.
+ * One id per page load. StrictMode mounts effects twice in development and a
+ * retried request would otherwise count again; the server collapses repeats
+ * of the same key to a single view.
  */
-const recordedThisLoad = new Set<string>();
+const loadKeys = new Map<string, string>();
 
+function dedupeKeyFor(slug: string): string {
+  const existing = loadKeys.get(slug);
+  if (existing) return existing;
+
+  const key =
+    typeof crypto !== "undefined" && "randomUUID" in crypto
+      ? crypto.randomUUID()
+      : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  loadKeys.set(slug, key);
+  return key;
+}
+
+/** Recording must never surface to a visitor, so failures are swallowed. */
 export function recordView(slug: string) {
-  if (recordedThisLoad.has(slug)) return;
-  recordedThisLoad.add(slug);
-
-  const source = sourceFromReferrer(typeof document === "undefined" ? "" : document.referrer);
-  commit({
-    ...state,
-    views: { ...state.views, [slug]: (state.views[slug] ?? 0) + 1 },
-    sources: {
-      ...state.sources,
-      [slug]: { ...state.sources[slug], [source]: (state.sources[slug]?.[source] ?? 0) + 1 },
-    },
-  });
+  const referrer = typeof document === "undefined" ? "" : document.referrer;
+  void api
+    .post(`/public/p/${slug}/views`, { referrer, dedupeKey: dedupeKeyFor(slug) })
+    .catch(() => {});
 }
 
-export function recordClick(slug: string, sectionId: string) {
-  commit({
-    ...state,
-    clicks: {
-      ...state.clicks,
-      [slug]: {
-        ...state.clicks[slug],
-        [sectionId]: (state.clicks[slug]?.[sectionId] ?? 0) + 1,
-      },
-    },
-  });
+export function recordClick(slug: string, sectionId: string, url = "") {
+  void api.post(`/public/p/${slug}/clicks`, { sectionId, url }).catch(() => {});
 }
 
-export function resetAnalytics() {
-  commit(EMPTY);
+export async function resetAnalytics() {
+  await api.del("/analytics");
+  await load();
+}
+
+export async function refreshAnalytics() {
+  await load();
 }
 
 export function useAnalytics(): Analytics {
   return useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
+}
+
+export function useAnalyticsReady(): boolean {
+  return useSyncExternalStore(subscribe, getReady, notReady);
 }

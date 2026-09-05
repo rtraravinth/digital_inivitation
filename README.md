@@ -1,36 +1,74 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# FACET
 
-## Getting Started
+A multi-role portfolio builder. One page per portfolio: a header, then as many
+sections as you need, each with the same four fields — title, description,
+tags, links. Keep a full page for everything you do, and short ones for the
+rooms where only part of it matters.
 
-First, run the development server:
+Two pieces:
+
+- **`/`** — the Next.js app: the editor, the builder, the theme gallery, stats
+  and account.
+- **`backend/`** — a FastAPI service on PostgreSQL that owns the data. See
+  [`backend/README.md`](backend/README.md).
+
+## Running it
+
+You need Python 3.12+, Node 20+, and a PostgreSQL you can create databases on.
+
+**1. The API**
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+cd backend
+python -m venv .venv
+.venv/Scripts/python -m pip install -e ".[dev]"     # macOS/Linux: .venv/bin/python
+cp .env.example .env                                 # then edit it
+createdb facet
+.venv/Scripts/python -m alembic upgrade head
+.venv/Scripts/python -m uvicorn app.main:app --reload
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Docs at <http://localhost:8000/docs>.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+**2. The app**
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+cp .env.local.example .env.local
+npm install
+npm run dev
+```
 
-## Learn More
+Open <http://localhost:3000>, create an account, and you are in. To start with
+the demo content instead of an empty page:
 
-To learn more about Next.js, take a look at the following resources:
+```bash
+cd backend
+.venv/Scripts/python -m app.cli seed --email you@example.com
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+**Stop the dev server before `npm run build`** — they share `.next` and
+contend, and a build against a live dev server takes minutes instead of
+seconds. If the UI looks unimplemented or your changes are not appearing,
+check for an orphaned server first: Next silently starts on 3001 while the
+browser keeps hitting a stale one on 3000.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Checks
 
-## Deploy on Vercel
+```bash
+npm run lint
+npm run build
+cd backend && .venv/Scripts/python -m pytest && .venv/Scripts/python -m ruff check app tests
+```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## What is real, and what is not
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Real: accounts, sign-in, passwords, two-step verification (TOTP), single-use
+recovery codes, the signed-in device list and its revoke buttons, portfolios,
+sections, uploads, publishing, all four privacy switches, view and click
+analytics, and export/import.
+
+Not real, and labelled as such on screen: **billing**, **custom domains** and
+**email notifications**. Each needs a third-party service this project has not
+chosen, so each renders a notice saying the setting is stored and enforces
+nothing. If you add one of those backends, delete its notice in the same
+change.

@@ -9,12 +9,69 @@ export type Stat = { id: string; label: string; value: string };
 export type DateEntry = { id: string; year: string; text: string };
 
 /**
- * An upload, kept as a data URI so it survives in localStorage with no
- * backend. Images are downscaled on the way in; see lib/assets.ts.
+ * An upload. `url` points at the API, which stores the bytes and does the
+ * downscaling — see lib/assets.ts.
+ *
+ * `dataUrl` is the pre-backend form and is kept optional so portfolios stored
+ * before the API existed still render. Read an asset with `assetSrc()`, never
+ * either field directly.
  */
-export type Asset = { name: string; mime: string; dataUrl: string; size: number };
+export type Asset = {
+  id?: string;
+  url?: string;
+  name: string;
+  mime: string;
+  size: number;
+  dataUrl?: string;
+};
+
+/** Where to load an asset from, whichever era it came from. */
+export function assetSrc(asset: Asset | null | undefined): string | undefined {
+  if (!asset) return undefined;
+  if (asset.url) {
+    return asset.url.startsWith("http")
+      ? asset.url
+      : `${process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") ?? "http://localhost:8000"}${asset.url}`;
+  }
+  return asset.dataUrl;
+}
 
 export type Quote = { text: string; attribution: string };
+
+/**
+ * What a section *is*, from the add-block picker. Purely presentational: it
+ * picks the glyph on the Links theme's rows and the label in the block
+ * manager. Every kind still has the same four fields underneath.
+ */
+export type BlockKind =
+  | "link"
+  | "venture"
+  | "contact"
+  | "booking"
+  | "testimonial"
+  | "gallery"
+  | "numbers"
+  | "document";
+
+export const BLOCK_TYPES: Array<{
+  id: BlockKind;
+  icon: string;
+  name: string;
+  desc: string;
+}> = [
+  { id: "link", icon: "↗", name: "Link", desc: "Anything with a URL" },
+  { id: "venture", icon: "▤", name: "Venture", desc: "Business with stats" },
+  { id: "contact", icon: "✉", name: "Contact", desc: "Email, call or form" },
+  { id: "booking", icon: "◷", name: "Booking", desc: "Calendar slot" },
+  { id: "testimonial", icon: "❝", name: "Testimonial", desc: "A client quote" },
+  { id: "gallery", icon: "▦", name: "Gallery", desc: "Photos, b&w" },
+  { id: "numbers", icon: "◸", name: "Numbers", desc: "Stat row" },
+  { id: "document", icon: "▣", name: "Document", desc: "PDF or one-pager" },
+];
+
+export const BLOCK_ICON: Record<BlockKind, string> = Object.fromEntries(
+  BLOCK_TYPES.map((b) => [b.id, b.icon]),
+) as Record<BlockKind, string>;
 
 /**
  * Every section is the same four fields — title, description, tags, links —
@@ -31,6 +88,9 @@ export type Section = {
   image: Asset | null;
   file: Asset | null;
   quote: Quote | null;
+  /** Hidden sections stay in the document and off the published page. */
+  hidden: boolean;
+  kind: BlockKind;
 };
 
 /** The header is a section with two extra lines: who you are, and what you're doing now. */
@@ -45,15 +105,88 @@ export type PortfolioHeader = {
 
 export type PortfolioStatus = "live" | "draft" | "empty";
 
-/** The three published-page structures. Content stays put; the frame changes. */
-export type ThemeId = "editorial" | "index" | "poster";
+/** The published-page structures. Content stays put; the frame changes. */
+export type ThemeId =
+  | "editorial"
+  | "index"
+  | "poster"
+  | "links"
+  | "ledger"
+  | "dossier"
+  | "broadsheet";
+
 export type Ground = "light" | "dark" | "paper";
 export type FontId = "archivo" | "fraunces" | "space-grotesk";
 
-export const THEMES: Array<{ id: ThemeId; name: string; desc: string }> = [
-  { id: "editorial", name: "Editorial", desc: "Tabs across a modular grid" },
-  { id: "index", name: "Index rail", desc: "Roles as a numbered sidebar, content as records" },
-  { id: "poster", name: "Poster", desc: "Accent field hero, roles as a statement" },
+/** The gallery filters by who a theme suits, not by what it looks like. */
+export type ThemeAudience = "founders" | "advisers" | "office" | "writers" | "multi";
+
+export const THEME_AUDIENCES: Array<{ id: ThemeAudience; name: string }> = [
+  { id: "founders", name: "Founders" },
+  { id: "advisers", name: "Advisers" },
+  { id: "office", name: "Public office" },
+  { id: "writers", name: "Writers" },
+  { id: "multi", name: "Multi-role" },
+];
+
+export const THEMES: Array<{
+  id: ThemeId;
+  name: string;
+  desc: string;
+  long: string;
+  badge?: string;
+  audiences: ThemeAudience[];
+}> = [
+  {
+    id: "editorial",
+    name: "Editorial",
+    desc: "Tabs across a modular grid",
+    long: "A tabbed grid with the portrait on the right. The default, and the safest.",
+    audiences: ["founders", "multi", "advisers"],
+  },
+  {
+    id: "index",
+    name: "Index rail",
+    desc: "Roles as a numbered sidebar, content as records",
+    long: "A numbered rail of roles beside records of the work. Good for long histories.",
+    audiences: ["advisers", "office", "multi"],
+  },
+  {
+    id: "poster",
+    name: "Poster",
+    desc: "Accent field hero, roles as a statement",
+    long: "A colour field and display type. Loud, for people who present a lot.",
+    audiences: ["founders", "writers"],
+  },
+  {
+    id: "links",
+    name: "Links",
+    desc: "Role tabs over a stack of tappable rows",
+    long: "One shareable page of rows, sized for a thumb. The link you put in a bio.",
+    audiences: ["founders", "writers", "multi"],
+  },
+  {
+    id: "ledger",
+    name: "Ledger",
+    desc: "Everything as one long table",
+    long: "Everything as one long table. Built for people with a lot of entries.",
+    audiences: ["advisers", "office"],
+  },
+  {
+    id: "dossier",
+    name: "Dossier",
+    desc: "Visitor picks a lens, the page rewrites itself",
+    long: "The visitor picks a lens first — one of your roles — and the page rewrites itself around it.",
+    badge: "New",
+    audiences: ["multi", "advisers", "office"],
+  },
+  {
+    id: "broadsheet",
+    name: "Broadsheet",
+    desc: "Columns of type with rules between",
+    long: "Three columns of type with rules between. Reads like a newspaper page.",
+    audiences: ["writers", "office"],
+  },
 ];
 
 export const GROUNDS: Array<{ id: Ground; name: string }> = [
@@ -80,6 +213,56 @@ export const FONTS: Array<{ id: FontId; name: string; sample: string; cssVar: st
 /** One accent runs the page — buttons, kickers and the closing banner. */
 export const SWATCHES = ["#ec3013", "#201e1d", "#1d4ed8", "#0f7b52", "#b45309"];
 
+/* ── layout ───────────────────────────────────────────────────────────── */
+
+/** How a visitor moves between the things you do. */
+export type RoleNav = "tabs" | "rail" | "scroll" | "lens";
+export type GridCols = 1 | 2 | 3;
+export type Density = "airy" | "standard" | "dense";
+
+export const ROLE_NAVS: Array<{ id: RoleNav; name: string }> = [
+  { id: "tabs", name: "Tabs across the page" },
+  { id: "rail", name: "Numbered side rail" },
+  { id: "scroll", name: "One scroll, roles as chapters" },
+  { id: "lens", name: "Visitor picks a lens first" },
+];
+
+export const DENSITIES: Array<{ id: Density; name: string }> = [
+  { id: "airy", name: "Airy" },
+  { id: "standard", name: "Standard" },
+  { id: "dense", name: "Dense — more per screen" },
+];
+
+/** The headline scale multiplies each theme's own display size. */
+export type TypeScale = "compact" | "default" | "display";
+
+export const TYPE_SCALES: Array<{ id: TypeScale; name: string; factor: number }> = [
+  { id: "compact", name: "Compact", factor: 0.82 },
+  { id: "default", name: "Default", factor: 1 },
+  { id: "display", name: "Display", factor: 1.28 },
+];
+
+export const DEFAULT_TRACKING = "-0.015em";
+
+export type Layout = {
+  roleNav: RoleNav;
+  grid: GridCols;
+  density: Density;
+  scale: TypeScale;
+  /** Any CSS letter-spacing value; the published page reads it as a token. */
+  tracking: string;
+};
+
+export function defaultLayout(): Layout {
+  return {
+    roleNav: "tabs",
+    grid: 2,
+    density: "standard",
+    scale: "default",
+    tracking: DEFAULT_TRACKING,
+  };
+}
+
 export type Portfolio = {
   id: string;
   name: string;
@@ -92,18 +275,31 @@ export type Portfolio = {
   accent: string;
   ground: Ground;
   font: FontId;
+  layout: Layout;
   header: PortfolioHeader;
   sections: Section[];
 };
 
+const THEME_IDS = new Set<string>(THEMES.map((t) => t.id));
+
 /** Fills in fields added after a portfolio was first stored. */
 export function normalize(p: Portfolio): Portfolio {
+  const layout = { ...defaultLayout(), ...(p.layout ?? {}) };
   return {
     ...p,
-    theme: p.theme ?? "editorial",
+    // An unknown theme means data from a build that had one we've since
+    // dropped; fall back rather than render nothing.
+    theme: THEME_IDS.has(p.theme) ? p.theme : "editorial",
     accent: p.accent ?? SWATCHES[0],
     ground: p.ground ?? "light",
     font: p.font ?? "archivo",
+    layout: {
+      roleNav: layout.roleNav ?? "tabs",
+      grid: layout.grid ?? 2,
+      density: layout.density ?? "standard",
+      scale: layout.scale ?? "default",
+      tracking: layout.tracking ?? DEFAULT_TRACKING,
+    },
     header: { ...emptyHeader(), ...(p.header ?? {}) },
     sections: (p.sections ?? []).map((s) => ({
       ...emptySection(s.id),
@@ -112,6 +308,8 @@ export function normalize(p: Portfolio): Portfolio {
       tags: s.tags ?? [],
       numbers: s.numbers ?? [],
       dates: s.dates ?? [],
+      hidden: s.hidden ?? false,
+      kind: s.kind ?? "link",
     })),
   };
 }
@@ -138,5 +336,212 @@ export function emptySection(id: string): Section {
     image: null,
     file: null,
     quote: null,
+    hidden: false,
+    kind: "link",
   };
 }
+
+/* ── account ──────────────────────────────────────────────────────────── */
+
+/**
+ * Everything on /account that isn't a portfolio. Most of it describes a
+ * server this build doesn't have — see NEEDS_SERVER below and the notice the
+ * Account page renders. It is stored, and honest about what it can't do.
+ */
+/** Mirrors PASSWORD_MIN in backend/app/schemas/auth.py. The server is what
+ * enforces it; this is so the UI can say so before the round trip. */
+export const PASSWORD_MIN = 12;
+
+export type AccountProfile = {
+  name: string;
+  handle: string;
+  current: string;
+  about: string;
+  tags: string[];
+  links: LinkItem[];
+  portrait: Asset | null;
+};
+
+/**
+ * What /account can safely know about your security settings. The TOTP seed
+ * and the recovery-code hashes never leave the server, so this carries a
+ * count rather than the codes themselves.
+ */
+export type AccountSecurity = {
+  email: string;
+  phone: string;
+  /** ISO timestamp, or null if it has never been changed. */
+  passwordChanged: string | null;
+  twoStep: boolean;
+  google: boolean;
+  recoveryCodesRemaining: number;
+};
+
+export type PlanId = "free" | "pro";
+
+export const PLANS: Array<{
+  id: PlanId;
+  name: string;
+  price: string;
+  features: string[];
+}> = [
+  {
+    id: "free",
+    name: "Free",
+    price: "₹0",
+    features: [
+      "One portfolio, unlimited sections",
+      "facet.page address",
+      "Basic view counts",
+    ],
+  },
+  {
+    id: "pro",
+    name: "Pro",
+    price: "₹499 / mo",
+    features: [
+      "Unlimited portfolios",
+      "Your own domain",
+      "Click and referrer stats",
+      "PDF export of any page",
+      "No Facet badge",
+    ],
+  },
+];
+
+export type NotificationKey =
+  | "booking"
+  | "weekly"
+  | "brokenLink"
+  | "mention"
+  | "product";
+
+export const NOTIFICATIONS: Array<{
+  id: NotificationKey;
+  title: string;
+  desc: string;
+}> = [
+  {
+    id: "booking",
+    title: "Someone books an intro call",
+    desc: "Email and push, straight away.",
+  },
+  {
+    id: "weekly",
+    title: "Weekly summary",
+    desc: "Views, clicks and where they came from.",
+  },
+  {
+    id: "brokenLink",
+    title: "A link on your page breaks",
+    desc: "We check your links once a week.",
+  },
+  {
+    id: "mention",
+    title: "Someone mentions your page",
+    desc: "When a site we can see links to you.",
+  },
+  {
+    id: "product",
+    title: "Product news from Facet",
+    desc: "New themes and section types. Roughly monthly.",
+  },
+];
+
+export type PrivacyKey = "indexable" | "showContact" | "countVisits" | "badge";
+
+export const PRIVACY_SETTINGS: Array<{
+  id: PrivacyKey;
+  title: string;
+  desc: string;
+  /** True when flipping this actually changes the app's behaviour. */
+  wired: boolean;
+}> = [
+  {
+    id: "indexable",
+    title: "Let search engines index my pages",
+    desc: "Turn off and your pages only open for people you send the link to.",
+    wired: true,
+  },
+  {
+    id: "showContact",
+    title: "Show contact details to signed-out visitors",
+    desc: "Off hides the header's links behind a note on the published page.",
+    wired: true,
+  },
+  {
+    id: "countVisits",
+    title: "Count visits",
+    desc: "Aggregate only, in this browser. No cookies, no third-party trackers.",
+    wired: true,
+  },
+  {
+    id: "badge",
+    title: "Show a “Made with Facet” badge",
+    desc: "The claim bar at the top of every published page.",
+    wired: true,
+  },
+];
+
+export type AccountSettings = {
+  profile: AccountProfile;
+  security: AccountSecurity;
+  plan: PlanId;
+  customDomain: string;
+  notifications: Record<NotificationKey, boolean>;
+  privacy: Record<PrivacyKey, boolean>;
+};
+
+export function defaultAccount(): AccountSettings {
+  // Empty, not a persona. This is what /account renders for the moment
+  // before the real account arrives, and inventing a name to fill that gap
+  // would be showing the user data that is not theirs.
+  return {
+    profile: {
+      name: "",
+      handle: "",
+      current: "",
+      about: "",
+      tags: [],
+      links: [],
+      portrait: null,
+    },
+    security: {
+      email: "",
+      phone: "",
+      passwordChanged: null,
+      twoStep: false,
+      google: false,
+      recoveryCodesRemaining: 0,
+    },
+    plan: "free",
+    customDomain: "",
+    notifications: {
+      booking: true,
+      weekly: true,
+      brokenLink: true,
+      mention: false,
+      product: false,
+    },
+    privacy: {
+      indexable: true,
+      showContact: true,
+      countVisits: true,
+      badge: true,
+    },
+  };
+}
+
+/**
+ * The three /account groups that still need a third-party service this build
+ * has not chosen. Their settings are stored and enforce nothing, and each
+ * group renders a <ServerNotice> saying so in as many words.
+ *
+ * Sign-in, passwords, two-step, recovery codes and the device list used to be
+ * on this list. They are real now, so they are not.
+ */
+export const NEEDS_SERVER = {
+  billing: "Taking a payment needs a payment processor.",
+  domain: "Serving your own domain needs DNS and a host.",
+  email: "Sending mail needs a mail service.",
+} as const;

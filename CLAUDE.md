@@ -4,15 +4,27 @@
 
 A multi-role portfolio builder. One page per portfolio: a header, then N
 sections, each with the same four fields — title, description, tags, links.
-Built from a Claude Design canvas (`Portfolio Page.dc.html`), turn 4.
+Built from a Claude Design canvas (`Portfolio Page.dc.html`), which now runs
+to five turns. Every artboard in it is implemented; the map from artboard to
+code is under "Layout" below.
 
 ## Running it
 
+Two processes. The frontend does nothing useful without the API.
+
 ```
-npm run dev     # http://localhost:3000
+cd backend && .venv/Scripts/python -m uvicorn app.main:app --reload   # :8000
+npm run dev                                                          # :3000
+```
+
+```
 npm run build
 npm run lint
+cd backend && .venv/Scripts/python -m pytest    # 208 tests
 ```
+
+`NEXT_PUBLIC_API_URL` points the frontend at the API; see
+`.env.local.example`. `backend/README.md` covers the database and migrations.
 
 **Stop the dev server before `npm run build`.** They share `.next` and
 contend; a build against a live dev server can take minutes instead of seconds.
@@ -31,20 +43,64 @@ your browser keeps hitting the stale server on 3000. Kill it (`taskkill //F
 
 ## Layout
 
-- `src/lib/types.ts` — `Portfolio` / `Section` / `PortfolioHeader`, plus
-  `normalize()`, which backfills fields added after data was stored. Extend it
-  whenever you add a field, or old localStorage data will break.
-- `src/lib/store.tsx` — an external store read via `useSyncExternalStore`.
-  localStorage is the backend; swap `commit()` and the initial read for API
-  calls. Do **not** move this to `setState`-in-`useEffect` — the React Compiler
-  lint rule rejects it.
-- `src/lib/seed.ts` — the five seeded portfolios.
+- `src/lib/types.ts` — `Portfolio` / `Section` / `PortfolioHeader` / `Layout`
+  / `AccountSettings`, plus `normalize()`, which backfills fields added after
+  data was stored. Extend it whenever you add a field, or data written by an
+  older build will break. `assetSrc()` lives here too: it resolves an upload
+  whether it carries an API `url` or a pre-backend `dataUrl`.
+- `src/lib/api.ts` — the typed API client. Access token in memory, refresh
+  token in an httpOnly cookie, one silent retry on a 401.
+- `src/lib/session.tsx` — who is signed in; `AuthGuard` wraps every page that
+  needs an account. `/p/[...slug]` is deliberately not guarded.
+- `src/lib/store.tsx` — an external store read via `useSyncExternalStore`,
+  backed by the API. Do **not** move this to `setState`-in-`useEffect` — the
+  React Compiler lint rule rejects it, which is why the one-shot load fires on
+  first `subscribe()`.
+- `src/lib/account.ts` — the same external-store shape for `/account`, with
+  one action per settings group because the API has one endpoint per group.
+- `src/lib/published.ts` — the server-side fetch behind `/p/[...slug]`.
+- `src/lib/qr.ts` — a hand-rolled QR encoder (byte mode, ECC L, versions 1–9,
+  mask 0). It exists because the print code on `/stats` has to actually scan
+  and the CSP rules out a CDN. Verified against published Reed–Solomon
+  generator polynomials and by round-tripping through an independent decoder.
+- `src/lib/seed.ts` — the five seeded portfolios. `backend/scripts/dump_seed.mjs`
+  transpiles this file and writes `backend/app/seed_data.json`, so the seed is
+  not maintained twice; re-run it whenever this changes.
 - `src/components/Editor.tsx` — artboards 4b (desktop document) and 4d (mobile),
   sharing one state tree.
-- `src/components/published/themes.tsx` — the published page in three themes:
-  Editorial (1a), Index rail (1b), Poster (1c).
+- `src/components/builder/` — `Builder.tsx` is artboards 2a (three-pane:
+  section rail, live canvas, tabbed inspector) and 2c (mobile control sheet);
+  `ThemeGallery.tsx` is 2b; `controls.tsx` holds the Theme / Colour / Type /
+  Layout controls **shared** with the editor's drawer so the two cannot drift.
+- `src/components/BlockManager.tsx` — artboard 3b, at `/blocks/[id]`.
+- `src/components/PrintAll.tsx` — `/print` stacks every published page with a
+  page break between so the browser's own **Save as PDF** can export them.
+  That is what "Download all pages as PDF" on `/account` opens; generating a
+  PDF in-process would mean a library, and the themes already print correctly.
+- `src/components/account/panels.tsx` + `Account.tsx` — artboards 5a and 5b.
+- `src/components/published/themes.tsx` — the published page in seven themes:
+  Editorial (1a), Index rail (1b), Poster (1c), Links (3a), Ledger, Dossier,
+  Broadsheet. Also `SectionDetail`, artboard 1d, reached at `?section=<id>`.
 - `src/app/globals.css` — the Modernist design system: tokens in `@theme`,
   component classes in `@layer components`.
+
+**The live canvas scales with a CSS transform, not `zoom`.** A transform does
+not change layout size, so the inner element gets the unscaled height it needs
+and scrolls itself while the outer box shows a shrunken window onto it.
+Anything simpler either pushes the page sideways or needs a second copy of the
+themes.
+
+**The headline scale is a CSS variable, not a class swap.** `groundStyle()`
+sets `--type-scale` and `--tracking` on the published wrapper; each theme's
+display heading multiplies its own size through `headline()`, and the heading
+rule in `globals.css` reads `--tracking`. A Tailwind `text-[64px]` utility
+would beat a base rule, so the size has to be inline — that is why `headline()`
+returns a style object rather than a class.
+
+**`p.layout.roleNav` only applies to Editorial, Links, Ledger and Broadsheet.**
+Index rail, Poster and Dossier carry their own navigation — it is the reason
+you would pick them. The Layout panel says so on screen rather than offering a
+control that silently does nothing.
 
 ## Design system: Modernist
 
@@ -66,27 +122,83 @@ The published page swaps the design system's own CSS variables on a wrapper
 (`groundStyle`), so every `.btn` and `.tag` follows the chosen accent and
 ground with no per-theme restyling.
 
-## Storage is the constraint
+## The backend
 
-localStorage is the only backend, and a browser gives this origin a few
-megabytes total. Uploads are therefore stored as data URIs with limits in
-`src/lib/assets.ts`: images are downscaled to 1400px and re-encoded as JPEG
-until they fit ~420KB; other attachments are capped at 800KB. When a write
-still fails, `commit()` records a message that the editor shows as a banner —
-a failed save must never be silent. Account offers export/import so the data
-can leave the browser.
+`backend/` is a FastAPI service on PostgreSQL, and it is where everything now
+lives: portfolios, uploads, analytics, accounts. Its own README covers running
+it, but two rules matter from this side:
+
+- **The frontend needs it up.** With the API down, every authenticated page
+  shows its error banner and `/p/[slug]` returns a 404 — there is no local
+  fallback and there should not be one.
+- **`src/lib/api.ts` is the only module that knows the API exists.** It owns
+  the access token, one silent refresh-and-retry on a 401, and turning an
+  error envelope into an `ApiError` with a `code` a caller can branch on.
+
+The API is camelCase on the wire, so its responses drop straight into the
+types in `src/lib/types.ts` with no mapping layer. Keep it that way.
+
+## Saving is optimistic, and never silent
+
+`store.tsx` and `account.ts` apply a change locally and fire their listeners
+before the request goes out, so typing never waits on a round trip. Text
+fields are debounced by 500ms per section — that was free against
+localStorage and is not free against an API — and anything still waiting is
+flushed on `pagehide`.
+
+When a write fails, the store re-reads from the server rather than restoring a
+snapshot: by the time a debounced save fails, that snapshot is several
+keystrokes stale, and reverting to it would throw away edits that were fine.
+The API's own message goes into `syncError`, which the editor and `/account`
+render as a banner. **A failed save must never be silent.**
+
+Uploads go to `POST /assets`, which sniffs the type from the bytes, downscales
+images to 1400px and strips their EXIF. The browser no longer resizes anything
+and there is no storage budget to respect — `src/lib/assets.ts` is a thin
+wrapper over the upload now.
 
 ## Analytics are real, not simulated
 
-`src/lib/analytics.ts` counts actual views of `/p/[slug]` and actual clicks on
-section links and file downloads, in localStorage. They reflect this browser
-only, and `/stats` says so on screen. Never replace them with generated or
-placeholder figures — show an empty state instead.
+`src/lib/analytics.ts` posts actual views of `/p/[slug]` and actual clicks on
+section links, and `/stats` reads the aggregate endpoint. They are counted
+from event rows across every visitor, not estimated and not per-browser.
+Never replace them with generated or placeholder figures — show an empty state
+instead. Recording answers 202 whether or not it counted, so a visitor never
+sees an analytics decision, including the owner having "count visits" off.
+
+## The published page is server-rendered
+
+`/p/[...slug]` is an async server component that fetches
+`GET /api/v1/public/p/{slug}`. Do not turn it back into a client fetch: the
+privacy switches are enforced in that response, and `generateMetadata` is what
+makes "let search engines index my pages" actually emit a robots tag.
+
+The owner's switches arrive already applied — `header.links` is empty when
+contact is hidden, hidden sections are absent — and reach the themes through
+`PrivacyProvider`. `usePublishedPrivacy()` reads that context. It used to read
+the *visitor's* account, which meant a signed-out visitor saw the defaults and
+a signed-in one had their own settings applied to somebody else's page.
 
 ## Known gaps
 
-- **No server.** Everything is per-browser: portfolios, uploads, analytics.
-- **`/account` is not designed** anywhere in the canvas; it holds page
-  addresses, export/import, and the reset actions.
+- **Three `/account` groups still describe services this build has not
+  chosen.** Billing needs a payment processor, custom domains need DNS and a
+  host, email notifications need a mail service. Each renders a
+  `<ServerNotice>` saying so in as many words. Do not quietly make them look
+  functional — if you add one, delete its notice in the same change.
+  Everything else on that page is real: sign-in, passwords, two-step (TOTP),
+  single-use recovery codes, the device list and its revoke buttons, and all
+  four Privacy switches.
 - **The published page has no signed-out vs. owner distinction**, so
-  "Claim your page" is decorative.
+  "Claim your page" is decorative. The `badge` privacy switch hides it.
+- **Reordering is buttons, not drag.** The canvas draws a drag handle and says
+  "hold to reorder"; the implementation uses up/down buttons, which are
+  keyboard-reachable and need no pointer heuristics.
+- **The canvas says "all 12 themes"; there are seven.** Seven are built and
+  real. Do not pad the gallery to hit the number in the artboard.
+- **Slugs are global.** Two accounts cannot both hold `rohan`, because the
+  address is `facet.page/<slug>` with nothing in front of it. The create
+  dialog surfaces the 409 as a message.
+- **The frontend has no test runner.** The backend has 208 pytest tests;
+  changes here are checked with `npm run lint`, `npm run build` and by
+  actually opening the app.

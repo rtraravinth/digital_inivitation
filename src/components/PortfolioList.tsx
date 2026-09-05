@@ -4,10 +4,11 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { CreatePortfolioDialog } from "./CreatePortfolioDialog";
-import { usePortfolios } from "@/lib/store";
+import { messageFor } from "@/lib/api";
+import { usePortfolios, type StartFrom } from "@/lib/store";
 import { STATUS_LABEL, type Portfolio } from "@/lib/types";
 
-function CardMenu({ onDelete }: { onDelete: () => void }) {
+function CardMenu({ id, onDelete }: { id: string; onDelete: () => void }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -36,9 +37,33 @@ function CardMenu({ onDelete }: { onDelete: () => void }) {
           className="border-divider bg-bg absolute right-0 top-6 z-10 border-2"
           style={{ boxShadow: "var(--shadow-md)" }}
         >
+          <Link
+            href={`/builder/${id}`}
+            className="btn btn-ghost w-full justify-start whitespace-nowrap px-3"
+          >
+            Visual builder
+          </Link>
+          <Link
+            href={`/themes/${id}`}
+            className="btn btn-ghost w-full justify-start whitespace-nowrap px-3"
+          >
+            Change theme
+          </Link>
+          <Link
+            href={`/blocks/${id}`}
+            className="btn btn-ghost w-full justify-start whitespace-nowrap px-3"
+          >
+            Manage blocks
+          </Link>
+          <Link
+            href={`/stats?p=${id}`}
+            className="btn btn-ghost w-full justify-start whitespace-nowrap px-3"
+          >
+            Views and clicks
+          </Link>
           <button
             type="button"
-            className="btn btn-ghost w-full justify-start whitespace-nowrap px-3"
+            className="btn btn-ghost border-divider w-full justify-start whitespace-nowrap border-t px-3"
             onClick={() => {
               setOpen(false);
               onDelete();
@@ -66,7 +91,7 @@ function PortfolioCard({
         <span className={`tag ${live ? "tag-accent" : "tag-neutral"}`}>
           {STATUS_LABEL[portfolio.status]}
         </span>
-        <CardMenu onDelete={onDelete} />
+        <CardMenu id={portfolio.id} onDelete={onDelete} />
       </div>
 
       <div className="font-heading text-[22px] font-extrabold leading-[1.15]">
@@ -84,8 +109,14 @@ function PortfolioCard({
       <div className="border-divider mt-auto flex items-center gap-2 border-t pt-3">
         <span className="text-neutral-600 text-[11px]">{portfolio.meta}</span>
         <Link
-          href={`/editor/${portfolio.id}`}
+          href={`/builder/${portfolio.id}`}
           className="font-heading ml-auto text-xs font-extrabold"
+        >
+          Builder
+        </Link>
+        <Link
+          href={`/editor/${portfolio.id}`}
+          className="font-heading text-xs font-extrabold"
         >
           Edit →
         </Link>
@@ -95,14 +126,24 @@ function PortfolioCard({
 }
 
 export function PortfolioList() {
-  const { portfolios, createPortfolio, deletePortfolio } = usePortfolios();
+  const { portfolios, createPortfolioAsync, deletePortfolio, storageError } =
+    usePortfolios();
   const [creating, setCreating] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
   const router = useRouter();
 
-  function create(name: string, slug: string, startFrom: Parameters<typeof createPortfolio>[2]) {
-    const id = createPortfolio(name, slug, startFrom);
-    setCreating(false);
-    router.push(`/editor/${id}`);
+  // The server mints the id, so the dialog stays open until it answers —
+  // navigating to a provisional id would land on a page that does not exist.
+  async function create(name: string, slug: string, startFrom: StartFrom) {
+    setCreateError(null);
+    try {
+      const created = await createPortfolioAsync(name, slug, startFrom);
+      setCreating(false);
+      router.push(`/editor/${created.id}`);
+    } catch (error) {
+      // A taken address is the common one, and the API says so in words.
+      setCreateError(messageFor(error));
+    }
   }
 
   return (
@@ -122,6 +163,15 @@ export function PortfolioList() {
           + Create portfolio
         </button>
       </div>
+
+      {(createError ?? storageError) && (
+        <div
+          className="border-accent bg-surface border-l-2 px-6 py-3 text-[13px] sm:px-10"
+          role="alert"
+        >
+          {createError ?? storageError}
+        </div>
+      )}
 
       <div className="border-divider border-b px-6 pb-6 pt-8 sm:px-10">
         <h1 className="mb-2.5 text-[32px] sm:text-[40px]">Your portfolios</h1>

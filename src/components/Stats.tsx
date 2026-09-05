@@ -1,15 +1,21 @@
 "use client";
 
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { useState } from "react";
+import { QrCode } from "./QrCode";
 import { useAnalytics } from "@/lib/analytics";
 import { usePortfolios } from "@/lib/store";
 
 export function Stats() {
   const { portfolios, ready } = usePortfolios();
   const analytics = useAnalytics();
+  const params = useSearchParams();
   const [id, setId] = useState<string | null>(null);
-  const p = portfolios.find((x) => x.id === id) ?? portfolios[0];
+  const [shareNote, setShareNote] = useState("");
+  // ?p= lets the block manager and the builder deep-link to one page's stats.
+  const p =
+    portfolios.find((x) => x.id === (id ?? params.get("p"))) ?? portfolios[0];
 
   if (!p) {
     return (
@@ -39,6 +45,19 @@ export function Stats() {
   const top = [...rows].sort((a, b) => b.clicks - a.clicks)[0];
   const hasData = views > 0 || clicks > 0;
 
+  const url = `https://facet.page/${p.slug}`;
+  const signature = `${p.header.name || p.name}\n${p.header.current}\n${url}`;
+
+  async function copyText(text: string, note: string) {
+    try {
+      await navigator.clipboard.writeText(text);
+      setShareNote(note);
+      window.setTimeout(() => setShareNote(""), 2400);
+    } catch {
+      setShareNote("This browser blocked the clipboard — copy the address by hand.");
+    }
+  }
+
   return (
     <>
       <div className="nav bg-bg">
@@ -63,7 +82,7 @@ export function Stats() {
             </option>
           ))}
         </select>
-        <span className="tag tag-neutral">Counted in this browser</span>
+        <span className="tag tag-neutral">Counted across every visitor</span>
       </div>
 
       <div className="grid items-start gap-5 p-5 lg:grid-cols-[390px_1fr]">
@@ -90,22 +109,15 @@ export function Stats() {
               </button>
             </div>
 
-            <div className="flex items-center gap-3">
-              <div
-                className="h-[104px] w-[104px] flex-none"
-                aria-hidden
-                style={{
-                  background:
-                    "repeating-conic-gradient(#201e1d 0 25%, #f3f2f2 0 50%) 0 0/16px 16px",
-                  boxShadow: "inset 0 0 0 2px var(--color-divider)",
-                }}
-              />
+            <div className="flex items-start gap-3">
+              <QrCode text={url} size={104} downloadName={`facet-${p.slug}.png`} />
               <div>
                 <div className="font-heading mb-1 text-[13px] font-extrabold">
                   Print code
                 </div>
                 <p className="text-neutral-700 m-0 mb-2 text-[11px]">
-                  For business cards, event badges and the back of a menu.
+                  For business cards, event badges and the back of a menu. It encodes{" "}
+                  {url} and scans like any other QR code.
                 </p>
                 <Link
                   href={`/p/${p.slug}`}
@@ -115,6 +127,51 @@ export function Stats() {
                   Open page
                 </Link>
               </div>
+            </div>
+
+            <div>
+              <h6 className="mb-2">Send it somewhere</h6>
+              <div className="flex flex-wrap gap-2">
+                <a
+                  href={`https://wa.me/?text=${encodeURIComponent(url)}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="tag tag-neutral no-underline"
+                >
+                  WhatsApp ↗
+                </a>
+                <a
+                  href={`https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(url)}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="tag tag-neutral no-underline"
+                >
+                  LinkedIn ↗
+                </a>
+                <button
+                  type="button"
+                  className="tag tag-neutral cursor-pointer"
+                  onClick={() => copyText(signature, "Email signature copied.")}
+                >
+                  Email signature
+                </button>
+                <button
+                  type="button"
+                  className="tag tag-neutral cursor-pointer"
+                  onClick={() => copyText(url, "Address copied — paste it in your bio.")}
+                >
+                  Add to bio
+                </button>
+              </div>
+              {shareNote && (
+                <p
+                  className="m-0 mt-2 text-[11px] font-extrabold"
+                  role="status"
+                  style={{ color: "var(--color-accent-700)" }}
+                >
+                  {shareNote}
+                </p>
+              )}
             </div>
           </div>
 
@@ -179,8 +236,8 @@ export function Stats() {
             <div className="px-5 py-6">
               <p className="text-neutral-800 m-0 mb-3 text-[13px]">
                 Nothing recorded yet. Views and clicks are counted when someone
-                opens the published page in this browser — there is no server
-                collecting them.
+                opens the published page, wherever they are. Nothing here is
+                estimated — an empty page means nobody has visited yet.
               </p>
               <Link href={`/p/${p.slug}`} className="btn btn-primary">
                 Open the published page

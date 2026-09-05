@@ -1,9 +1,23 @@
 "use client";
 
-import { useState } from "react";
+import Link from "next/link";
+import { createContext, useContext, useState } from "react";
 import type { CSSProperties } from "react";
 import { recordClick } from "@/lib/analytics";
-import { FONTS, type Asset, type Ground, type Portfolio, type Section } from "@/lib/types";
+import type { PublishedPrivacy } from "@/lib/published";
+import {
+  BLOCK_ICON,
+  DEFAULT_TRACKING,
+  FONTS,
+  TYPE_SCALES,
+  type Asset,
+  type Density,
+  type GridCols,
+  type Ground,
+  type Portfolio,
+  type Section,
+  assetSrc,
+} from "@/lib/types";
 
 const HATCH =
   "repeating-linear-gradient(45deg,#d7d3d3 0 6px,#eae9e9 6px 12px)";
@@ -39,13 +53,25 @@ const GROUNDS: Record<Ground, Record<string, string>> = {
 /** Overriding the system's own variables lets every .btn/.tag follow along. */
 export function groundStyle(p: Portfolio): CSSProperties {
   const face = FONTS.find((x) => x.id === p.font) ?? FONTS[0];
+  const scale = TYPE_SCALES.find((s) => s.id === p.layout.scale) ?? TYPE_SCALES[1];
   return {
     ...GROUNDS[p.ground],
     "--color-accent": p.accent,
     "--font-heading": `var(${face.cssVar}), system-ui, sans-serif`,
+    // Read by globals.css's heading rule and by headline() below.
+    "--tracking": p.layout.tracking || DEFAULT_TRACKING,
+    "--type-scale": String(scale.factor),
     background: "var(--color-bg)",
     color: "var(--color-ink)",
   } as CSSProperties;
+}
+
+/**
+ * A theme's own display size, multiplied by the headline scale. Inline so it
+ * beats the Tailwind arbitrary font-size utility it replaces.
+ */
+export function headline(size: string): CSSProperties {
+  return { fontSize: `calc(${size} * var(--type-scale, 1))` };
 }
 
 /**
@@ -55,6 +81,7 @@ export function groundStyle(p: Portfolio): CSSProperties {
 export function roles(p: Portfolio): string[] {
   const counts = new Map<string, number>();
   for (const s of p.sections) {
+    if (s.hidden) continue;
     for (const t of s.tags) counts.set(t, (counts.get(t) ?? 0) + 1);
   }
   return [...counts.entries()]
@@ -63,13 +90,17 @@ export function roles(p: Portfolio): string[] {
     .map(([t]) => t);
 }
 
-/** The optional extras aggregate up from the sections to the page. */
+/** The optional extras aggregate up from the visible sections to the page. */
 function allNumbers(p: Portfolio) {
-  return p.sections.flatMap((s) => s.numbers).filter((n) => n.value.trim());
+  return p.sections
+    .filter((s) => !s.hidden)
+    .flatMap((s) => s.numbers)
+    .filter((n) => n.value.trim());
 }
 
 function allDates(p: Portfolio) {
   return p.sections
+    .filter((s) => !s.hidden)
     .flatMap((s) => s.dates)
     .filter((d) => d.year.trim())
     .sort((a, b) => a.year.localeCompare(b.year));
@@ -116,10 +147,124 @@ function StatRow({ p, big }: { p: Portfolio; big?: boolean }) {
   );
 }
 
+/* ── layout ───────────────────────────────────────────────────────────── */
+
+/** Hidden sections stay in the document and never reach the published page. */
+export function visibleSections(p: Portfolio): Section[] {
+  return p.sections.filter((s) => !s.hidden);
+}
+
+/** Density is a padding scale; it changes how much fits on a screen. */
+const DENSITY_PAD: Record<Density, { card: string; page: string; row: string }> = {
+  airy: { card: "p-8", page: "px-8 py-10 md:px-12", row: "py-5" },
+  standard: { card: "p-6", page: "px-6 py-8 md:px-10", row: "py-3.5" },
+  dense: { card: "p-4", page: "px-4 py-5 md:px-6", row: "py-2" },
+};
+
+export function pad(p: Portfolio) {
+  return DENSITY_PAD[p.layout.density];
+}
+
+const GRID_COLS: Record<GridCols, string> = {
+  1: "",
+  2: "sm:grid-cols-2",
+  3: "sm:grid-cols-2 lg:grid-cols-3",
+};
+
+export function gridCols(p: Portfolio) {
+  return GRID_COLS[p.layout.grid];
+}
+
+/**
+ * Role navigation, in the four shapes the Layout panel offers.
+ *
+ * "scroll" drops the filter and groups the page into chapters instead;
+ * "lens" makes the visitor choose a role before anything else is shown.
+ * Index rail, Poster and Dossier carry their own navigation by definition —
+ * it is the reason you would pick them — so they ignore this.
+ */
 function useRoleFilter(p: Portfolio) {
-  const [role, setRole] = useState<string | null>(null);
-  const shown = role ? p.sections.filter((s) => s.tags.includes(role)) : p.sections;
-  return { role, setRole, shown };
+  const [role, setRoleRaw] = useState<string | null>(null);
+  // Separate from `role`, because "show me everything" is a real answer to
+  // the lens question and must not leave the visitor back on the gate.
+  const [answered, setAnswered] = useState(false);
+  const nav = p.layout.roleNav;
+  const all = visibleSections(p);
+  const shown = role ? all.filter((s) => s.tags.includes(role)) : all;
+
+  const setRole = (r: string | null) => {
+    setRoleRaw(r);
+    setAnswered(true);
+  };
+
+  const chapters =
+    nav === "scroll"
+      ? roles(p)
+          .map((r) => ({ role: r, sections: all.filter((s) => s.tags.includes(r)) }))
+          .filter((c) => c.sections.length > 0)
+      : [];
+
+  return {
+    role,
+    setRole,
+    shown,
+    nav,
+    chapters,
+    /** True until a "lens" page's opening question has been answered. */
+    gated: nav === "lens" && !answered,
+  };
+}
+
+/** The opening screen of a "visitor picks a lens first" page. */
+function LensGate({
+  p,
+  setRole,
+}: {
+  p: Portfolio;
+  setRole: (r: string | null) => void;
+}) {
+  const options = roles(p);
+  return (
+    <div className={`mx-auto max-w-[760px] ${pad(p).page}`}>
+      <h1 className="m-0 mb-3 leading-[1.05]" style={headline("40px")}>{p.header.name}</h1>
+      <p className="mb-8 max-w-[46ch] text-lg" style={{ color: "var(--color-neutral-800)" }}>
+        {p.header.description}
+      </p>
+      <h6 className="mb-3.5">What brings you here?</h6>
+      <div className="grid gap-0.5 sm:grid-cols-2" style={{ background: "var(--color-divider)" }}>
+        {options.map((r) => {
+          const count = visibleSections(p).filter((s) => s.tags.includes(r)).length;
+          return (
+            <button
+              key={r}
+              type="button"
+              onClick={() => setRole(r)}
+              className="flex cursor-pointer flex-col items-start gap-1 p-5 text-left"
+              style={{ background: "var(--color-bg)" }}
+            >
+              <span className="font-heading text-lg font-extrabold">{r}</span>
+              <span className="text-[12px]" style={{ color: "var(--color-neutral-700)" }}>
+                {count} {count === 1 ? "entry" : "entries"}
+              </span>
+            </button>
+          );
+        })}
+        <button
+          type="button"
+          onClick={() => setRole(null)}
+          className="flex cursor-pointer flex-col items-start gap-1 p-5 text-left"
+          style={{ background: "var(--color-bg)" }}
+        >
+          <span className="font-heading text-lg font-extrabold" style={{ color: "var(--color-accent)" }}>
+            Show me everything
+          </span>
+          <span className="text-[12px]" style={{ color: "var(--color-neutral-700)" }}>
+            {visibleSections(p).length} entries
+          </span>
+        </button>
+      </div>
+    </div>
+  );
 }
 
 function Tabs({
@@ -145,7 +290,7 @@ function Tabs({
               key={label}
               type="button"
               onClick={() => setRole(r)}
-              className="font-heading cursor-pointer px-4 py-2.5 text-[13px] font-extrabold"
+              className="font-heading flex-none cursor-pointer whitespace-nowrap px-4 py-2.5 text-[13px] font-extrabold"
               style={{
                 background: on ? "var(--color-bg)" : "transparent",
                 color: on ? "var(--color-ink)" : "inherit",
@@ -161,7 +306,9 @@ function Tabs({
             key={label}
             type="button"
             onClick={() => setRole(r)}
-            className="font-heading cursor-pointer py-3.5 text-sm font-extrabold"
+            // flex-none + nowrap: the row scrolls sideways inside its own
+            // overflow container rather than breaking a role name in half.
+            className="font-heading flex-none cursor-pointer whitespace-nowrap py-3.5 text-sm font-extrabold"
             style={{
               color: on ? "var(--color-accent)" : "var(--color-neutral-700)",
               boxShadow: on ? "inset 0 -3px 0 var(--color-accent)" : "none",
@@ -232,7 +379,7 @@ function Media({
     return (
       // eslint-disable-next-line @next/next/no-img-element
       <img
-        src={asset.dataUrl}
+        src={assetSrc(asset)}
         alt={asset.name}
         className={`grayscale-photo object-cover ${className}`}
       />
@@ -270,7 +417,7 @@ function SectionAside({ p, section }: { p: Portfolio; section: Section }) {
       )}
       {section.file && (
         <a
-          href={section.file.dataUrl}
+          href={assetSrc(section.file)}
           download={section.file.name}
           onClick={() => recordClick(p.slug, section.id)}
           className="btn btn-secondary self-start"
@@ -283,7 +430,36 @@ function SectionAside({ p, section }: { p: Portfolio; section: Section }) {
   );
 }
 
+/**
+ * The owner's privacy switches, handed down from the server response.
+ *
+ * This used to read the *visitor's* own account, which meant a signed-out
+ * visitor saw the defaults and a signed-in one had their own settings applied
+ * to somebody else's page. The server decides now, and passes the answer in.
+ */
+const PrivacyContext = createContext<PublishedPrivacy>({
+  noindex: false,
+  badge: true,
+  showContact: true,
+});
+
+export function PrivacyProvider({
+  value,
+  children,
+}: {
+  value: PublishedPrivacy;
+  children: React.ReactNode;
+}) {
+  return <PrivacyContext.Provider value={value}>{children}</PrivacyContext.Provider>;
+}
+
+export function usePublishedPrivacy() {
+  return useContext(PrivacyContext);
+}
+
 function ClaimBar() {
+  const privacy = usePublishedPrivacy();
+  if (!privacy.badge) return null;
   return (
     <div className="nav" style={{ background: "var(--color-bg)" }}>
       <span className="nav-brand">FACET</span>
@@ -296,13 +472,140 @@ function ClaimBar() {
   );
 }
 
+/** The header's links, unless the owner has hidden them from strangers. */
+function HeaderLinks({ p, block }: { p: Portfolio; block?: boolean }) {
+  const privacy = usePublishedPrivacy();
+  if (!privacy.showContact) {
+    return (
+      <p className="m-0 text-[12px]" style={{ color: "var(--color-neutral-700)" }}>
+        Contact details are hidden. Ask {p.header.name.split(" ")[0] || "the owner"} for
+        them directly.
+      </p>
+    );
+  }
+  return (
+    <div className={block ? "flex flex-col gap-2" : "flex flex-wrap gap-2"}>
+      {p.header.links.map((l) => (
+        <a
+          key={l.id}
+          href={href(l.url)}
+          target="_blank"
+          rel="noopener noreferrer"
+          className={`btn btn-secondary ${block ? "btn-block" : ""}`}
+        >
+          {l.label}
+        </a>
+      ))}
+    </div>
+  );
+}
+
+/**
+ * "Save contact" — a real vCard built from the header, so a phone that opens
+ * it files the page's owner in the address book. No server, no library: the
+ * card is assembled here and handed over as a blob.
+ */
+function saveContact(p: Portfolio) {
+  const esc = (v: string) => v.replace(/[\\;,]/g, (c) => `\\${c}`).replace(/\n/g, "\\n");
+  const emails = p.header.links.filter((l) => l.url.includes("@") && !l.url.includes("/"));
+  const urls = p.header.links.filter((l) => !emails.includes(l));
+
+  const lines = [
+    "BEGIN:VCARD",
+    "VERSION:3.0",
+    `FN:${esc(p.header.name)}`,
+    p.header.current && `TITLE:${esc(p.header.current)}`,
+    p.header.description && `NOTE:${esc(p.header.description)}`,
+    ...emails.map((l) => `EMAIL;TYPE=INTERNET:${esc(l.url.trim())}`),
+    ...urls.map((l) => `URL:${esc(href(l.url))}`),
+    `URL:https://facet.page/${esc(p.slug)}`,
+    "END:VCARD",
+  ].filter(Boolean);
+
+  const blob = new Blob([lines.join("\r\n")], { type: "text/vcard;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `${p.header.name.trim().replace(/\s+/g, "-").toLowerCase() || p.slug}.vcf`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+/** A section's title, linking through to its own page — artboard 1d. */
+function SectionTitleLink({
+  p,
+  section,
+  className,
+}: {
+  p: Portfolio;
+  section: Section;
+  className: string;
+}) {
+  return (
+    <Link
+      href={`/p/${p.slug}?section=${section.id}`}
+      className={className}
+      style={{ color: "inherit", textDecoration: "none" }}
+    >
+      {section.title}
+    </Link>
+  );
+}
+
 /* ── 1a Editorial — tabs across a modular grid ────────────────────────── */
 
+/** One card in the Editorial / Poster / Broadsheet grids. */
+function SectionCard({ p, section }: { p: Portfolio; section: Section }) {
+  return (
+    <div
+      className={`flex flex-col gap-2.5 ${pad(p).card}`}
+      style={{
+        background: "var(--color-bg)",
+        borderRight: "1px solid var(--color-divider)",
+        borderBottom: "1px solid var(--color-divider)",
+      }}
+    >
+      {section.image && <Media asset={section.image} className="mb-1 h-[150px] w-full" />}
+      {section.tags[0] && <span className="card-kicker">{section.tags[0]}</span>}
+      <SectionTitleLink
+        p={p}
+        section={section}
+        className="font-heading text-[21px] font-extrabold leading-tight hover:underline"
+      />
+      <p className="m-0 flex-1 text-sm opacity-80">{section.description}</p>
+      <SectionAside p={p} section={section} />
+      <SectionLinks p={p} section={section} />
+    </div>
+  );
+}
+
 export function Editorial({ p }: { p: Portfolio }) {
-  const { role, setRole, shown } = useRoleFilter(p);
+  const { role, setRole, shown, nav, chapters, gated } = useRoleFilter(p);
   const cta = p.header.links[0];
   const numbers = allNumbers(p);
   const dates = allDates(p);
+  const railRoles = [null, ...roles(p)];
+  const showContact = usePublishedPrivacy().showContact;
+
+  if (gated) {
+    return (
+      <div style={groundStyle(p)}>
+        <ClaimBar />
+        <LensGate p={p} setRole={setRole} />
+      </div>
+    );
+  }
+
+  const cards = (
+    <div
+      className={`grid ${gridCols(p)}`}
+      style={{ borderRight: "1px solid var(--color-divider)" }}
+    >
+      {shown.map((s) => (
+        <SectionCard key={s.id} p={p} section={s} />
+      ))}
+    </div>
+  );
 
   return (
     <div style={groundStyle(p)}>
@@ -311,7 +614,7 @@ export function Editorial({ p }: { p: Portfolio }) {
       <div className="grid gap-12 px-6 pb-8 pt-10 md:grid-cols-[1fr_380px] md:px-10">
         <div>
           {p.header.current && <Kicker>{p.header.current}</Kicker>}
-          <h1 className="m-0 mb-4 text-[40px] leading-[1.02] md:text-[64px]">
+          <h1 className="m-0 mb-4 leading-[1.02]" style={headline("clamp(40px, 6vw, 64px)")}>
             {p.header.name}
           </h1>
           <p className="m-0 mb-5 max-w-[44ch] text-lg">{p.header.description}</p>
@@ -335,45 +638,103 @@ export function Editorial({ p }: { p: Portfolio }) {
         </div>
       </div>
 
-      <div
-        className="flex gap-7 overflow-x-auto px-6 md:px-10"
-        style={{ borderBottom: "2px solid var(--color-divider)" }}
-      >
-        <Tabs p={p} role={role} setRole={setRole} variant="underline" />
-      </div>
-
-      {/* 1a: cards span two columns, "By the numbers" holds the third. */}
-      <div
-        className="grid lg:grid-cols-[1fr_1fr_340px]"
-        style={{ borderBottom: "2px solid var(--color-divider)" }}
-      >
+      {nav === "tabs" && (
         <div
-          className="grid sm:grid-cols-2 lg:col-span-2"
-          style={{ borderRight: "2px solid var(--color-divider)" }}
+          className="flex gap-7 overflow-x-auto px-6 md:px-10"
+          style={{ borderBottom: "2px solid var(--color-divider)" }}
         >
-          {shown.map((s) => (
-            <div
-              key={s.id}
-              className="flex flex-col gap-2.5 p-6"
-              style={{
-                background: "var(--color-bg)",
-                borderRight: "1px solid var(--color-divider)",
-                borderBottom: "1px solid var(--color-divider)",
-              }}
-            >
-              {s.image && <Media asset={s.image} className="mb-1 h-[150px] w-full" />}
-              {s.tags[0] && <span className="card-kicker">{s.tags[0]}</span>}
-              <span className="font-heading text-[21px] font-extrabold leading-tight">
-                {s.title}
-              </span>
-              <p className="m-0 flex-1 text-sm opacity-80">{s.description}</p>
-              <SectionAside p={p} section={s} />
-              <SectionLinks p={p} section={s} />
-            </div>
-          ))}
+          <Tabs p={p} role={role} setRole={setRole} variant="underline" />
         </div>
+      )}
 
-        {numbers.length > 0 && (
+      {nav === "lens" && (
+        <div
+          className="flex flex-wrap items-center gap-3 px-6 py-3 md:px-10"
+          style={{ borderBottom: "2px solid var(--color-divider)" }}
+        >
+          <span className="text-[12px]" style={{ color: "var(--color-neutral-700)" }}>
+            Showing
+          </span>
+          <span className="tag tag-accent">{role ?? "Everything"}</span>
+          <button type="button" className="btn btn-ghost" onClick={() => setRole(null)}>
+            Everything
+          </button>
+        </div>
+      )}
+
+      {/* Cards beside "By the numbers" — unless a rail is taking the left. */}
+      <div
+        className={`grid ${
+          nav === "rail"
+            ? "lg:grid-cols-[220px_1fr]"
+            : numbers.length > 0
+              ? "lg:grid-cols-[1fr_340px]"
+              : ""
+        }`}
+        style={{ borderBottom: "2px solid var(--color-divider)" }}
+      >
+        {nav === "rail" && (
+          <div
+            className="p-4"
+            style={{
+              background: "var(--color-surface)",
+              borderRight: "2px solid var(--color-divider)",
+            }}
+          >
+            {railRoles.map((r, i) => {
+              const on = r === role;
+              const count = r
+                ? visibleSections(p).filter((s) => s.tags.includes(r)).length
+                : visibleSections(p).length;
+              return (
+                <button
+                  key={r ?? "all"}
+                  type="button"
+                  onClick={() => setRole(r)}
+                  className="flex w-full cursor-pointer items-center gap-3 py-2.5 text-left text-sm"
+                  style={{
+                    borderBottom: "1px solid var(--color-divider)",
+                    color: on ? "var(--color-accent)" : "inherit",
+                    fontWeight: on ? 800 : 400,
+                  }}
+                >
+                  <span className="font-heading text-[11px] font-extrabold opacity-55">
+                    {String(i).padStart(2, "0")}
+                  </span>
+                  <span>{r ?? "All work"}</span>
+                  <span className="ml-auto text-[11px] opacity-55">{count}</span>
+                </button>
+              );
+            })}
+          </div>
+        )}
+
+        {nav === "scroll" ? (
+          <div>
+            {chapters.map((c) => (
+              <div key={c.role}>
+                <div
+                  className="px-6 py-3 md:px-10"
+                  style={{
+                    background: "var(--color-surface)",
+                    borderBottom: "1px solid var(--color-divider)",
+                  }}
+                >
+                  <h6 className="m-0">{c.role}</h6>
+                </div>
+                <div className={`grid ${gridCols(p)}`}>
+                  {c.sections.map((s) => (
+                    <SectionCard key={s.id} p={p} section={s} />
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          cards
+        )}
+
+        {numbers.length > 0 && nav !== "rail" && (
           <div className="p-6">
             <h6 className="mb-3.5">By the numbers</h6>
             {numbers.map((n) => (
@@ -393,6 +754,9 @@ export function Editorial({ p }: { p: Portfolio }) {
           </div>
         )}
       </div>
+
+      {/* The rail takes the column the numbers panel would have used. */}
+      {numbers.length > 0 && nav === "rail" && <StatRow p={p} />}
 
       {dates.length > 0 && (
         <div className="px-6 py-8 md:px-10">
@@ -430,22 +794,23 @@ export function Editorial({ p }: { p: Portfolio }) {
         <div className="font-heading max-w-[22ch] text-[26px] font-extrabold leading-[1.15]">
           Working on something that needs a steady hand on the numbers?
         </div>
-        {cta && (
-          <button
-            type="button"
+        {cta && showContact && (
+          <a
+            href={href(cta.url)}
+            target="_blank"
+            rel="noopener noreferrer"
             className="btn md:ml-auto"
             style={{ background: "var(--color-bg)", color: "var(--color-ink)" }}
           >
             {cta.label}
-          </button>
+          </a>
         )}
-        <button
-          type="button"
-          className="btn"
+        <span
+          className={`btn ${cta && showContact ? "" : "md:ml-auto"}`}
           style={{ borderColor: "var(--color-bg)", color: "var(--color-bg)" }}
         >
           facet.page/{p.slug}
-        </button>
+        </span>
       </div>
     </div>
   );
@@ -474,7 +839,7 @@ export function IndexRail({ p }: { p: Portfolio }) {
           >
             <Media asset={p.header.portrait} className="h-full w-full" />
           </div>
-          <h2 className="mb-1.5 text-[30px]">{p.header.name}</h2>
+          <h2 className="mb-1.5" style={headline("30px")}>{p.header.name}</h2>
           <p className="mb-5 text-[13px]" style={{ color: "var(--color-neutral-700)" }}>
             {p.header.current}
           </p>
@@ -483,8 +848,8 @@ export function IndexRail({ p }: { p: Portfolio }) {
             {all.map((r, i) => {
               const on = r === role;
               const count = r
-                ? p.sections.filter((s) => s.tags.includes(r)).length
-                : p.sections.length;
+                ? visibleSections(p).filter((s) => s.tags.includes(r)).length
+                : visibleSections(p).length;
               return (
                 <button
                   key={r ?? "all"}
@@ -507,12 +872,8 @@ export function IndexRail({ p }: { p: Portfolio }) {
             })}
           </div>
 
-          <div className="mt-6 flex flex-col gap-2">
-            {p.header.links.map((l) => (
-              <button key={l.id} type="button" className="btn btn-secondary btn-block">
-                {l.label}
-              </button>
-            ))}
+          <div className="mt-6">
+            <HeaderLinks p={p} block />
           </div>
         </div>
 
@@ -540,7 +901,11 @@ export function IndexRail({ p }: { p: Portfolio }) {
                   <tr key={s.id}>
                     <td className="font-extrabold">{String(i + 1).padStart(2, "0")}</td>
                     <td>
-                      <div className="font-extrabold">{s.title}</div>
+                      <SectionTitleLink
+                        p={p}
+                        section={s}
+                        className="block font-extrabold hover:underline"
+                      />
                       <div
                         className="text-xs"
                         style={{ color: "var(--color-neutral-700)" }}
@@ -591,7 +956,7 @@ export function Poster({ p }: { p: Portfolio }) {
           </button>
         </div>
 
-        <h1 className="m-0 mb-5 text-[56px] leading-[0.92] tracking-[-0.03em] md:text-[104px]">
+        <h1 className="m-0 mb-5 leading-[0.92] tracking-[-0.03em]" style={headline("clamp(56px, 10vw, 104px)")}>
           {p.header.name.split(" ").map((w, i) => (
             <span key={`${w}-${i}`} className="block">
               {w}
@@ -608,26 +973,26 @@ export function Poster({ p }: { p: Portfolio }) {
       <StatRow p={p} big />
 
       <div
-        className="grid md:grid-cols-2"
+        className={`grid ${gridCols(p)}`}
         style={{ borderTop: "2px solid var(--color-divider)" }}
       >
         {shown.map((s) => (
           <div
             key={s.id}
-            className="flex flex-col gap-3 p-7"
+            className={`flex flex-col gap-3 ${pad(p).card}`}
             style={{
               background: "var(--color-bg)",
               borderRight: "1px solid var(--color-divider)",
               borderBottom: "1px solid var(--color-divider)",
             }}
           >
-            <div
-              className="h-[150px]"
-            >
+            <div className="h-[150px]">
               <Media asset={s.image} className="h-full w-full" caption="image — 16:9" />
             </div>
             {s.tags[0] && <span className="card-kicker">{s.tags[0]}</span>}
-            <h3 className="m-0">{s.title}</h3>
+            <h3 className="m-0">
+              <SectionTitleLink p={p} section={s} className="hover:underline" />
+            </h3>
             <p className="m-0 text-sm" style={{ color: "var(--color-neutral-800)" }}>
               {s.description}
             </p>
@@ -665,8 +1030,595 @@ export function Poster({ p }: { p: Portfolio }) {
   );
 }
 
+/* ── 3a Links — role tabs over a stack of tappable rows ───────────────── */
+
+export function Links({ p }: { p: Portfolio }) {
+  const { role, setRole, shown, nav, gated } = useRoleFilter(p);
+  const showContact = usePublishedPrivacy().showContact;
+  const cta = p.header.links[0];
+
+  if (gated) {
+    return (
+      <div style={groundStyle(p)}>
+        <ClaimBar />
+        <LensGate p={p} setRole={setRole} />
+      </div>
+    );
+  }
+
+  return (
+    <div style={groundStyle(p)}>
+      <ClaimBar />
+
+      <div className="mx-auto w-full max-w-[560px]">
+        <div
+          className="px-[18px] pb-4 pt-6"
+          style={{ borderBottom: "2px solid var(--color-divider)" }}
+        >
+          <div className="flex items-start gap-3.5">
+            <div className="h-[72px] w-[72px] flex-none">
+              <Media asset={p.header.portrait} className="h-full w-full" />
+            </div>
+            <div>
+              <h2 className="m-0 mb-1" style={headline("24px")}>{p.header.name}</h2>
+              <p className="m-0 text-[13px]" style={{ color: "var(--color-neutral-800)" }}>
+                {p.header.description}
+              </p>
+            </div>
+          </div>
+          <div className="mt-3 flex flex-wrap gap-1.5">
+            {p.header.tags.map((t, i) => (
+              <span key={t} className={`tag ${i === 0 ? "tag-accent" : "tag-neutral"}`}>
+                {t}
+              </span>
+            ))}
+          </div>
+        </div>
+
+        {nav !== "scroll" && (
+          <div
+            className="flex gap-[18px] overflow-x-auto px-[18px]"
+            style={{ borderBottom: "2px solid var(--color-divider)" }}
+          >
+            <Tabs p={p} role={role} setRole={setRole} variant="underline" />
+          </div>
+        )}
+
+        {shown.map((s, i) => {
+          const first = s.links[0];
+          const sub = first?.label || s.tags.join(" · ") || s.description;
+          const inner = (
+            <>
+              <span
+                className="font-heading flex h-[34px] w-[34px] flex-none items-center justify-center text-xs font-extrabold"
+                style={{
+                  color: "var(--color-accent)",
+                  boxShadow: "inset 0 0 0 2px var(--color-divider)",
+                }}
+              >
+                {BLOCK_ICON[s.kind] ?? String(i + 1).padStart(2, "0")}
+              </span>
+              <span className="flex min-w-0 flex-col gap-0.5">
+                <span className="font-heading text-[15px] font-extrabold leading-tight">
+                  {s.title}
+                </span>
+                <span
+                  className="truncate text-xs"
+                  style={{ color: "var(--color-neutral-700)" }}
+                >
+                  {sub}
+                </span>
+              </span>
+              <span
+                className="font-heading ml-auto pl-2 text-sm font-extrabold"
+                style={{ color: "var(--color-neutral-700)" }}
+              >
+                {first ? "↗" : "›"}
+              </span>
+            </>
+          );
+          // 44px minimum hit target — these rows are built for a thumb.
+          const rowClass =
+            "flex min-h-[56px] items-center gap-3 px-[18px] py-3.5 no-underline";
+          const rowStyle = {
+            borderBottom: "1px solid var(--color-divider)",
+            color: "var(--color-ink)",
+          };
+          return first ? (
+            <a
+              key={s.id}
+              href={href(first.url)}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={() => recordClick(p.slug, s.id)}
+              className={rowClass}
+              style={rowStyle}
+            >
+              {inner}
+            </a>
+          ) : (
+            <Link
+              key={s.id}
+              href={`/p/${p.slug}?section=${s.id}`}
+              className={rowClass}
+              style={rowStyle}
+            >
+              {inner}
+            </Link>
+          );
+        })}
+
+        {showContact && (
+          <div
+            className="flex gap-2 px-[18px] py-4"
+            style={{ borderBottom: "2px solid var(--color-divider)" }}
+          >
+            {cta && (
+              <a
+                href={href(cta.url)}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="btn btn-primary flex-1"
+              >
+                {cta.label}
+              </a>
+            )}
+            <button
+              type="button"
+              className={`btn btn-secondary ${cta ? "" : "flex-1"}`}
+              onClick={() => saveContact(p)}
+            >
+              Save contact
+            </button>
+          </div>
+        )}
+
+        <div className="flex items-center gap-2 px-[18px] py-3.5">
+          <span className="text-[11px]" style={{ color: "var(--color-neutral-700)" }}>
+            facet.page/{p.slug}
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ── Ledger — everything as one long table ────────────────────────────── */
+
+export function Ledger({ p }: { p: Portfolio }) {
+  const { role, setRole, shown, nav, gated } = useRoleFilter(p);
+  const dates = allDates(p);
+
+  if (gated) {
+    return (
+      <div style={groundStyle(p)}>
+        <ClaimBar />
+        <LensGate p={p} setRole={setRole} />
+      </div>
+    );
+  }
+
+  /** The earliest year a section mentions, which is what a ledger sorts by. */
+  const since = (s: Section) =>
+    s.dates.map((d) => d.year).sort()[0] ?? "";
+
+  return (
+    <div style={groundStyle(p)}>
+      <ClaimBar />
+
+      <div
+        className={pad(p).page}
+        style={{ borderBottom: "2px solid var(--color-divider)" }}
+      >
+        <h1 className="m-0 mb-2 leading-[1.05]" style={headline("34px")}>{p.header.name}</h1>
+        <p className="m-0 max-w-[60ch] text-[15px]">{p.header.current}</p>
+      </div>
+
+      {nav !== "scroll" && (
+        <div
+          className="flex gap-7 overflow-x-auto px-6 md:px-10"
+          style={{ borderBottom: "2px solid var(--color-divider)" }}
+        >
+          <Tabs p={p} role={role} setRole={setRole} variant="underline" />
+        </div>
+      )}
+
+      <div className="overflow-x-auto">
+        <table className="table">
+          <thead>
+            <tr>
+              <th style={{ width: 60 }}>#</th>
+              <th style={{ width: 90 }}>Since</th>
+              <th>Entry</th>
+              <th style={{ width: 150 }}>Role</th>
+              <th style={{ width: 120 }}>Figures</th>
+              <th style={{ width: 180 }}>Links</th>
+            </tr>
+          </thead>
+          <tbody>
+            {shown.map((s, i) => (
+              <tr key={s.id}>
+                <td className="font-extrabold">{String(i + 1).padStart(2, "0")}</td>
+                <td>{since(s) || "—"}</td>
+                <td>
+                  <SectionTitleLink
+                    p={p}
+                    section={s}
+                    className="block font-extrabold hover:underline"
+                  />
+                  <div className="text-xs" style={{ color: "var(--color-neutral-700)" }}>
+                    {s.description}
+                  </div>
+                </td>
+                <td>{s.tags[0] && <span className="tag tag-neutral">{s.tags[0]}</span>}</td>
+                <td className="text-[13px]">
+                  {s.numbers.map((n) => n.value).join(", ") || "—"}
+                </td>
+                <td className="text-[13px]">
+                  <SectionLinks p={p} section={s} />
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <StatRow p={p} />
+
+      {dates.length > 0 && (
+        <div className="overflow-x-auto">
+          <table className="table">
+            <thead>
+              <tr>
+                <th style={{ width: 90 }}>Year</th>
+                <th>Event</th>
+              </tr>
+            </thead>
+            <tbody>
+              {dates.map((d) => (
+                <tr key={d.id}>
+                  <td className="font-extrabold" style={{ color: "var(--color-accent)" }}>
+                    {d.year}
+                  </td>
+                  <td>{d.text}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ── Dossier — the visitor picks a lens, the page rewrites itself ─────── */
+
+export function Dossier({ p }: { p: Portfolio }) {
+  // A lens is the whole point of this theme, so it asks regardless of the
+  // Layout panel's role-navigation setting.
+  const [lens, setLens] = useState<string | null>(null);
+  const [answered, setAnswered] = useState(false);
+  const showContact = usePublishedPrivacy().showContact;
+  const all = visibleSections(p);
+  const shown = lens ? all.filter((s) => s.tags.includes(lens)) : all;
+  const options = roles(p);
+
+  if (!answered) {
+    return (
+      <div style={groundStyle(p)}>
+        <ClaimBar />
+        <LensGate
+          p={p}
+          setRole={(r) => {
+            setLens(r);
+            setAnswered(true);
+          }}
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div style={groundStyle(p)}>
+      <ClaimBar />
+
+      <div
+        className="flex flex-wrap items-center gap-2 px-6 py-3 md:px-10"
+        style={{ background: "var(--color-surface)", borderBottom: "2px solid var(--color-divider)" }}
+      >
+        <span className="text-[12px]" style={{ color: "var(--color-neutral-700)" }}>
+          Reading as
+        </span>
+        {options.map((r) => (
+          <button
+            key={r}
+            type="button"
+            onClick={() => setLens(r)}
+            className={`tag cursor-pointer ${lens === r ? "tag-accent" : "tag-neutral"}`}
+          >
+            {r}
+          </button>
+        ))}
+        <button
+          type="button"
+          onClick={() => setLens(null)}
+          className={`tag cursor-pointer ${lens === null ? "tag-accent" : "tag-outline"}`}
+        >
+          Everything
+        </button>
+      </div>
+
+      <div className={`mx-auto max-w-[820px] ${pad(p).page}`}>
+        <Kicker>{lens ?? "The whole picture"}</Kicker>
+        <h1 className="m-0 mb-4 leading-[1.02]" style={headline("44px")}>{p.header.name}</h1>
+        <p className="m-0 mb-6 max-w-[54ch] text-lg">{p.header.description}</p>
+        {showContact && <HeaderLinks p={p} />}
+
+        <hr className="hr" />
+
+        {shown.map((s, i) => (
+          <article key={s.id} className={DENSITY_PAD[p.layout.density].row}>
+            <div className="mb-2 flex items-baseline gap-3">
+              <span
+                className="font-heading text-[11px] font-extrabold"
+                style={{ color: "var(--color-accent)" }}
+              >
+                {String(i + 1).padStart(2, "0")}
+              </span>
+              <h3 className="m-0">
+                <SectionTitleLink p={p} section={s} className="hover:underline" />
+              </h3>
+            </div>
+            {s.image && <Media asset={s.image} className="mb-3 h-[200px] w-full" />}
+            <p className="m-0 mb-2 max-w-[62ch] text-[15px]">{s.description}</p>
+            {s.numbers.length > 0 && (
+              <div className="mb-2 flex flex-wrap gap-5">
+                {s.numbers.map((n) => (
+                  <span key={n.id} className="flex items-baseline gap-1.5">
+                    <span className="font-heading text-lg font-extrabold">{n.value}</span>
+                    <span
+                      className="text-[11px]"
+                      style={{ color: "var(--color-neutral-700)" }}
+                    >
+                      {n.label}
+                    </span>
+                  </span>
+                ))}
+              </div>
+            )}
+            <SectionAside p={p} section={s} />
+            <SectionLinks p={p} section={s} />
+            <hr className="hr" />
+          </article>
+        ))}
+
+        {shown.length === 0 && (
+          <p style={{ color: "var(--color-neutral-700)" }}>
+            Nothing filed under {lens}. Try another lens above.
+          </p>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ── Broadsheet — columns of type with rules between ──────────────────── */
+
+export function Broadsheet({ p }: { p: Portfolio }) {
+  const { role, setRole, shown, nav, gated } = useRoleFilter(p);
+  const dates = allDates(p);
+
+  if (gated) {
+    return (
+      <div style={groundStyle(p)}>
+        <ClaimBar />
+        <LensGate p={p} setRole={setRole} />
+      </div>
+    );
+  }
+
+  return (
+    <div style={groundStyle(p)}>
+      <ClaimBar />
+
+      {/* Masthead */}
+      <div
+        className="px-6 pb-4 pt-8 text-center md:px-10"
+        style={{ borderBottom: "4px double var(--color-divider)" }}
+      >
+        <h1 className="m-0 leading-none tracking-[-0.02em]" style={headline("clamp(44px, 7vw, 68px)")}>
+          {p.header.name}
+        </h1>
+        <p
+          className="m-0 mt-2 text-[12px] uppercase tracking-[0.18em]"
+          style={{ color: "var(--color-neutral-700)" }}
+        >
+          {p.header.current}
+        </p>
+      </div>
+
+      {nav !== "scroll" && (
+        <div
+          className="flex justify-center gap-7 overflow-x-auto px-6 md:px-10"
+          style={{ borderBottom: "2px solid var(--color-divider)" }}
+        >
+          <Tabs p={p} role={role} setRole={setRole} variant="underline" />
+        </div>
+      )}
+
+      <div className={pad(p).page}>
+        <p className="m-0 mb-6 text-[19px] leading-relaxed first-letter:float-left first-letter:mr-2 first-letter:font-extrabold first-letter:text-[56px] first-letter:leading-[0.8]">
+          {p.header.description}
+        </p>
+
+        {/* Real newspaper columns — the rule between them is a column-rule. */}
+        <div
+          className="[column-gap:2rem] md:[column-count:2] lg:[column-count:3]"
+          style={{ columnRule: "1px solid var(--color-divider)" }}
+        >
+          {shown.map((s) => (
+            <article key={s.id} className="mb-6 break-inside-avoid">
+              {s.tags[0] && <span className="card-kicker">{s.tags[0]}</span>}
+              <h3 className="m-0 mb-1.5 mt-1 text-[19px]">
+                <SectionTitleLink p={p} section={s} className="hover:underline" />
+              </h3>
+              {s.image && <Media asset={s.image} className="mb-2 h-[120px] w-full" />}
+              <p className="m-0 mb-2 text-[14px] leading-snug">{s.description}</p>
+              {s.quote?.text && (
+                <blockquote
+                  className="m-0 my-2 py-1 pl-3 text-[14px] italic"
+                  style={{ borderLeft: "3px solid var(--color-accent)" }}
+                >
+                  “{s.quote.text}”
+                </blockquote>
+              )}
+              <SectionLinks p={p} section={s} />
+            </article>
+          ))}
+        </div>
+      </div>
+
+      <StatRow p={p} />
+
+      {dates.length > 0 && (
+        <div className={pad(p).page} style={{ borderTop: "2px solid var(--color-divider)" }}>
+          <h6 className="mb-3.5">In brief</h6>
+          <div
+            className="[column-gap:2rem] md:[column-count:2] lg:[column-count:3]"
+            style={{ columnRule: "1px solid var(--color-divider)" }}
+          >
+            {dates.map((d) => (
+              <div key={d.id} className="mb-2 break-inside-avoid text-[14px]">
+                <span
+                  className="font-heading mr-2 font-extrabold"
+                  style={{ color: "var(--color-accent)" }}
+                >
+                  {d.year}
+                </span>
+                {d.text}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ── 1d Section detail — one entry on its own page ────────────────────── */
+
+export function SectionDetail({ p, section }: { p: Portfolio; section: Section }) {
+  const index = visibleSections(p).findIndex((s) => s.id === section.id);
+  const total = visibleSections(p).length;
+
+  return (
+    <div style={groundStyle(p)}>
+      <div
+        className="flex items-center gap-2.5 px-4 py-3"
+        style={{ borderBottom: "2px solid var(--color-divider)" }}
+      >
+        <Link href={`/p/${p.slug}`} className="btn btn-secondary">
+          ← Back
+        </Link>
+        <span
+          className="ml-auto text-[12px]"
+          style={{ color: "var(--color-neutral-700)" }}
+        >
+          {index >= 0 ? `Entry ${index + 1} / ${total}` : p.header.name}
+        </span>
+      </div>
+
+      <div className="mx-auto w-full max-w-[720px]">
+        <Media asset={section.image} className="h-[180px] w-full md:h-[280px]" />
+
+        <div className="px-4 py-5 md:px-6">
+          {section.tags[0] && <span className="card-kicker">{section.tags.join(" · ")}</span>}
+          <h1 className="m-0 mb-2.5 mt-2 leading-tight" style={headline("clamp(28px, 5vw, 40px)")}>
+            {section.title}
+          </h1>
+          <p className="m-0 text-[15px]" style={{ color: "var(--color-neutral-800)" }}>
+            {section.description}
+          </p>
+        </div>
+
+        {section.numbers.length > 0 && (
+          <div
+            className="grid grid-cols-2"
+            style={{
+              borderTop: "2px solid var(--color-divider)",
+              borderBottom: "2px solid var(--color-divider)",
+            }}
+          >
+            {section.numbers.map((n) => (
+              <div
+                key={n.id}
+                className="px-4 py-3.5"
+                style={{
+                  background: "var(--color-bg)",
+                  borderRight: "1px solid var(--color-divider)",
+                  borderBottom: "1px solid var(--color-divider)",
+                }}
+              >
+                <div className="font-heading text-[22px] font-extrabold leading-none">
+                  {n.value}
+                </div>
+                <div className="text-[11px]" style={{ color: "var(--color-neutral-700)" }}>
+                  {n.label}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <div className="px-4 py-4 md:px-6">
+          {section.dates.length > 0 && (
+            <>
+              <h6 className="mb-3">Milestones</h6>
+              {[...section.dates]
+                .sort((a, b) => a.year.localeCompare(b.year))
+                .map((d) => (
+                  <div
+                    key={d.id}
+                    className="flex gap-3.5 py-2.5"
+                    style={{ borderBottom: "1px solid var(--color-divider)" }}
+                  >
+                    <span
+                      className="font-heading w-11 flex-none text-[13px] font-extrabold"
+                      style={{ color: "var(--color-accent)" }}
+                    >
+                      {d.year}
+                    </span>
+                    <span className="text-[13px]">{d.text}</span>
+                  </div>
+                ))}
+            </>
+          )}
+
+          <div className="mt-4 flex flex-col gap-3">
+            <SectionAside p={p} section={section} />
+            <SectionLinks p={p} section={section} />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function PublishedBody({ p }: { p: Portfolio }) {
-  if (p.theme === "index") return <IndexRail p={p} />;
-  if (p.theme === "poster") return <Poster p={p} />;
-  return <Editorial p={p} />;
+  switch (p.theme) {
+    case "index":
+      return <IndexRail p={p} />;
+    case "poster":
+      return <Poster p={p} />;
+    case "links":
+      return <Links p={p} />;
+    case "ledger":
+      return <Ledger p={p} />;
+    case "dossier":
+      return <Dossier p={p} />;
+    case "broadsheet":
+      return <Broadsheet p={p} />;
+    default:
+      return <Editorial p={p} />;
+  }
 }

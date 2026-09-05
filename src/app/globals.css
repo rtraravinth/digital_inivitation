@@ -71,7 +71,9 @@
     font-family: var(--font-heading);
     font-weight: 800;
     line-height: 1.12;
-    letter-spacing: -0.015em;
+    /* Retuned per portfolio by the Layout panel; groundStyle() sets the var
+       on the published page's wrapper. */
+    letter-spacing: var(--tracking, -0.015em);
     margin: 0 0 0.5rem;
   }
   h1 {
@@ -403,5 +405,26 @@
     justify-content: flex-end;
     gap: 0.5rem;
     margin-top: 0.5rem;
+  }
+}
+
+/* ── print ─────────────────────────────────────────────────────────────
+   /print stacks every published page for the browser's own Save as PDF.
+   Chrome drops background colours unless the user ticks "Background
+   graphics", so ask for them: the accent bands are the design, not decoration.
+   ──────────────────────────────────────────────────────────────────── */
+@media print {
+  .no-print {
+    display: none !important;
+  }
+  .page-break {
+    break-after: page;
+  }
+  .page-break:last-child {
+    break-after: auto;
+  }
+  body {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
   }
 }

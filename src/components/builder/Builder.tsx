@@ -9,7 +9,7 @@ import {
   ThemeThumb,
   TypeControl,
 } from "./controls";
-import { PublishedBody, roles } from "../published/themes";
+import { PublishedBody, tabs } from "../published/themes";
 import { PublishedLock } from "../PublishedLock";
 import { usePortfolios } from "@/lib/store";
 import {
@@ -112,7 +112,7 @@ function Canvas({
 function SectionRail({ p }: { p: Portfolio }) {
   const { addSection, moveSection, toggleSectionHidden } = usePortfolios();
   const [selected, setSelected] = useState<string | null>(null);
-  const pageRoles = roles(p);
+  const pageTabs = tabs(p);
 
   return (
     <>
@@ -198,16 +198,16 @@ function SectionRail({ p }: { p: Portfolio }) {
       </div>
 
       <div className="border-divider border-t-2 p-3.5">
-        <h6 className="mb-2.5">Roles on this page</h6>
+        <h6 className="mb-2.5">Tabs on this page</h6>
         <div className="flex flex-wrap gap-1.5">
-          {pageRoles.map((r, i) => (
-            <span key={r} className={`tag ${i === 0 ? "tag-accent" : "tag-neutral"}`}>
-              {r}
+          {pageTabs.map((t, i) => (
+            <span key={t} className={`tag ${i === 0 ? "tag-accent" : "tag-neutral"}`}>
+              {t}
             </span>
           ))}
-          {pageRoles.length === 0 && (
+          {pageTabs.length === 0 && (
             <span className="text-neutral-700 text-[11px]">
-              Tag a section and its tags become the roles a visitor can filter by.
+              Add a section and its tab becomes one a visitor can move along.
             </span>
           )}
         </div>
@@ -288,11 +288,6 @@ export function Builder({ id }: { id: string }) {
 
         <Link href={`/editor/${p.id}`} className="btn btn-secondary">
           Document
-        </Link>
-        {/* The mobile sheet has had this in its Content tab all along; the
-            desktop bar is where the same route belongs at this width. */}
-        <Link href={`/blocks/${p.id}`} className="btn btn-secondary">
-          Blocks
         </Link>
         <Link
           href={previewPath(p.id)}
@@ -542,9 +537,6 @@ export function Builder({ id }: { id: string }) {
               </div>
               <Link href={`/editor/${p.id}`} className="btn btn-primary btn-block">
                 Open the full document editor
-              </Link>
-              <Link href={`/blocks/${p.id}`} className="btn btn-secondary btn-block">
-                Manage blocks
               </Link>
             </div>
           )}

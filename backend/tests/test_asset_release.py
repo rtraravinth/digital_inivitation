@@ -42,7 +42,7 @@ async def rows(db_session) -> set[str]:
 async def test_replacing_a_section_image_drops_the_old_one(auth_client, portfolio, db_session):
     section = (
         await auth_client.post(
-            f"/api/v1/portfolios/{portfolio['id']}/sections", json={"kind": "gallery"}
+            f"/api/v1/portfolios/{portfolio['id']}/sections", json={}
         )
     ).json()
     first, second = await upload(auth_client, (1, 2, 3)), await upload(auth_client, (4, 5, 6))
@@ -60,7 +60,7 @@ async def test_replacing_a_section_image_drops_the_old_one(auth_client, portfoli
 async def test_clearing_a_section_image_drops_it(auth_client, portfolio, db_session):
     section = (
         await auth_client.post(
-            f"/api/v1/portfolios/{portfolio['id']}/sections", json={"kind": "gallery"}
+            f"/api/v1/portfolios/{portfolio['id']}/sections", json={}
         )
     ).json()
     asset = await upload(auth_client, (7, 8, 9))
@@ -75,7 +75,7 @@ async def test_clearing_a_section_image_drops_it(auth_client, portfolio, db_sess
 async def test_an_upload_still_used_elsewhere_survives(auth_client, portfolio, db_session):
     """The same asset on two sections: detaching one must not delete it."""
     make = lambda: auth_client.post(  # noqa: E731
-        f"/api/v1/portfolios/{portfolio['id']}/sections", json={"kind": "gallery"}
+        f"/api/v1/portfolios/{portfolio['id']}/sections", json={}
     )
     one, two = (await make()).json(), (await make()).json()
     asset = await upload(auth_client, (11, 12, 13))
@@ -93,7 +93,7 @@ async def test_an_unattached_upload_is_left_alone(auth_client, portfolio, db_ses
     """The window between uploading and attaching must not collect it."""
     section = (
         await auth_client.post(
-            f"/api/v1/portfolios/{portfolio['id']}/sections", json={"kind": "gallery"}
+            f"/api/v1/portfolios/{portfolio['id']}/sections", json={}
         )
     ).json()
     attached, loose = await upload(auth_client, (1, 1, 1)), await upload(auth_client, (2, 2, 2))

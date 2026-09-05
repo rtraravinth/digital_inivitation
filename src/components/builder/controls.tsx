@@ -353,9 +353,9 @@ export function LayoutControl({ p, onChange }: { p: Portfolio; onChange: Recipe 
 
   return (
     <>
-      <h6 className="mb-1.5">Role navigation</h6>
+      <h6 className="mb-1.5">Tab navigation</h6>
       <p className="text-neutral-700 text-xs">
-        How visitors move between the things you do.
+        How visitors move between your tabs.
       </p>
       {!navApplies && (
         <p

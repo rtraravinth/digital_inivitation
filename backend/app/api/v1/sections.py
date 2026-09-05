@@ -33,12 +33,20 @@ router = APIRouter(
 
 
 @router.post(
-    "", status_code=status.HTTP_201_CREATED, response_model=SectionOut, summary="Add a block"
+    "",
+    status_code=status.HTTP_201_CREATED,
+    response_model=SectionOut,
+    summary="Add a section",
+    description=(
+        "The body is empty — a section has no type to choose. The new one "
+        "files under the tab the page already uses, so it is reachable the "
+        "moment it exists."
+    ),
 )
 async def add_section(
     payload: SectionCreate, portfolio: EditablePortfolio, session: SessionDep
 ) -> SectionOut:
-    section = await SectionService(session).add(portfolio, payload.kind)
+    section = await SectionService(session).add(portfolio)
     return section_out(section)
 
 

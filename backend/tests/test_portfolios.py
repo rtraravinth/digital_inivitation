@@ -232,6 +232,58 @@ async def test_patch_header_stores_tags_and_links(auth_client, portfolio):
     assert header["links"][0]["label"] == "Email"
 
 
+async def test_patch_header_stores_the_pages_numbers_and_timeline(auth_client, portfolio):
+    """They belong to the page: one "By the numbers" row, one timeline."""
+    response = await auth_client.patch(
+        f"/api/v1/portfolios/{portfolio['id']}/header",
+        json={
+            "numbers": [{"id": "n1", "label": "Cities", "value": "3"}],
+            "dates": [{"id": "d1", "year": "2021", "text": "Founded"}],
+        },
+    )
+    assert response.status_code == 200
+
+    header = response.json()["header"]
+    assert header["numbers"][0]["value"] == "3"
+    assert header["dates"][0]["year"] == "2021"
+
+
+async def test_a_section_no_longer_carries_numbers_or_a_timeline(auth_client, portfolio):
+    section = portfolio["sections"][0]
+    assert "numbers" not in section
+    assert "dates" not in section
+
+    response = await auth_client.patch(
+        f"/api/v1/portfolios/{portfolio['id']}/sections/{section['id']}",
+        json={"numbers": [{"id": "n1", "label": "Cities", "value": "3"}]},
+    )
+    assert response.status_code == 422
+
+
+async def test_copying_a_portfolio_carries_its_numbers_and_timeline(auth_client, portfolio):
+    await auth_client.patch(
+        f"/api/v1/portfolios/{portfolio['id']}/header",
+        json={
+            "numbers": [{"id": "n1", "label": "Cities", "value": "3"}],
+            "dates": [{"id": "d1", "year": "2021", "text": "Founded"}],
+        },
+    )
+
+    response = await auth_client.post(
+        "/api/v1/portfolios",
+        json={
+            "name": "Copy",
+            "slug": "rohan-copy",
+            "startFrom": {"kind": "copy", "id": portfolio["id"]},
+        },
+    )
+    assert response.status_code == 201, response.text
+
+    header = response.json()["header"]
+    assert header["numbers"][0]["label"] == "Cities"
+    assert header["dates"][0]["text"] == "Founded"
+
+
 async def test_publish_sets_status_live_and_unpublish_sets_draft(auth_client, portfolio):
     up = await auth_client.post(f"/api/v1/portfolios/{portfolio['id']}/publish")
     assert up.json()["status"] == "live"

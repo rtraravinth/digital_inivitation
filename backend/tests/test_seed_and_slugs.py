@@ -161,7 +161,7 @@ async def test_the_seeds_live_pages_publish_and_serve(auth_client, client):
     assert detail["header"]["name"] == "Rohan Mehta"
     assert len(detail["sections"]) == 6
     assert detail["sections"][0]["title"] == "Northwell Kitchens"
-    assert detail["sections"][0]["numbers"][0]["value"] == "11"
+    assert detail["header"]["numbers"][0]["value"] == "11"
 
     published = await client.get(f"/api/v1/public/p/{TEST_HANDLE}/full")
     assert published.status_code == 200

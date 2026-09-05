@@ -71,7 +71,7 @@ export function Stats() {
   const rows = p.sections.map((s) => ({
     id: s.id,
     title: s.title || "Untitled",
-    role: s.tags[0] ?? "—",
+    tab: s.tab,
     hasLink: s.links.length > 0,
     clicks: perSection[s.id] ?? 0,
   }));
@@ -183,7 +183,7 @@ export function Stats() {
                 <thead>
                   <tr>
                     <th>Section</th>
-                    <th style={{ width: 130 }}>Role</th>
+                    <th style={{ width: 130 }}>Tab</th>
                     <th style={{ width: 90 }}>Clicks</th>
                     <th style={{ width: 80 }}>Rate</th>
                   </tr>
@@ -193,7 +193,7 @@ export function Stats() {
                     <tr key={r.id}>
                       <td className="font-extrabold">{r.title}</td>
                       <td>
-                        <span className="tag tag-neutral">{r.role}</span>
+                        <span className="tag tag-neutral">{r.tab}</span>
                       </td>
                       <td>{r.clicks}</td>
                       <td>

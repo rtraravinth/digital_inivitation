@@ -22,7 +22,7 @@ from app.models.enums import (
 from app.schemas.account import LinkItem
 from app.schemas.asset import AssetOut
 from app.schemas.common import CamelModel, StrictCamelModel
-from app.schemas.section import SectionOut
+from app.schemas.section import DateEntry, SectionOut, Stat
 
 #: Lowercase, digits and hyphens, in one or more "/"-separated segments; each
 #: segment starts and ends alphanumeric. The address is facet.page/<slug>, so
@@ -48,11 +48,20 @@ class Layout(StrictCamelModel):
 
 
 class HeaderOut(CamelModel):
+    """The header, plus the two lists the whole page shares.
+
+    ``numbers`` feeds the "By the numbers" row and ``dates`` the timeline.
+    Both are drawn once per page, so they belong to the portfolio and not to
+    whichever section happened to be typed into first.
+    """
+
     name: str
     current: str
     description: str
     tags: list[str]
     links: list[LinkItem]
+    numbers: list[Stat]
+    dates: list[DateEntry]
     portrait: AssetOut | None
 
 
@@ -62,6 +71,8 @@ class HeaderPatch(StrictCamelModel):
     description: str | None = Field(default=None, max_length=20_000)
     tags: list[str] | None = Field(default=None, max_length=40)
     links: list[LinkItem] | None = Field(default=None, max_length=60)
+    numbers: list[Stat] | None = Field(default=None, max_length=40)
+    dates: list[DateEntry] | None = Field(default=None, max_length=60)
     portrait_asset_id: uuid.UUID | None = None
     clear_portrait: bool = False
 

@@ -18,11 +18,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.errors import AppError, ValidationFailed
 from app.models import Asset, Portfolio, PortfolioHeader, Section, User
 from app.models.enums import (
-    BLOCK_KINDS,
     DEFAULT_ACCENT,
+    DEFAULT_TAB,
     FONTS,
     GROUNDS,
     STATUSES,
+    TAB_MAX_LENGTH,
     THEMES,
 )
 from app.models.portfolio import default_layout
@@ -68,6 +69,8 @@ class TransferService:
                 "description": header.description,
                 "tags": list(header.tags or []),
                 "links": list(header.links or []),
+                "numbers": list(header.numbers or []),
+                "dates": list(header.dates or []),
                 "portrait": _asset_dict(header.portrait),
             },
             "sections": [
@@ -75,13 +78,10 @@ class TransferService:
                     "id": str(section.id),
                     "title": section.title,
                     "description": section.description,
-                    "tags": list(section.tags or []),
+                    "tab": section.tab,
                     "links": list(section.links or []),
-                    "numbers": list(section.numbers or []),
-                    "dates": list(section.dates or []),
                     "quote": section.quote,
                     "hidden": section.hidden,
-                    "kind": section.kind,
                     "image": _asset_dict(section.image),
                     "file": _asset_dict(section.file),
                 }
@@ -133,6 +133,7 @@ class TransferService:
         self, user: User, raw: dict[str, Any], slug: str
     ) -> Portfolio:
         header_raw = raw.get("header") or {}
+        sections_raw = [s for s in (raw.get("sections") or []) if isinstance(s, dict)]
 
         portfolio = Portfolio(
             user_id=user.id,
@@ -155,6 +156,8 @@ class TransferService:
             description=str(header_raw.get("description") or ""),
             tags=list(header_raw.get("tags") or []),
             links=list(header_raw.get("links") or []),
+            numbers=_page_list(header_raw, sections_raw, "numbers"),
+            dates=_page_list(header_raw, sections_raw, "dates"),
             portrait_asset_id=await self._restore_asset(user, header_raw.get("portrait")),
         )
 
@@ -163,18 +166,14 @@ class TransferService:
                 position=index,
                 title=str(section.get("title") or ""),
                 description=str(section.get("description") or ""),
-                tags=list(section.get("tags") or []),
+                tab=_tab_of(section),
                 links=list(section.get("links") or []),
-                numbers=list(section.get("numbers") or []),
-                dates=list(section.get("dates") or []),
                 quote=section.get("quote"),
                 hidden=bool(section.get("hidden")),
-                kind=_one_of(section.get("kind"), BLOCK_KINDS, "link"),
                 image_asset_id=await self._restore_asset(user, section.get("image")),
                 file_asset_id=await self._restore_asset(user, section.get("file")),
             )
-            for index, section in enumerate(raw.get("sections") or [])
-            if isinstance(section, dict)
+            for index, section in enumerate(sections_raw)
         ]
 
         self.session.add(portfolio)
@@ -244,6 +243,36 @@ class _MemoryUpload:
         chunk = self._data[self._offset : end]
         self._offset = end
         return chunk
+
+
+def _tab_of(section: dict[str, Any]) -> str:
+    """The section's tab, or the first of the tags an older export wrote.
+
+    Tags used to be a list, and the page filtered on all of them. Only the
+    first can survive as a tab, which is what the tab row showed first.
+    """
+    tab = str(section.get("tab") or "").strip()
+    if tab:
+        return tab[:TAB_MAX_LENGTH]
+    for tag in section.get("tags") or []:
+        if isinstance(tag, str) and tag.strip():
+            return tag.strip()[:TAB_MAX_LENGTH]
+    return DEFAULT_TAB
+
+
+def _page_list(
+    header_raw: dict[str, Any], sections_raw: list[dict[str, Any]], field: str
+) -> list[Any]:
+    """The page's numbers, or its timeline, wherever the export put them.
+
+    They used to be written on each section and gathered up for display. An
+    export from that build has them there and nowhere else, so it is read the
+    same way the page read it: every section's, in order.
+    """
+    on_header = header_raw.get(field)
+    if on_header:
+        return list(on_header)
+    return [entry for section in sections_raw for entry in (section.get(field) or [])]
 
 
 def _asset_dict(asset: Asset | None) -> dict[str, Any] | None:

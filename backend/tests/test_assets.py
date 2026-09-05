@@ -144,7 +144,11 @@ async def test_attaching_an_asset_to_a_section_returns_it_nested(auth_client, po
         json={"imageAssetId": asset["id"]},
     )
     assert response.status_code == 200
-    assert response.json()["image"]["url"] == asset["url"]
+    image = response.json()["image"]
+    # Not the whole URL: its signature is minted per response, so two
+    # serialisations a second apart carry different tokens for one asset.
+    assert image["id"] == asset["id"]
+    assert image["url"].startswith(f"/api/v1/assets/{asset['id']}?t=")
 
     cleared = await auth_client.patch(
         f"/api/v1/portfolios/{portfolio['id']}/sections/{section_id}",

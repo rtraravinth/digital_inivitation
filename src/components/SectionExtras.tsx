@@ -4,9 +4,10 @@ import { useState } from "react";
 import { UploadButton } from "./UploadButton";
 import { formatBytes, readFileAsset, readImageAsset } from "@/lib/assets";
 import { newId } from "@/lib/store";
-import { assetSrc, type Asset, type Section } from "@/lib/types";
+import { assetSrc, type Asset, type PortfolioHeader, type Section } from "@/lib/types";
 
 type Change = (recipe: (s: Section) => Section) => void;
+type HeaderChange = (recipe: (h: PortfolioHeader) => PortfolioHeader) => void;
 
 function AssetChip({
   asset,
@@ -48,13 +49,13 @@ function AssetChip({
   );
 }
 
-function NumberRows({ section, onChange }: { section: Section; onChange: Change }) {
-  if (section.numbers.length === 0) return null;
+function NumberRows({ header, onChange }: { header: PortfolioHeader; onChange: HeaderChange }) {
+  if (header.numbers.length === 0) return null;
   return (
     <div className="field mb-3">
       <label>Numbers — shown in “By the numbers”</label>
       <div className="flex flex-col gap-1.5">
-        {section.numbers.map((n) => (
+        {header.numbers.map((n) => (
           <div key={n.id} className="flex items-start gap-1.5">
             <div className="grid flex-1 gap-1.5 sm:grid-cols-[110px_1fr]">
               <input
@@ -63,9 +64,9 @@ function NumberRows({ section, onChange }: { section: Section; onChange: Change 
                 aria-label="Number value"
                 value={n.value}
                 onChange={(e) =>
-                  onChange((s) => ({
-                    ...s,
-                    numbers: s.numbers.map((x) =>
+                  onChange((h) => ({
+                    ...h,
+                    numbers: h.numbers.map((x) =>
                       x.id === n.id ? { ...x, value: e.target.value } : x,
                     ),
                   }))
@@ -77,9 +78,9 @@ function NumberRows({ section, onChange }: { section: Section; onChange: Change 
                 aria-label="Number label"
                 value={n.label}
                 onChange={(e) =>
-                  onChange((s) => ({
-                    ...s,
-                    numbers: s.numbers.map((x) =>
+                  onChange((h) => ({
+                    ...h,
+                    numbers: h.numbers.map((x) =>
                       x.id === n.id ? { ...x, label: e.target.value } : x,
                     ),
                   }))
@@ -91,9 +92,9 @@ function NumberRows({ section, onChange }: { section: Section; onChange: Change 
               className="btn btn-secondary btn-icon"
               aria-label="Remove number"
               onClick={() =>
-                onChange((s) => ({
-                  ...s,
-                  numbers: s.numbers.filter((x) => x.id !== n.id),
+                onChange((h) => ({
+                  ...h,
+                  numbers: h.numbers.filter((x) => x.id !== n.id),
                 }))
               }
             >
@@ -106,13 +107,13 @@ function NumberRows({ section, onChange }: { section: Section; onChange: Change 
   );
 }
 
-function DateRows({ section, onChange }: { section: Section; onChange: Change }) {
-  if (section.dates.length === 0) return null;
+function DateRows({ header, onChange }: { header: PortfolioHeader; onChange: HeaderChange }) {
+  if (header.dates.length === 0) return null;
   return (
     <div className="field mb-3">
       <label>Dates — shown in the timeline</label>
       <div className="flex flex-col gap-1.5">
-        {section.dates.map((d) => (
+        {header.dates.map((d) => (
           <div key={d.id} className="flex items-start gap-1.5">
             <div className="grid flex-1 gap-1.5 sm:grid-cols-[110px_1fr]">
               <input
@@ -121,9 +122,9 @@ function DateRows({ section, onChange }: { section: Section; onChange: Change })
                 aria-label="Year"
                 value={d.year}
                 onChange={(e) =>
-                  onChange((s) => ({
-                    ...s,
-                    dates: s.dates.map((x) =>
+                  onChange((h) => ({
+                    ...h,
+                    dates: h.dates.map((x) =>
                       x.id === d.id ? { ...x, year: e.target.value } : x,
                     ),
                   }))
@@ -135,9 +136,9 @@ function DateRows({ section, onChange }: { section: Section; onChange: Change })
                 aria-label="Event"
                 value={d.text}
                 onChange={(e) =>
-                  onChange((s) => ({
-                    ...s,
-                    dates: s.dates.map((x) =>
+                  onChange((h) => ({
+                    ...h,
+                    dates: h.dates.map((x) =>
                       x.id === d.id ? { ...x, text: e.target.value } : x,
                     ),
                   }))
@@ -149,7 +150,7 @@ function DateRows({ section, onChange }: { section: Section; onChange: Change })
               className="btn btn-secondary btn-icon"
               aria-label="Remove date"
               onClick={() =>
-                onChange((s) => ({ ...s, dates: s.dates.filter((x) => x.id !== d.id) }))
+                onChange((h) => ({ ...h, dates: h.dates.filter((x) => x.id !== d.id) }))
               }
             >
               ✕
@@ -162,8 +163,60 @@ function DateRows({ section, onChange }: { section: Section; onChange: Change })
 }
 
 /**
- * The five extras the canvas draws buttons for. Uploads live as data URIs in
- * localStorage, so images are downscaled and attachments are capped.
+ * The page's numbers and its timeline.
+ *
+ * They sit on the header because the published page draws one "By the
+ * numbers" row and one timeline for the whole portfolio — put them on a
+ * section and every theme has to gather them back up again, and the author
+ * has to guess which section to type them into.
+ */
+export function PortfolioExtras({
+  header,
+  onChange,
+}: {
+  header: PortfolioHeader;
+  onChange: HeaderChange;
+}) {
+  return (
+    <div className="border-divider border-t pt-3">
+      <div className="mono-label mb-2">Add to this portfolio (optional)</div>
+
+      <div className="mb-3 flex flex-wrap gap-2">
+        <button
+          type="button"
+          className="btn btn-secondary"
+          onClick={() =>
+            onChange((h) => ({
+              ...h,
+              numbers: [...h.numbers, { id: newId(), value: "", label: "" }],
+            }))
+          }
+        >
+          Numbers
+        </button>
+        <button
+          type="button"
+          className="btn btn-secondary"
+          onClick={() =>
+            onChange((h) => ({
+              ...h,
+              dates: [...h.dates, { id: newId(), year: "", text: "" }],
+            }))
+          }
+        >
+          Dates
+        </button>
+      </div>
+
+      <NumberRows header={header} onChange={onChange} />
+      <DateRows header={header} onChange={onChange} />
+    </div>
+  );
+}
+
+/**
+ * The three extras that belong to one section: an image, a file, a quote.
+ * Numbers and the timeline are the page's — see `PortfolioExtras`.
  */
 export function SectionExtras({
   section,
@@ -179,30 +232,6 @@ export function SectionExtras({
       <div className="mono-label mb-2">Add to this section (optional)</div>
 
       <div className="mb-3 flex flex-wrap gap-2">
-        <button
-          type="button"
-          className="btn btn-secondary"
-          onClick={() =>
-            onChange((s) => ({
-              ...s,
-              dates: [...s.dates, { id: newId(), year: "", text: "" }],
-            }))
-          }
-        >
-          Dates
-        </button>
-        <button
-          type="button"
-          className="btn btn-secondary"
-          onClick={() =>
-            onChange((s) => ({
-              ...s,
-              numbers: [...s.numbers, { id: newId(), value: "", label: "" }],
-            }))
-          }
-        >
-          Numbers
-        </button>
         <UploadButton
           label={section.image ? "Replace image" : "Image"}
           accept="image/*"
@@ -240,9 +269,6 @@ export function SectionExtras({
           {error}
         </p>
       )}
-
-      <NumberRows section={section} onChange={onChange} />
-      <DateRows section={section} onChange={onChange} />
 
       {section.image && (
         <div className="field mb-3">

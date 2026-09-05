@@ -6,7 +6,6 @@ import type { CSSProperties } from "react";
 import { recordClick } from "@/lib/analytics";
 import type { PublishedPrivacy } from "@/lib/published";
 import {
-  BLOCK_ICON,
   DEFAULT_TRACKING,
   FONTS,
   TYPE_SCALES,
@@ -17,6 +16,8 @@ import {
   type Portfolio,
   type Section,
   assetSrc,
+  pageAddress,
+  pagePath,
 } from "@/lib/types";
 
 const HATCH =
@@ -75,33 +76,29 @@ export function headline(size: string): CSSProperties {
 }
 
 /**
- * Roles are the tags used across the sections. Capped at six, most-used
- * first — the tab row is a row, not a tag cloud.
+ * The page's tabs: every distinct tab its visible sections file under, in
+ * the order the sections are in.
+ *
+ * Not capped. A tab is the only route to the sections under it, so dropping
+ * one past a limit would take those sections off the page.
  */
-export function roles(p: Portfolio): string[] {
-  const counts = new Map<string, number>();
+export function tabs(p: Portfolio): string[] {
+  const seen: string[] = [];
   for (const s of p.sections) {
     if (s.hidden) continue;
-    for (const t of s.tags) counts.set(t, (counts.get(t) ?? 0) + 1);
+    const tab = s.tab.trim();
+    if (tab && !seen.includes(tab)) seen.push(tab);
   }
-  return [...counts.entries()]
-    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
-    .slice(0, 6)
-    .map(([t]) => t);
+  return seen;
 }
 
-/** The optional extras aggregate up from the visible sections to the page. */
+/** The page's own extras: one row of numbers, one timeline, from the header. */
 function allNumbers(p: Portfolio) {
-  return p.sections
-    .filter((s) => !s.hidden)
-    .flatMap((s) => s.numbers)
-    .filter((n) => n.value.trim());
+  return p.header.numbers.filter((n) => n.value.trim());
 }
 
 function allDates(p: Portfolio) {
-  return p.sections
-    .filter((s) => !s.hidden)
-    .flatMap((s) => s.dates)
+  return p.header.dates
     .filter((d) => d.year.trim())
     .sort((a, b) => a.year.localeCompare(b.year));
 }
@@ -176,54 +173,62 @@ export function gridCols(p: Portfolio) {
 }
 
 /**
- * Role navigation, in the four shapes the Layout panel offers.
+ * Tab navigation, in the four shapes the Layout panel offers.
  *
  * "scroll" drops the filter and groups the page into chapters instead;
- * "lens" makes the visitor choose a role before anything else is shown.
+ * "lens" makes the visitor choose a tab before anything else is shown.
  * Index rail, Poster and Dossier carry their own navigation by definition —
  * it is the reason you would pick them — so they ignore this.
+ *
+ * There is no "everything" state. Every section files under exactly one tab,
+ * so one tab is always open — the first, until the visitor picks another.
  */
-function useRoleFilter(p: Portfolio) {
-  const [role, setRoleRaw] = useState<string | null>(null);
-  // Separate from `role`, because "show me everything" is a real answer to
-  // the lens question and must not leave the visitor back on the gate.
+function useTabFilter(p: Portfolio) {
+  const options = tabs(p);
+  const [picked, setPicked] = useState<string | null>(null);
+  // Separate from `picked`, because a lens page has to know the question was
+  // answered even when the answer is the tab it would have opened anyway.
   const [answered, setAnswered] = useState(false);
   const nav = p.layout.roleNav;
   const all = visibleSections(p);
-  const shown = role ? all.filter((s) => s.tags.includes(role)) : all;
 
-  const setRole = (r: string | null) => {
-    setRoleRaw(r);
+  // A tab the page no longer has — the last section under it was deleted or
+  // hidden — falls back rather than showing an empty page.
+  const tab = picked && options.includes(picked) ? picked : (options[0] ?? "");
+  const shown = tab ? all.filter((s) => s.tab === tab) : all;
+
+  const setTab = (next: string) => {
+    setPicked(next);
     setAnswered(true);
   };
 
   const chapters =
     nav === "scroll"
-      ? roles(p)
-          .map((r) => ({ role: r, sections: all.filter((s) => s.tags.includes(r)) }))
+      ? options
+          .map((t) => ({ tab: t, sections: all.filter((s) => s.tab === t) }))
           .filter((c) => c.sections.length > 0)
       : [];
 
   return {
-    role,
-    setRole,
+    tab,
+    setTab,
     shown,
     nav,
     chapters,
     /** True until a "lens" page's opening question has been answered. */
-    gated: nav === "lens" && !answered,
+    gated: nav === "lens" && !answered && options.length > 0,
   };
 }
 
 /** The opening screen of a "visitor picks a lens first" page. */
 function LensGate({
   p,
-  setRole,
+  setTab,
 }: {
   p: Portfolio;
-  setRole: (r: string | null) => void;
+  setTab: (t: string) => void;
 }) {
-  const options = roles(p);
+  const options = tabs(p);
   return (
     <div className={`mx-auto max-w-[760px] ${pad(p).page}`}>
       <h1 className="m-0 mb-3 leading-[1.05]" style={headline("40px")}>{p.header.name}</h1>
@@ -232,36 +237,23 @@ function LensGate({
       </p>
       <h6 className="mb-3.5">What brings you here?</h6>
       <div className="grid gap-0.5 sm:grid-cols-2" style={{ background: "var(--color-divider)" }}>
-        {options.map((r) => {
-          const count = visibleSections(p).filter((s) => s.tags.includes(r)).length;
+        {options.map((t) => {
+          const count = visibleSections(p).filter((s) => s.tab === t).length;
           return (
             <button
-              key={r}
+              key={t}
               type="button"
-              onClick={() => setRole(r)}
+              onClick={() => setTab(t)}
               className="flex cursor-pointer flex-col items-start gap-1 p-5 text-left"
               style={{ background: "var(--color-bg)" }}
             >
-              <span className="font-heading text-lg font-extrabold">{r}</span>
+              <span className="font-heading text-lg font-extrabold">{t}</span>
               <span className="text-[12px]" style={{ color: "var(--color-neutral-700)" }}>
                 {count} {count === 1 ? "entry" : "entries"}
               </span>
             </button>
           );
         })}
-        <button
-          type="button"
-          onClick={() => setRole(null)}
-          className="flex cursor-pointer flex-col items-start gap-1 p-5 text-left"
-          style={{ background: "var(--color-bg)" }}
-        >
-          <span className="font-heading text-lg font-extrabold" style={{ color: "var(--color-accent)" }}>
-            Show me everything
-          </span>
-          <span className="text-[12px]" style={{ color: "var(--color-neutral-700)" }}>
-            {visibleSections(p).length} entries
-          </span>
-        </button>
       </div>
     </div>
   );
@@ -269,27 +261,25 @@ function LensGate({
 
 function Tabs({
   p,
-  role,
-  setRole,
+  tab,
+  setTab,
   variant,
 }: {
   p: Portfolio;
-  role: string | null;
-  setRole: (r: string | null) => void;
+  tab: string;
+  setTab: (t: string) => void;
   variant: "underline" | "block";
 }) {
-  const all = [null, ...roles(p)];
   return (
     <>
-      {all.map((r) => {
-        const on = r === role;
-        const label = r ?? "All work";
+      {tabs(p).map((t) => {
+        const on = t === tab;
         if (variant === "block") {
           return (
             <button
-              key={label}
+              key={t}
               type="button"
-              onClick={() => setRole(r)}
+              onClick={() => setTab(t)}
               className="font-heading flex-none cursor-pointer whitespace-nowrap px-4 py-2.5 text-[13px] font-extrabold"
               style={{
                 background: on ? "var(--color-bg)" : "transparent",
@@ -297,24 +287,24 @@ function Tabs({
                 opacity: on ? 1 : 0.75,
               }}
             >
-              {label}
+              {t}
             </button>
           );
         }
         return (
           <button
-            key={label}
+            key={t}
             type="button"
-            onClick={() => setRole(r)}
+            onClick={() => setTab(t)}
             // flex-none + nowrap: the row scrolls sideways inside its own
-            // overflow container rather than breaking a role name in half.
+            // overflow container rather than breaking a tab name in half.
             className="font-heading flex-none cursor-pointer whitespace-nowrap py-3.5 text-sm font-extrabold"
             style={{
               color: on ? "var(--color-accent)" : "var(--color-neutral-700)",
               boxShadow: on ? "inset 0 -3px 0 var(--color-accent)" : "none",
             }}
           >
-            {label}
+            {t}
           </button>
         );
       })}
@@ -345,6 +335,8 @@ function href(url: string) {
 }
 
 function SectionLinks({ p, section }: { p: Portfolio; section: Section }) {
+  const handle = usePublishedHandle();
+  const record = useRecordClick();
   if (section.links.length === 0) return null;
   return (
     <div className="flex flex-wrap gap-x-4 gap-y-1 text-[13px]">
@@ -354,7 +346,7 @@ function SectionLinks({ p, section }: { p: Portfolio; section: Section }) {
           href={href(l.url)}
           target="_blank"
           rel="noopener noreferrer"
-          onClick={() => recordClick(p.slug, section.id)}
+          onClick={() => record(handle, p.slug, section.id)}
           style={{ color: "var(--color-accent)" }}
         >
           {l.label || l.url} ↗
@@ -397,6 +389,8 @@ function Media({
 
 /** The pull quote and the downloadable attachment, when a section has them. */
 function SectionAside({ p, section }: { p: Portfolio; section: Section }) {
+  const handle = usePublishedHandle();
+  const record = useRecordClick();
   return (
     <>
       {section.quote?.text && (
@@ -419,7 +413,7 @@ function SectionAside({ p, section }: { p: Portfolio; section: Section }) {
         <a
           href={assetSrc(section.file)}
           download={section.file.name}
-          onClick={() => recordClick(p.slug, section.id)}
+          onClick={() => record(handle, p.slug, section.id)}
           className="btn btn-secondary self-start"
           style={{ fontSize: 12, padding: "4px 10px" }}
         >
@@ -457,20 +451,53 @@ export function usePublishedPrivacy() {
   return useContext(PrivacyContext);
 }
 
-function ClaimBar() {
-  const privacy = usePublishedPrivacy();
-  if (!privacy.badge) return null;
-  return (
-    <div className="nav" style={{ background: "var(--color-bg)" }}>
-      <span className="nav-brand">FACET</span>
-      <span className="text-[13px] opacity-70">Explore</span>
-      <span className="text-[13px] opacity-70">Log in</span>
-      <button type="button" className="btn btn-primary">
-        Claim your page
-      </button>
-    </div>
-  );
+/**
+ * The owner's handle, from the address that served this page.
+ *
+ * Click recording posts to /public/p/<handle>/<slug>/clicks, and a slug alone
+ * no longer identifies a page — two accounts can both have "investors".
+ */
+const HandleContext = createContext<string>("");
+
+export function PublishedHandleProvider({
+  value,
+  children,
+}: {
+  value: string;
+  children: React.ReactNode;
+}) {
+  return <HandleContext.Provider value={value}>{children}</HandleContext.Provider>;
 }
+
+export function usePublishedHandle() {
+  return useContext(HandleContext);
+}
+
+/**
+ * True while the owner is looking at their own page from inside the app.
+ *
+ * Analytics are counted from real visitors, so a preview must not add to
+ * them: click recording goes through `useRecordClick`, which is a no-op here.
+ */
+const PreviewContext = createContext(false);
+
+export function PreviewProvider({
+  value,
+  children,
+}: {
+  value: boolean;
+  children: React.ReactNode;
+}) {
+  return <PreviewContext.Provider value={value}>{children}</PreviewContext.Provider>;
+}
+
+function noRecord() {}
+
+function useRecordClick() {
+  return useContext(PreviewContext) ? noRecord : recordClick;
+}
+
+
 
 /** The header's links, unless the owner has hidden them from strangers. */
 function HeaderLinks({ p, block }: { p: Portfolio; block?: boolean }) {
@@ -505,7 +532,7 @@ function HeaderLinks({ p, block }: { p: Portfolio; block?: boolean }) {
  * it files the page's owner in the address book. No server, no library: the
  * card is assembled here and handed over as a blob.
  */
-function saveContact(p: Portfolio) {
+function saveContact(p: Portfolio, handle: string) {
   const esc = (v: string) => v.replace(/[\\;,]/g, (c) => `\\${c}`).replace(/\n/g, "\\n");
   const emails = p.header.links.filter((l) => l.url.includes("@") && !l.url.includes("/"));
   const urls = p.header.links.filter((l) => !emails.includes(l));
@@ -518,7 +545,7 @@ function saveContact(p: Portfolio) {
     p.header.description && `NOTE:${esc(p.header.description)}`,
     ...emails.map((l) => `EMAIL;TYPE=INTERNET:${esc(l.url.trim())}`),
     ...urls.map((l) => `URL:${esc(href(l.url))}`),
-    `URL:https://facet.page/${esc(p.slug)}`,
+    `URL:https://${esc(pageAddress(handle, p.slug))}`,
     "END:VCARD",
   ].filter(Boolean);
 
@@ -541,9 +568,10 @@ function SectionTitleLink({
   section: Section;
   className: string;
 }) {
+  const handle = usePublishedHandle();
   return (
     <Link
-      href={`/p/${p.slug}?section=${section.id}`}
+      href={`${pagePath(handle, p.slug)}?section=${section.id}`}
       className={className}
       style={{ color: "inherit", textDecoration: "none" }}
     >
@@ -566,7 +594,7 @@ function SectionCard({ p, section }: { p: Portfolio; section: Section }) {
       }}
     >
       {section.image && <Media asset={section.image} className="mb-1 h-[150px] w-full" />}
-      {section.tags[0] && <span className="card-kicker">{section.tags[0]}</span>}
+      <span className="card-kicker">{section.tab}</span>
       <SectionTitleLink
         p={p}
         section={section}
@@ -580,18 +608,18 @@ function SectionCard({ p, section }: { p: Portfolio; section: Section }) {
 }
 
 export function Editorial({ p }: { p: Portfolio }) {
-  const { role, setRole, shown, nav, chapters, gated } = useRoleFilter(p);
+  const handle = usePublishedHandle();
+  const { tab, setTab, shown, nav, chapters, gated } = useTabFilter(p);
   const cta = p.header.links[0];
   const numbers = allNumbers(p);
   const dates = allDates(p);
-  const railRoles = [null, ...roles(p)];
+  const railTabs = tabs(p);
   const showContact = usePublishedPrivacy().showContact;
 
   if (gated) {
     return (
       <div style={groundStyle(p)}>
-        <ClaimBar />
-        <LensGate p={p} setRole={setRole} />
+        <LensGate p={p} setTab={setTab} />
       </div>
     );
   }
@@ -609,7 +637,6 @@ export function Editorial({ p }: { p: Portfolio }) {
 
   return (
     <div style={groundStyle(p)}>
-      <ClaimBar />
 
       <div className="grid gap-12 px-6 pb-8 pt-10 md:grid-cols-[1fr_380px] md:px-10">
         <div>
@@ -643,7 +670,7 @@ export function Editorial({ p }: { p: Portfolio }) {
           className="flex gap-7 overflow-x-auto px-6 md:px-10"
           style={{ borderBottom: "2px solid var(--color-divider)" }}
         >
-          <Tabs p={p} role={role} setRole={setRole} variant="underline" />
+          <Tabs p={p} tab={tab} setTab={setTab} variant="underline" />
         </div>
       )}
 
@@ -655,10 +682,7 @@ export function Editorial({ p }: { p: Portfolio }) {
           <span className="text-[12px]" style={{ color: "var(--color-neutral-700)" }}>
             Showing
           </span>
-          <span className="tag tag-accent">{role ?? "Everything"}</span>
-          <button type="button" className="btn btn-ghost" onClick={() => setRole(null)}>
-            Everything
-          </button>
+          <span className="tag tag-accent">{tab}</span>
         </div>
       )}
 
@@ -681,16 +705,14 @@ export function Editorial({ p }: { p: Portfolio }) {
               borderRight: "2px solid var(--color-divider)",
             }}
           >
-            {railRoles.map((r, i) => {
-              const on = r === role;
-              const count = r
-                ? visibleSections(p).filter((s) => s.tags.includes(r)).length
-                : visibleSections(p).length;
+            {railTabs.map((t, i) => {
+              const on = t === tab;
+              const count = visibleSections(p).filter((s) => s.tab === t).length;
               return (
                 <button
-                  key={r ?? "all"}
+                  key={t}
                   type="button"
-                  onClick={() => setRole(r)}
+                  onClick={() => setTab(t)}
                   className="flex w-full cursor-pointer items-center gap-3 py-2.5 text-left text-sm"
                   style={{
                     borderBottom: "1px solid var(--color-divider)",
@@ -699,9 +721,9 @@ export function Editorial({ p }: { p: Portfolio }) {
                   }}
                 >
                   <span className="font-heading text-[11px] font-extrabold opacity-55">
-                    {String(i).padStart(2, "0")}
+                    {String(i + 1).padStart(2, "0")}
                   </span>
-                  <span>{r ?? "All work"}</span>
+                  <span>{t}</span>
                   <span className="ml-auto text-[11px] opacity-55">{count}</span>
                 </button>
               );
@@ -712,7 +734,7 @@ export function Editorial({ p }: { p: Portfolio }) {
         {nav === "scroll" ? (
           <div>
             {chapters.map((c) => (
-              <div key={c.role}>
+              <div key={c.tab}>
                 <div
                   className="px-6 py-3 md:px-10"
                   style={{
@@ -720,7 +742,7 @@ export function Editorial({ p }: { p: Portfolio }) {
                     borderBottom: "1px solid var(--color-divider)",
                   }}
                 >
-                  <h6 className="m-0">{c.role}</h6>
+                  <h6 className="m-0">{c.tab}</h6>
                 </div>
                 <div className={`grid ${gridCols(p)}`}>
                   {c.sections.map((s) => (
@@ -809,22 +831,21 @@ export function Editorial({ p }: { p: Portfolio }) {
           className={`btn ${cta && showContact ? "" : "md:ml-auto"}`}
           style={{ borderColor: "var(--color-bg)", color: "var(--color-bg)" }}
         >
-          facet.page/{p.slug}
+          {pageAddress(handle, p.slug)}
         </span>
       </div>
     </div>
   );
 }
 
-/* ── 1b Index rail — roles as a numbered sidebar, records as a table ──── */
+/* ── 1b Index rail — tabs as a numbered sidebar, records as a table ──── */
 
 export function IndexRail({ p }: { p: Portfolio }) {
-  const { role, setRole, shown } = useRoleFilter(p);
-  const all = [null, ...roles(p)];
+  const { tab, setTab, shown } = useTabFilter(p);
+  const all = tabs(p);
 
   return (
     <div style={groundStyle(p)}>
-      <ClaimBar />
 
       <div className="grid md:grid-cols-[300px_1fr]">
         <div
@@ -845,16 +866,14 @@ export function IndexRail({ p }: { p: Portfolio }) {
           </p>
 
           <div style={{ borderTop: "2px solid var(--color-divider)" }}>
-            {all.map((r, i) => {
-              const on = r === role;
-              const count = r
-                ? visibleSections(p).filter((s) => s.tags.includes(r)).length
-                : visibleSections(p).length;
+            {all.map((t, i) => {
+              const on = t === tab;
+              const count = visibleSections(p).filter((s) => s.tab === t).length;
               return (
                 <button
-                  key={r ?? "all"}
+                  key={t}
                   type="button"
-                  onClick={() => setRole(r)}
+                  onClick={() => setTab(t)}
                   className="flex w-full cursor-pointer items-center gap-3 py-2.5 text-left text-sm"
                   style={{
                     borderBottom: "1px solid var(--color-divider)",
@@ -863,9 +882,9 @@ export function IndexRail({ p }: { p: Portfolio }) {
                   }}
                 >
                   <span className="font-heading text-[11px] font-extrabold opacity-55">
-                    {String(i).padStart(2, "0")}
+                    {String(i + 1).padStart(2, "0")}
                   </span>
-                  <span>{r ?? "All work"}</span>
+                  <span>{t}</span>
                   <span className="ml-auto text-[11px] opacity-55">{count}</span>
                 </button>
               );
@@ -882,7 +901,7 @@ export function IndexRail({ p }: { p: Portfolio }) {
             className="px-6 pb-6 pt-8 md:px-9"
             style={{ borderBottom: "2px solid var(--color-divider)" }}
           >
-            <Kicker>{role ?? "All work"}</Kicker>
+            <Kicker>{tab}</Kicker>
             <p className="m-0 max-w-[60ch] text-[19px]">{p.header.description}</p>
           </div>
 
@@ -892,7 +911,7 @@ export function IndexRail({ p }: { p: Portfolio }) {
                 <tr>
                   <th style={{ width: 70 }}>#</th>
                   <th>Work</th>
-                  <th style={{ width: 150 }}>Role</th>
+                  <th style={{ width: 150 }}>Tab</th>
                   <th style={{ width: 210 }}>Links</th>
                 </tr>
               </thead>
@@ -914,7 +933,7 @@ export function IndexRail({ p }: { p: Portfolio }) {
                       </div>
                     </td>
                     <td>
-                      {s.tags[0] && <span className="tag tag-neutral">{s.tags[0]}</span>}
+                      <span className="tag tag-neutral">{s.tab}</span>
                     </td>
                     <td className="text-[13px]">
                       {s.links.map((l) => l.label).join(", ") || "—"}
@@ -932,10 +951,10 @@ export function IndexRail({ p }: { p: Portfolio }) {
   );
 }
 
-/* ── 1c Poster — accent field hero, roles as a statement ──────────────── */
+/* ── 1c Poster — accent field hero, tabs as a statement ───────────────── */
 
 export function Poster({ p }: { p: Portfolio }) {
-  const { role, setRole, shown } = useRoleFilter(p);
+  const { tab, setTab, shown } = useTabFilter(p);
   const dates = allDates(p);
 
   return (
@@ -944,17 +963,6 @@ export function Poster({ p }: { p: Portfolio }) {
         className="px-6 pt-8 md:px-11 md:pt-11"
         style={{ background: "var(--color-accent)", color: "var(--color-bg)" }}
       >
-        <div className="mb-9 flex items-baseline gap-4">
-          <span className="font-heading text-lg font-extrabold">FACET</span>
-          <span className="text-xs opacity-75">facet.page/{p.slug}</span>
-          <button
-            type="button"
-            className="btn ml-auto"
-            style={{ background: "var(--color-bg)", color: "var(--color-ink)" }}
-          >
-            Claim your page
-          </button>
-        </div>
 
         <h1 className="m-0 mb-5 leading-[0.92] tracking-[-0.03em]" style={headline("clamp(56px, 10vw, 104px)")}>
           {p.header.name.split(" ").map((w, i) => (
@@ -966,7 +974,7 @@ export function Poster({ p }: { p: Portfolio }) {
         <p className="m-0 mb-9 max-w-[34ch] text-[22px]">{p.header.description}</p>
 
         <div className="flex flex-wrap">
-          <Tabs p={p} role={role} setRole={setRole} variant="block" />
+          <Tabs p={p} tab={tab} setTab={setTab} variant="block" />
         </div>
       </div>
 
@@ -989,7 +997,7 @@ export function Poster({ p }: { p: Portfolio }) {
             <div className="h-[150px]">
               <Media asset={s.image} className="h-full w-full" caption="image — 16:9" />
             </div>
-            {s.tags[0] && <span className="card-kicker">{s.tags[0]}</span>}
+            <span className="card-kicker">{s.tab}</span>
             <h3 className="m-0">
               <SectionTitleLink p={p} section={s} className="hover:underline" />
             </h3>
@@ -1030,25 +1038,25 @@ export function Poster({ p }: { p: Portfolio }) {
   );
 }
 
-/* ── 3a Links — role tabs over a stack of tappable rows ───────────────── */
+/* ── 3a Links — tabs over a stack of tappable rows ────────────────────── */
 
 export function Links({ p }: { p: Portfolio }) {
-  const { role, setRole, shown, nav, gated } = useRoleFilter(p);
+  const handle = usePublishedHandle();
+  const record = useRecordClick();
+  const { tab, setTab, shown, nav, gated } = useTabFilter(p);
   const showContact = usePublishedPrivacy().showContact;
   const cta = p.header.links[0];
 
   if (gated) {
     return (
       <div style={groundStyle(p)}>
-        <ClaimBar />
-        <LensGate p={p} setRole={setRole} />
+        <LensGate p={p} setTab={setTab} />
       </div>
     );
   }
 
   return (
     <div style={groundStyle(p)}>
-      <ClaimBar />
 
       <div className="mx-auto w-full max-w-[560px]">
         <div
@@ -1080,13 +1088,13 @@ export function Links({ p }: { p: Portfolio }) {
             className="flex gap-[18px] overflow-x-auto px-[18px]"
             style={{ borderBottom: "2px solid var(--color-divider)" }}
           >
-            <Tabs p={p} role={role} setRole={setRole} variant="underline" />
+            <Tabs p={p} tab={tab} setTab={setTab} variant="underline" />
           </div>
         )}
 
         {shown.map((s, i) => {
           const first = s.links[0];
-          const sub = first?.label || s.tags.join(" · ") || s.description;
+          const sub = first?.label || s.description || s.tab;
           const inner = (
             <>
               <span
@@ -1096,7 +1104,7 @@ export function Links({ p }: { p: Portfolio }) {
                   boxShadow: "inset 0 0 0 2px var(--color-divider)",
                 }}
               >
-                {BLOCK_ICON[s.kind] ?? String(i + 1).padStart(2, "0")}
+                {String(i + 1).padStart(2, "0")}
               </span>
               <span className="flex min-w-0 flex-col gap-0.5">
                 <span className="font-heading text-[15px] font-extrabold leading-tight">
@@ -1130,7 +1138,7 @@ export function Links({ p }: { p: Portfolio }) {
               href={href(first.url)}
               target="_blank"
               rel="noopener noreferrer"
-              onClick={() => recordClick(p.slug, s.id)}
+              onClick={() => record(handle, p.slug, s.id)}
               className={rowClass}
               style={rowStyle}
             >
@@ -1139,7 +1147,7 @@ export function Links({ p }: { p: Portfolio }) {
           ) : (
             <Link
               key={s.id}
-              href={`/p/${p.slug}?section=${s.id}`}
+              href={`${pagePath(handle, p.slug)}?section=${s.id}`}
               className={rowClass}
               style={rowStyle}
             >
@@ -1166,7 +1174,7 @@ export function Links({ p }: { p: Portfolio }) {
             <button
               type="button"
               className={`btn btn-secondary ${cta ? "" : "flex-1"}`}
-              onClick={() => saveContact(p)}
+              onClick={() => saveContact(p, handle)}
             >
               Save contact
             </button>
@@ -1175,7 +1183,7 @@ export function Links({ p }: { p: Portfolio }) {
 
         <div className="flex items-center gap-2 px-[18px] py-3.5">
           <span className="text-[11px]" style={{ color: "var(--color-neutral-700)" }}>
-            facet.page/{p.slug}
+            {pageAddress(handle, p.slug)}
           </span>
         </div>
       </div>
@@ -1186,25 +1194,19 @@ export function Links({ p }: { p: Portfolio }) {
 /* ── Ledger — everything as one long table ────────────────────────────── */
 
 export function Ledger({ p }: { p: Portfolio }) {
-  const { role, setRole, shown, nav, gated } = useRoleFilter(p);
+  const { tab, setTab, shown, nav, gated } = useTabFilter(p);
   const dates = allDates(p);
 
   if (gated) {
     return (
       <div style={groundStyle(p)}>
-        <ClaimBar />
-        <LensGate p={p} setRole={setRole} />
+        <LensGate p={p} setTab={setTab} />
       </div>
     );
   }
 
-  /** The earliest year a section mentions, which is what a ledger sorts by. */
-  const since = (s: Section) =>
-    s.dates.map((d) => d.year).sort()[0] ?? "";
-
   return (
     <div style={groundStyle(p)}>
-      <ClaimBar />
 
       <div
         className={pad(p).page}
@@ -1219,7 +1221,7 @@ export function Ledger({ p }: { p: Portfolio }) {
           className="flex gap-7 overflow-x-auto px-6 md:px-10"
           style={{ borderBottom: "2px solid var(--color-divider)" }}
         >
-          <Tabs p={p} role={role} setRole={setRole} variant="underline" />
+          <Tabs p={p} tab={tab} setTab={setTab} variant="underline" />
         </div>
       )}
 
@@ -1228,10 +1230,8 @@ export function Ledger({ p }: { p: Portfolio }) {
           <thead>
             <tr>
               <th style={{ width: 60 }}>#</th>
-              <th style={{ width: 90 }}>Since</th>
               <th>Entry</th>
-              <th style={{ width: 150 }}>Role</th>
-              <th style={{ width: 120 }}>Figures</th>
+              <th style={{ width: 150 }}>Tab</th>
               <th style={{ width: 180 }}>Links</th>
             </tr>
           </thead>
@@ -1239,7 +1239,6 @@ export function Ledger({ p }: { p: Portfolio }) {
             {shown.map((s, i) => (
               <tr key={s.id}>
                 <td className="font-extrabold">{String(i + 1).padStart(2, "0")}</td>
-                <td>{since(s) || "—"}</td>
                 <td>
                   <SectionTitleLink
                     p={p}
@@ -1250,10 +1249,7 @@ export function Ledger({ p }: { p: Portfolio }) {
                     {s.description}
                   </div>
                 </td>
-                <td>{s.tags[0] && <span className="tag tag-neutral">{s.tags[0]}</span>}</td>
-                <td className="text-[13px]">
-                  {s.numbers.map((n) => n.value).join(", ") || "—"}
-                </td>
+                <td><span className="tag tag-neutral">{s.tab}</span></td>
                 <td className="text-[13px]">
                   <SectionLinks p={p} section={s} />
                 </td>
@@ -1295,22 +1291,22 @@ export function Ledger({ p }: { p: Portfolio }) {
 
 export function Dossier({ p }: { p: Portfolio }) {
   // A lens is the whole point of this theme, so it asks regardless of the
-  // Layout panel's role-navigation setting.
-  const [lens, setLens] = useState<string | null>(null);
+  // Layout panel's navigation setting.
+  const [picked, setPicked] = useState<string | null>(null);
   const [answered, setAnswered] = useState(false);
   const showContact = usePublishedPrivacy().showContact;
   const all = visibleSections(p);
-  const shown = lens ? all.filter((s) => s.tags.includes(lens)) : all;
-  const options = roles(p);
+  const options = tabs(p);
+  const lens = picked && options.includes(picked) ? picked : (options[0] ?? "");
+  const shown = lens ? all.filter((s) => s.tab === lens) : all;
 
-  if (!answered) {
+  if (!answered && options.length > 0) {
     return (
       <div style={groundStyle(p)}>
-        <ClaimBar />
         <LensGate
           p={p}
-          setRole={(r) => {
-            setLens(r);
+          setTab={(t) => {
+            setPicked(t);
             setAnswered(true);
           }}
         />
@@ -1320,7 +1316,6 @@ export function Dossier({ p }: { p: Portfolio }) {
 
   return (
     <div style={groundStyle(p)}>
-      <ClaimBar />
 
       <div
         className="flex flex-wrap items-center gap-2 px-6 py-3 md:px-10"
@@ -1329,27 +1324,20 @@ export function Dossier({ p }: { p: Portfolio }) {
         <span className="text-[12px]" style={{ color: "var(--color-neutral-700)" }}>
           Reading as
         </span>
-        {options.map((r) => (
+        {options.map((t) => (
           <button
-            key={r}
+            key={t}
             type="button"
-            onClick={() => setLens(r)}
-            className={`tag cursor-pointer ${lens === r ? "tag-accent" : "tag-neutral"}`}
+            onClick={() => setPicked(t)}
+            className={`tag cursor-pointer ${lens === t ? "tag-accent" : "tag-neutral"}`}
           >
-            {r}
+            {t}
           </button>
         ))}
-        <button
-          type="button"
-          onClick={() => setLens(null)}
-          className={`tag cursor-pointer ${lens === null ? "tag-accent" : "tag-outline"}`}
-        >
-          Everything
-        </button>
       </div>
 
       <div className={`mx-auto max-w-[820px] ${pad(p).page}`}>
-        <Kicker>{lens ?? "The whole picture"}</Kicker>
+        <Kicker>{lens || "The whole picture"}</Kicker>
         <h1 className="m-0 mb-4 leading-[1.02]" style={headline("44px")}>{p.header.name}</h1>
         <p className="m-0 mb-6 max-w-[54ch] text-lg">{p.header.description}</p>
         {showContact && <HeaderLinks p={p} />}
@@ -1371,21 +1359,6 @@ export function Dossier({ p }: { p: Portfolio }) {
             </div>
             {s.image && <Media asset={s.image} className="mb-3 h-[200px] w-full" />}
             <p className="m-0 mb-2 max-w-[62ch] text-[15px]">{s.description}</p>
-            {s.numbers.length > 0 && (
-              <div className="mb-2 flex flex-wrap gap-5">
-                {s.numbers.map((n) => (
-                  <span key={n.id} className="flex items-baseline gap-1.5">
-                    <span className="font-heading text-lg font-extrabold">{n.value}</span>
-                    <span
-                      className="text-[11px]"
-                      style={{ color: "var(--color-neutral-700)" }}
-                    >
-                      {n.label}
-                    </span>
-                  </span>
-                ))}
-              </div>
-            )}
             <SectionAside p={p} section={s} />
             <SectionLinks p={p} section={s} />
             <hr className="hr" />
@@ -1405,21 +1378,19 @@ export function Dossier({ p }: { p: Portfolio }) {
 /* ── Broadsheet — columns of type with rules between ──────────────────── */
 
 export function Broadsheet({ p }: { p: Portfolio }) {
-  const { role, setRole, shown, nav, gated } = useRoleFilter(p);
+  const { tab, setTab, shown, nav, gated } = useTabFilter(p);
   const dates = allDates(p);
 
   if (gated) {
     return (
       <div style={groundStyle(p)}>
-        <ClaimBar />
-        <LensGate p={p} setRole={setRole} />
+        <LensGate p={p} setTab={setTab} />
       </div>
     );
   }
 
   return (
     <div style={groundStyle(p)}>
-      <ClaimBar />
 
       {/* Masthead */}
       <div
@@ -1442,7 +1413,7 @@ export function Broadsheet({ p }: { p: Portfolio }) {
           className="flex justify-center gap-7 overflow-x-auto px-6 md:px-10"
           style={{ borderBottom: "2px solid var(--color-divider)" }}
         >
-          <Tabs p={p} role={role} setRole={setRole} variant="underline" />
+          <Tabs p={p} tab={tab} setTab={setTab} variant="underline" />
         </div>
       )}
 
@@ -1458,7 +1429,7 @@ export function Broadsheet({ p }: { p: Portfolio }) {
         >
           {shown.map((s) => (
             <article key={s.id} className="mb-6 break-inside-avoid">
-              {s.tags[0] && <span className="card-kicker">{s.tags[0]}</span>}
+              <span className="card-kicker">{s.tab}</span>
               <h3 className="m-0 mb-1.5 mt-1 text-[19px]">
                 <SectionTitleLink p={p} section={s} className="hover:underline" />
               </h3>
@@ -1508,6 +1479,7 @@ export function Broadsheet({ p }: { p: Portfolio }) {
 /* ── 1d Section detail — one entry on its own page ────────────────────── */
 
 export function SectionDetail({ p, section }: { p: Portfolio; section: Section }) {
+  const handle = usePublishedHandle();
   const index = visibleSections(p).findIndex((s) => s.id === section.id);
   const total = visibleSections(p).length;
 
@@ -1517,7 +1489,7 @@ export function SectionDetail({ p, section }: { p: Portfolio; section: Section }
         className="flex items-center gap-2.5 px-4 py-3"
         style={{ borderBottom: "2px solid var(--color-divider)" }}
       >
-        <Link href={`/p/${p.slug}`} className="btn btn-secondary">
+        <Link href={pagePath(handle, p.slug)} className="btn btn-secondary">
           ← Back
         </Link>
         <span
@@ -1532,7 +1504,7 @@ export function SectionDetail({ p, section }: { p: Portfolio; section: Section }
         <Media asset={section.image} className="h-[180px] w-full md:h-[280px]" />
 
         <div className="px-4 py-5 md:px-6">
-          {section.tags[0] && <span className="card-kicker">{section.tags.join(" · ")}</span>}
+          <span className="card-kicker">{section.tab}</span>
           <h1 className="m-0 mb-2.5 mt-2 leading-tight" style={headline("clamp(28px, 5vw, 40px)")}>
             {section.title}
           </h1>
@@ -1541,60 +1513,8 @@ export function SectionDetail({ p, section }: { p: Portfolio; section: Section }
           </p>
         </div>
 
-        {section.numbers.length > 0 && (
-          <div
-            className="grid grid-cols-2"
-            style={{
-              borderTop: "2px solid var(--color-divider)",
-              borderBottom: "2px solid var(--color-divider)",
-            }}
-          >
-            {section.numbers.map((n) => (
-              <div
-                key={n.id}
-                className="px-4 py-3.5"
-                style={{
-                  background: "var(--color-bg)",
-                  borderRight: "1px solid var(--color-divider)",
-                  borderBottom: "1px solid var(--color-divider)",
-                }}
-              >
-                <div className="font-heading text-[22px] font-extrabold leading-none">
-                  {n.value}
-                </div>
-                <div className="text-[11px]" style={{ color: "var(--color-neutral-700)" }}>
-                  {n.label}
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-
         <div className="px-4 py-4 md:px-6">
-          {section.dates.length > 0 && (
-            <>
-              <h6 className="mb-3">Milestones</h6>
-              {[...section.dates]
-                .sort((a, b) => a.year.localeCompare(b.year))
-                .map((d) => (
-                  <div
-                    key={d.id}
-                    className="flex gap-3.5 py-2.5"
-                    style={{ borderBottom: "1px solid var(--color-divider)" }}
-                  >
-                    <span
-                      className="font-heading w-11 flex-none text-[13px] font-extrabold"
-                      style={{ color: "var(--color-accent)" }}
-                    >
-                      {d.year}
-                    </span>
-                    <span className="text-[13px]">{d.text}</span>
-                  </div>
-                ))}
-            </>
-          )}
-
-          <div className="mt-4 flex flex-col gap-3">
+          <div className="flex flex-col gap-3">
             <SectionAside p={p} section={section} />
             <SectionLinks p={p} section={section} />
           </div>

@@ -10,7 +10,7 @@ import uuid
 
 from fastapi import APIRouter, status
 
-from app.api.deps import OwnedPortfolio, SessionDep
+from app.api.deps import EditablePortfolio, SessionDep
 from app.api.route import TransactionRoute
 from app.schemas.common import ERROR_RESPONSES
 from app.schemas.portfolio import PortfolioOut
@@ -33,12 +33,20 @@ router = APIRouter(
 
 
 @router.post(
-    "", status_code=status.HTTP_201_CREATED, response_model=SectionOut, summary="Add a block"
+    "",
+    status_code=status.HTTP_201_CREATED,
+    response_model=SectionOut,
+    summary="Add a section",
+    description=(
+        "The body is empty — a section has no type to choose. The new one "
+        "files under the tab the page already uses, so it is reachable the "
+        "moment it exists."
+    ),
 )
 async def add_section(
-    payload: SectionCreate, portfolio: OwnedPortfolio, session: SessionDep
+    payload: SectionCreate, portfolio: EditablePortfolio, session: SessionDep
 ) -> SectionOut:
-    section = await SectionService(session).add(portfolio, payload.kind)
+    section = await SectionService(session).add(portfolio)
     return section_out(section)
 
 
@@ -46,7 +54,7 @@ async def add_section(
 async def update_section(
     section_id: uuid.UUID,
     payload: SectionPatch,
-    portfolio: OwnedPortfolio,
+    portfolio: EditablePortfolio,
     session: SessionDep,
 ) -> SectionOut:
     section = await SectionService(session).update(portfolio, section_id, payload)
@@ -57,7 +65,7 @@ async def update_section(
     "/{section_id}", status_code=status.HTTP_204_NO_CONTENT, summary="Delete a section"
 )
 async def delete_section(
-    section_id: uuid.UUID, portfolio: OwnedPortfolio, session: SessionDep
+    section_id: uuid.UUID, portfolio: EditablePortfolio, session: SessionDep
 ) -> None:
     await SectionService(session).delete(portfolio, section_id)
 
@@ -68,7 +76,7 @@ async def delete_section(
 async def move_section(
     section_id: uuid.UUID,
     payload: SectionMove,
-    portfolio: OwnedPortfolio,
+    portfolio: EditablePortfolio,
     session: SessionDep,
 ) -> PortfolioOut:
     await SectionService(session).move(portfolio, section_id, payload.delta)
@@ -77,7 +85,7 @@ async def move_section(
 
 @router.put("/order", response_model=PortfolioOut, summary="Set the whole order")
 async def reorder_sections(
-    payload: SectionOrder, portfolio: OwnedPortfolio, session: SessionDep
+    payload: SectionOrder, portfolio: EditablePortfolio, session: SessionDep
 ) -> PortfolioOut:
     await SectionService(session).reorder(portfolio, payload)
     return PortfolioService(session).to_out(portfolio)

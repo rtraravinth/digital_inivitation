@@ -5,7 +5,12 @@ import { useEffect } from "react";
 import { recordView } from "@/lib/analytics";
 import type { PublishedPrivacy } from "@/lib/published";
 import type { Portfolio } from "@/lib/types";
-import { PrivacyProvider, PublishedBody, SectionDetail } from "./themes";
+import {
+  PrivacyProvider,
+  PublishedBody,
+  PublishedHandleProvider,
+  SectionDetail,
+} from "./themes";
 
 /**
  * The client half of a published page.
@@ -15,10 +20,12 @@ import { PrivacyProvider, PublishedBody, SectionDetail } from "./themes";
  * ?section= entry view.
  */
 export function PublishedPage({
+  handle,
   slug,
   portfolio,
   privacy,
 }: {
+  handle: string;
   slug: string;
   portfolio: Portfolio;
   privacy: PublishedPrivacy;
@@ -30,8 +37,8 @@ export function PublishedPage({
   // StrictMode's double effect in development does not count twice — and the
   // owner's "count visits" switch is checked there, not here.
   useEffect(() => {
-    recordView(slug);
-  }, [slug]);
+    recordView(handle, slug);
+  }, [handle, slug]);
 
   // Artboard 1d: one entry on its own page, reached from any theme's title.
   const section = sectionId
@@ -40,11 +47,13 @@ export function PublishedPage({
 
   return (
     <PrivacyProvider value={privacy}>
-      {section ? (
-        <SectionDetail p={portfolio} section={section} />
-      ) : (
-        <PublishedBody p={portfolio} />
-      )}
+      <PublishedHandleProvider value={handle}>
+        {section ? (
+          <SectionDetail p={portfolio} section={section} />
+        ) : (
+          <PublishedBody p={portfolio} />
+        )}
+      </PublishedHandleProvider>
     </PrivacyProvider>
   );
 }

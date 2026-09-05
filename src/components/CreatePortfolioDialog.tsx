@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react";
 import type { StartFrom } from "@/lib/store";
-import type { Portfolio } from "@/lib/types";
+import { PAGE_DOMAIN, type Portfolio } from "@/lib/types";
+import { useAccount } from "@/lib/account";
 
 function slugify(name: string) {
   return name
@@ -18,11 +19,19 @@ export function CreatePortfolioDialog({
 }: {
   portfolios: Portfolio[];
   onCancel: () => void;
-  onCreate: (name: string, slug: string, startFrom: StartFrom) => void;
+  onCreate: (
+    name: string,
+    slug: string,
+    startFrom: StartFrom,
+    summary: string,
+  ) => void;
 }) {
+  const handle = useAccount().account.profile.handle;
   const [name, setName] = useState("Investor one-pager");
-  const [slug, setSlug] = useState("rohan/investors");
+  // One segment: the handle in front is the namespace now.
+  const [slug, setSlug] = useState("investors");
   const [slugTouched, setSlugTouched] = useState(false);
+  const [summary, setSummary] = useState("");
   const [kind, setKind] = useState<StartFrom["kind"]>("blank");
   const [copyId, setCopyId] = useState(portfolios[0]?.id ?? "");
 
@@ -44,7 +53,7 @@ export function CreatePortfolioDialog({
     if (!name.trim()) return;
     const startFrom: StartFrom =
       kind === "copy" ? { kind: "copy", id: copyId } : { kind };
-    onCreate(name.trim(), slug.trim(), startFrom);
+    onCreate(name.trim(), slug.trim(), startFrom, summary.trim());
   }
 
   const source = portfolios.find((p) => p.id === copyId);
@@ -80,7 +89,9 @@ export function CreatePortfolioDialog({
           <div className="field mb-3.5">
             <label htmlFor="cp-slug">Page address</label>
             <div className="flex items-center gap-0">
-              <span className="text-muted shrink-0 pr-1 text-sm">facet.page/</span>
+              <span className="text-muted shrink-0 pr-1 text-sm">
+                {PAGE_DOMAIN}/{handle}/
+              </span>
               <input
                 id="cp-slug"
                 className="input"
@@ -91,6 +102,20 @@ export function CreatePortfolioDialog({
                 }}
               />
             </div>
+          </div>
+
+          <div className="field mb-3.5">
+            <label htmlFor="cp-summary">Card note (optional)</label>
+            <input
+              id="cp-summary"
+              className="input"
+              placeholder="One line about this page — which room it is for"
+              value={summary}
+              onChange={(e) => setSummary(e.target.value)}
+            />
+            <span className="text-neutral-700 text-[11px]">
+              Shown on the portfolio card, never on the page itself.
+            </span>
           </div>
 
           <div className="text-neutral-700 mb-2 text-xs">Start from</div>

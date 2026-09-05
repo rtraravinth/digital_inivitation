@@ -3,7 +3,7 @@
 # FACET
 
 A multi-role portfolio builder. One page per portfolio: a header, then N
-sections, each with the same four fields — title, description, tags, links.
+sections, each with the same four fields — title, description, tab, links.
 Built from a Claude Design canvas (`Portfolio Page.dc.html`), which now runs
 to five turns. Every artboard in it is implemented; the map from artboard to
 code is under "Layout" below.
@@ -13,14 +13,22 @@ code is under "Layout" below.
 Two processes. The frontend does nothing useful without the API.
 
 ```
-cd backend && .venv/Scripts/python -m uvicorn app.main:app --reload   # :8000
-npm run dev                                                          # :3000
+npm run api    # :8000 — uvicorn, bound to every interface
+npm run dev    # :3000
 ```
+
+`npm run api` exists because typing the uvicorn command by hand went wrong
+twice: the venv is at `.venv/bin` on Linux and macOS but `.venv/Scripts` on
+Windows, and uvicorn binds loopback by default. A loopback bind breaks every
+request the moment `NEXT_PUBLIC_API_URL` names a LAN address — opening the app
+from a phone — with `ERR_CONNECTION_REFUSED` and nothing in the API's log,
+because the connection never arrives. Pass flags through when you need them:
+`npm run api -- --host 127.0.0.1`.
 
 ```
 npm run build
 npm run lint
-cd backend && .venv/Scripts/python -m pytest    # 208 tests
+cd backend && .venv/bin/python -m pytest    # 244 tests (.venv/Scripts on Windows)
 ```
 
 `NEXT_PUBLIC_API_URL` points the frontend at the API; see
@@ -45,7 +53,13 @@ your browser keeps hitting the stale server on 3000. Kill it (`taskkill //F
 
 - `src/lib/types.ts` — `Portfolio` / `Section` / `PortfolioHeader` / `Layout`
   / `AccountSettings`, plus `normalize()`, which backfills fields added after
-  data was stored. Extend it whenever you add a field, or data written by an
+  data was stored. **Numbers and the timeline live on the header, not on a
+  section**: the page draws one "By the numbers" row and one timeline, so a
+  per-section copy only had to be gathered back up — and the author had to
+  guess which section to type them into. A section's own extras are its
+  image, its file and its quote. The editor says which is which: "Add to this
+  portfolio (optional)" against the header, "Add to this section (optional)"
+  against a section. Extend it whenever you add a field, or data written by an
   older build will break. `assetSrc()` lives here too: it resolves an upload
   whether it carries an API `url` or a pre-backend `dataUrl`.
 - `src/lib/api.ts` — the typed API client. Access token in memory, refresh
@@ -72,7 +86,6 @@ your browser keeps hitting the stale server on 3000. Kill it (`taskkill //F
   section rail, live canvas, tabbed inspector) and 2c (mobile control sheet);
   `ThemeGallery.tsx` is 2b; `controls.tsx` holds the Theme / Colour / Type /
   Layout controls **shared** with the editor's drawer so the two cannot drift.
-- `src/components/BlockManager.tsx` — artboard 3b, at `/blocks/[id]`.
 - `src/components/PrintAll.tsx` — `/print` stacks every published page with a
   page break between so the browser's own **Save as PDF** can export them.
   That is what "Download all pages as PDF" on `/account` opens; generating a
@@ -96,6 +109,21 @@ display heading multiplies its own size through `headline()`, and the heading
 rule in `globals.css` reads `--tracking`. A Tailwind `text-[64px]` utility
 would beat a base rule, so the size has to be inline — that is why `headline()`
 returns a style object rather than a class.
+
+**Every section files under exactly one tab, and the tab is required.** The
+tab row on a published page is `tabs(p)` in `published/themes.tsx` — every
+distinct tab its visible sections use, in section order, uncapped, because a
+tab is the only route to the sections under it. There is no "All work" tab
+and no "everything" state: one tab is always open, the first until the
+visitor picks another. The editor's `TabField` offers the page's existing
+tabs before letting you name a new one, so "Advisory" typed twice cannot
+become two tabs. The backend refuses a blank tab (`SectionPatch.tab`), and a
+new section starts on the page's first tab, or `Work` on an empty page.
+
+**`p.layout.roleNav` keeps its name, not its wording.** It is the wire
+format, a stored value and in tests, so it is still `roleNav`; every label it
+shows says "tab". Renaming the key would be a migration for no user-visible
+gain.
 
 **`p.layout.roleNav` only applies to Editorial, Links, Ledger and Broadsheet.**
 Index rail, Poster and Dossier carry their own navigation — it is the reason
@@ -131,9 +159,26 @@ it, but two rules matter from this side:
 - **The frontend needs it up.** With the API down, every authenticated page
   shows its error banner and `/p/[slug]` returns a 404 — there is no local
   fallback and there should not be one.
+- **An owner's asset URL is signed, not merely authenticated.** `asset_out()`
+  appends `?t=<jwt>` to `/api/v1/assets/{id}`, and the route takes that
+  signature *or* a bearer token. An `<img>` cannot send an `Authorization`
+  header, and the access token lives in memory in `src/lib/api.ts` and never
+  reaches the markup — without the signature every owner-side image (editor,
+  builder canvas, `/preview`, `/print`) is a 401 and renders
+  broken. The token names one asset and expires
+  (`FACET_ASSET_URL_TTL_MINUTES`, 24h). Published pages are unaffected: they
+  use `/api/v1/public/assets/{id}`, which needs nothing.
 - **`src/lib/api.ts` is the only module that knows the API exists.** It owns
   the access token, one silent refresh-and-retry on a 401, and turning an
   error envelope into an `ApiError` with a `code` a caller can branch on.
+- **A live portfolio is frozen.** `EditablePortfolio` in `backend/app/api/deps.py`
+  answers 409 `portfolio_published` to every portfolio and section write while
+  `status == "live"`; publish and unpublish take `OwnedPortfolio`, or there
+  would be no way back out. The editor, builder and theme gallery all render
+  `PublishedLock` instead of themselves for a live portfolio, and the list card offers Preview and Unpublish in place of Edit,
+  Builder and Delete. `updatePortfolio` in `src/lib/store.tsx` therefore
+  unpublishes *before* its patches and publishes *after* them — a batch that
+  published first would 409 on its own edits.
 
 The API is camelCase on the wire, so its responses drop straight into the
 types in `src/lib/types.ts` with no mapping layer. Keep it that way.
@@ -181,6 +226,15 @@ a signed-in one had their own settings applied to somebody else's page.
 
 ## Known gaps
 
+- **Artboard 3b — the block manager, at `/blocks/[id]` — is deliberately not
+  built.** It listed the sections with reorder, hide and delete buttons, a
+  click count each, a copy-address bar and a typed "+ Add block" picker.
+  Every one of those lives somewhere else: the editor reorders and deletes,
+  the builder's rail hides and shows, `/stats` counts the clicks, and
+  `ShareDialog` copies the address. It was a second front door to one set of
+  writes, so it went, and with it `Section.kind` — the picker was the only
+  thing that ever set a kind, and every kind was the same fields underneath.
+  Do not rebuild it from the canvas.
 - **Three `/account` groups still describe services this build has not
   chosen.** Billing needs a payment processor, custom domains need DNS and a
   host, email notifications need a mail service. Each renders a
@@ -199,6 +253,6 @@ a signed-in one had their own settings applied to somebody else's page.
 - **Slugs are global.** Two accounts cannot both hold `rohan`, because the
   address is `facet.page/<slug>` with nothing in front of it. The create
   dialog surfaces the 409 as a message.
-- **The frontend has no test runner.** The backend has 208 pytest tests;
+- **The frontend has no test runner.** The backend has 244 pytest tests;
   changes here are checked with `npm run lint`, `npm run build` and by
   actually opening the app.

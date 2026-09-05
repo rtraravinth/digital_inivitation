@@ -39,67 +39,53 @@ export function assetSrc(asset: Asset | null | undefined): string | undefined {
 export type Quote = { text: string; attribution: string };
 
 /**
- * What a section *is*, from the add-block picker. Purely presentational: it
- * picks the glyph on the Links theme's rows and the label in the block
- * manager. Every kind still has the same four fields underneath.
+ * What a section files under when the page has no tabs yet. Mirrors
+ * DEFAULT_TAB in backend/app/models/enums.py.
  */
-export type BlockKind =
-  | "link"
-  | "venture"
-  | "contact"
-  | "booking"
-  | "testimonial"
-  | "gallery"
-  | "numbers"
-  | "document";
+export const DEFAULT_TAB = "Work";
 
-export const BLOCK_TYPES: Array<{
-  id: BlockKind;
-  icon: string;
-  name: string;
-  desc: string;
-}> = [
-  { id: "link", icon: "↗", name: "Link", desc: "Anything with a URL" },
-  { id: "venture", icon: "▤", name: "Venture", desc: "Business with stats" },
-  { id: "contact", icon: "✉", name: "Contact", desc: "Email, call or form" },
-  { id: "booking", icon: "◷", name: "Booking", desc: "Calendar slot" },
-  { id: "testimonial", icon: "❝", name: "Testimonial", desc: "A client quote" },
-  { id: "gallery", icon: "▦", name: "Gallery", desc: "Photos, b&w" },
-  { id: "numbers", icon: "◸", name: "Numbers", desc: "Stat row" },
-  { id: "document", icon: "▣", name: "Document", desc: "PDF or one-pager" },
-];
-
-export const BLOCK_ICON: Record<BlockKind, string> = Object.fromEntries(
-  BLOCK_TYPES.map((b) => [b.id, b.icon]),
-) as Record<BlockKind, string>;
+/** As long as a tab name may be. Mirrors TAB_MAX_LENGTH on the API. */
+export const TAB_MAX_LENGTH = 60;
 
 /**
- * Every section is the same four fields — title, description, tags, links —
+ * Every section is the same four fields — title, description, tab, links —
  * so there is nothing to learn twice. Everything below that is opt-in.
+ *
+ * `tab` is the exception: a visitor reaches a section through its tab and
+ * nowhere else, so it is required and never blank. One tab per section, and
+ * the page's tab row is the distinct set of them.
+ *
+ * Numbers and the timeline are not here: the page draws one of each, from
+ * the header. See `PortfolioHeader`.
  */
 export type Section = {
   id: string;
   title: string;
   description: string;
-  tags: string[];
+  tab: string;
   links: LinkItem[];
-  numbers: Stat[];
-  dates: DateEntry[];
   image: Asset | null;
   file: Asset | null;
   quote: Quote | null;
   /** Hidden sections stay in the document and off the published page. */
   hidden: boolean;
-  kind: BlockKind;
 };
 
-/** The header is a section with two extra lines: who you are, and what you're doing now. */
+/**
+ * The header is a section with two extra lines: who you are, and what you're
+ * doing now — plus the two lists the whole page shares. `numbers` fills the
+ * "By the numbers" row and `dates` the timeline; both are drawn once, so
+ * they belong to the portfolio rather than to whichever section they were
+ * typed into.
+ */
 export type PortfolioHeader = {
   name: string;
   current: string;
   description: string;
   tags: string[];
   links: LinkItem[];
+  numbers: Stat[];
+  dates: DateEntry[];
   portrait: Asset | null;
 };
 
@@ -147,21 +133,21 @@ export const THEMES: Array<{
   {
     id: "index",
     name: "Index rail",
-    desc: "Roles as a numbered sidebar, content as records",
-    long: "A numbered rail of roles beside records of the work. Good for long histories.",
+    desc: "Tabs as a numbered sidebar, content as records",
+    long: "A numbered rail of tabs beside records of the work. Good for long histories.",
     audiences: ["advisers", "office", "multi"],
   },
   {
     id: "poster",
     name: "Poster",
-    desc: "Accent field hero, roles as a statement",
+    desc: "Accent field hero, tabs as a statement",
     long: "A colour field and display type. Loud, for people who present a lot.",
     audiences: ["founders", "writers"],
   },
   {
     id: "links",
     name: "Links",
-    desc: "Role tabs over a stack of tappable rows",
+    desc: "Tabs over a stack of tappable rows",
     long: "One shareable page of rows, sized for a thumb. The link you put in a bio.",
     audiences: ["founders", "writers", "multi"],
   },
@@ -176,7 +162,7 @@ export const THEMES: Array<{
     id: "dossier",
     name: "Dossier",
     desc: "Visitor picks a lens, the page rewrites itself",
-    long: "The visitor picks a lens first — one of your roles — and the page rewrites itself around it.",
+    long: "The visitor picks a lens first — one of your tabs — and the page rewrites itself around it.",
     badge: "New",
     audiences: ["multi", "advisers", "office"],
   },
@@ -215,7 +201,11 @@ export const SWATCHES = ["#ec3013", "#201e1d", "#1d4ed8", "#0f7b52", "#b45309"];
 
 /* ── layout ───────────────────────────────────────────────────────────── */
 
-/** How a visitor moves between the things you do. */
+/**
+ * How a visitor moves between the tabs. The key stays `roleNav`: it is the
+ * wire format and a stored value, and renaming it would buy nothing a label
+ * change does not.
+ */
 export type RoleNav = "tabs" | "rail" | "scroll" | "lens";
 export type GridCols = 1 | 2 | 3;
 export type Density = "airy" | "standard" | "dense";
@@ -223,7 +213,7 @@ export type Density = "airy" | "standard" | "dense";
 export const ROLE_NAVS: Array<{ id: RoleNav; name: string }> = [
   { id: "tabs", name: "Tabs across the page" },
   { id: "rail", name: "Numbered side rail" },
-  { id: "scroll", name: "One scroll, roles as chapters" },
+  { id: "scroll", name: "One scroll, tabs as chapters" },
   { id: "lens", name: "Visitor picks a lens first" },
 ];
 
@@ -300,28 +290,43 @@ export function normalize(p: Portfolio): Portfolio {
       scale: layout.scale ?? "default",
       tracking: layout.tracking ?? DEFAULT_TRACKING,
     },
-    header: { ...emptyHeader(), ...(p.header ?? {}) },
+    header: {
+      ...emptyHeader(),
+      ...(p.header ?? {}),
+      numbers: p.header?.numbers ?? [],
+      dates: p.header?.dates ?? [],
+    },
     sections: (p.sections ?? []).map((s) => ({
       ...emptySection(s.id),
       ...s,
       links: s.links ?? [],
-      tags: s.tags ?? [],
-      numbers: s.numbers ?? [],
-      dates: s.dates ?? [],
+      // A section written before tabs existed carries none. It would be
+      // unreachable with a blank one, so it lands on the default.
+      tab: s.tab?.trim() || DEFAULT_TAB,
       hidden: s.hidden ?? false,
-      kind: s.kind ?? "link",
     })),
   };
 }
 
 export const STATUS_LABEL: Record<PortfolioStatus, string> = {
-  live: "Live",
-  draft: "Draft",
+  live: "Published",
+  draft: "Not published",
+  // Still its own word: an empty portfolio is not published either, but it
+  // has nothing on it yet, which is what the card is telling you.
   empty: "Empty",
 };
 
 export function emptyHeader(): PortfolioHeader {
-  return { name: "", current: "", description: "", tags: [], links: [], portrait: null };
+  return {
+    name: "",
+    current: "",
+    description: "",
+    tags: [],
+    links: [],
+    numbers: [],
+    dates: [],
+    portrait: null,
+  };
 }
 
 export function emptySection(id: string): Section {
@@ -329,15 +334,12 @@ export function emptySection(id: string): Section {
     id,
     title: "",
     description: "",
-    tags: [],
+    tab: DEFAULT_TAB,
     links: [],
-    numbers: [],
-    dates: [],
     image: null,
     file: null,
     quote: null,
     hidden: false,
-    kind: "link",
   };
 }
 
@@ -351,6 +353,35 @@ export function emptySection(id: string): Section {
 /** Mirrors PASSWORD_MIN in backend/app/schemas/auth.py. The server is what
  * enforces it; this is so the UI can say so before the round trip. */
 export const PASSWORD_MIN = 12;
+
+/** The public domain these pages are published under. */
+export const PAGE_DOMAIN = "facet.page";
+
+/**
+ * A page's address, which is `<handle>/<slug>` — the handle is the namespace,
+ * so a slug alone no longer identifies a page. One place for it, because it
+ * is printed on the dashboard, the builder, the block manager, /stats, and
+ * inside a QR code that has to match all of them.
+ */
+export function pageAddress(handle: string, slug: string): string {
+  return `${PAGE_DOMAIN}/${handle}/${slug}`;
+}
+
+/** The same page on this app: the route that actually serves it. */
+export function pagePath(handle: string, slug: string): string {
+  return `/p/${handle}/${slug}`;
+}
+
+/**
+ * The owner's own preview of a portfolio, published or not.
+ *
+ * `pagePath` is the visitor's address and only resolves while the portfolio
+ * is live; every Preview button inside the app uses this instead, so a draft
+ * previews rather than 404s.
+ */
+export function previewPath(id: string): string {
+  return `/preview/${id}`;
+}
 
 export type AccountProfile = {
   name: string;

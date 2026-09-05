@@ -10,7 +10,9 @@ import {
   THEMES,
   type Portfolio,
   type ThemeAudience,
+  previewPath,
 } from "@/lib/types";
+import { PublishedLock } from "../PublishedLock";
 
 export function ThemeGallery({ id }: { id: string }) {
   const { ready, getPortfolio, updatePortfolio } = usePortfolios();
@@ -26,6 +28,13 @@ export function ThemeGallery({ id }: { id: string }) {
         {ready && <Link href="/">← Back to portfolios</Link>}
       </div>
     );
+  }
+
+  // A live page is frozen — the API refuses every write to it — so this
+  // screen steps aside for Preview and Unpublish rather than rendering
+  // controls that can only fail.
+  if (portfolio.status === "live") {
+    return <PublishedLock portfolio={portfolio} />;
   }
 
   const p: Portfolio = portfolio;
@@ -99,7 +108,14 @@ export function ThemeGallery({ id }: { id: string }) {
                 >
                   {on ? "Selected" : "Use theme"}
                 </button>
-                <Link href={`/p/${p.slug}`} className="btn btn-secondary">
+                <Link
+                  href={previewPath(p.id)}
+                  className="btn btn-secondary"
+                  // A new tab, because the point of a preview is seeing the page
+                  // with nothing of the app around it — exactly what a visitor gets.
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
                   Preview
                 </Link>
               </div>

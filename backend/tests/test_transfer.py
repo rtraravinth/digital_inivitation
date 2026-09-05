@@ -157,8 +157,60 @@ async def test_a_legacy_export_keeps_its_content(auth_client):
 
     assert full["name"] == "Legacy"
     assert full["sections"][0]["title"] == "With an image"
-    assert full["sections"][0]["tags"] == ["Old"]
-    assert full["sections"][0]["kind"] == "gallery"
+    assert full["sections"][0]["tab"] == "Old"
+    # `kind` is in the payload and is simply ignored: sections no longer
+    # have a type, and an old export must still import.
+    assert "kind" not in full["sections"][0]
+
+
+async def test_a_legacy_exports_section_numbers_move_up_to_the_header(auth_client):
+    """An export from the build that stored them per section still reads.
+
+    The page gathered every section's entries into one row and one timeline,
+    so that is what the header gets, in section order.
+    """
+    payload = legacy_export()
+    payload[0]["slug"] = "legacy-extras"
+    payload[0]["sections"][0]["numbers"] = [{"id": "n1", "label": "Cities", "value": "3"}]
+    payload[0]["sections"][0]["dates"] = [{"id": "d1", "year": "2021", "text": "Founded"}]
+
+    await auth_client.post("/api/v1/import", json={"mode": "merge", "portfolios": payload})
+    imported = next(
+        p for p in (await auth_client.get("/api/v1/portfolios")).json()
+        if p["slug"] == "legacy-extras"
+    )
+    full = (await auth_client.get(f"/api/v1/portfolios/{imported['id']}")).json()
+
+    assert full["header"]["numbers"][0]["value"] == "3"
+    assert full["header"]["dates"][0]["year"] == "2021"
+
+
+async def test_an_export_writes_numbers_and_the_timeline_on_the_header(auth_client, portfolio):
+    await auth_client.patch(
+        f"/api/v1/portfolios/{portfolio['id']}/header",
+        json={"numbers": [{"id": "n1", "label": "Cities", "value": "3"}]},
+    )
+
+    exported = (await auth_client.get("/api/v1/export")).json()
+    mine = next(p for p in exported if p["slug"] == portfolio["slug"])
+
+    assert mine["header"]["numbers"][0]["value"] == "3"
+    assert "numbers" not in mine["sections"][0]
+
+
+async def test_a_legacy_export_with_no_tags_lands_on_the_default_tab(auth_client):
+    payload = legacy_export()
+    payload[0]["slug"] = "legacy-untagged"
+    payload[0]["sections"][0]["tags"] = []
+
+    await auth_client.post("/api/v1/import", json={"mode": "merge", "portfolios": payload})
+    imported = next(
+        p for p in (await auth_client.get("/api/v1/portfolios")).json()
+        if p["slug"] == "legacy-untagged"
+    )
+    full = (await auth_client.get(f"/api/v1/portfolios/{imported['id']}")).json()
+
+    assert full["sections"][0]["tab"] == "Work"
 
 
 async def test_an_unknown_theme_in_an_import_falls_back(auth_client):

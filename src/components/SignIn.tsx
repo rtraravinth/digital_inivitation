@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { ApiError, messageFor } from "@/lib/api";
 import { completeTwoStep, register, signIn } from "@/lib/session";
-import { PASSWORD_MIN } from "@/lib/types";
+import { PAGE_DOMAIN, PASSWORD_MIN, pageAddress } from "@/lib/types";
 import { PasswordField } from "./PasswordField";
 
 type Mode = "in" | "up";
@@ -19,11 +19,20 @@ export function SignIn() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
+  const [handle, setHandle] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [code, setCode] = useState("");
   const [challenge, setChallenge] = useState<Challenge | null>(null);
 
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<ApiError | Error | null>(null);
+
+  /* Sign-up only. Signing in has one password field and nothing to compare
+     it against, so neither check applies there. */
+  const mismatch =
+    mode === "up" && confirmPassword.length > 0 && password !== confirmPassword;
+  const signUpReady =
+    password.length >= PASSWORD_MIN && password === confirmPassword;
 
   /** The API names the offending field on a 422; show it where it happened. */
   const fieldError = (field: string) =>
@@ -53,7 +62,7 @@ export function SignIn() {
 
     return run(async () => {
       if (mode === "up") {
-        await register(email.trim(), password, name.trim());
+        await register(email.trim(), password, name.trim(), handle.trim().toLowerCase());
         router.push("/");
         return;
       }
@@ -119,6 +128,39 @@ export function SignIn() {
               </div>
             )}
 
+            {mode === "up" && (
+              <div className="field">
+                <label htmlFor="handle">Your Handle</label>
+                {/* Asked for here because it is the base of every page this
+                    account will publish. Leaving it until /account is what
+                    let accounts exist with no address at all. */}
+                <div className="flex items-center">
+                  <span className="text-muted shrink-0 pr-1 text-sm">{PAGE_DOMAIN}/</span>
+                  <input
+                    id="handle"
+                    className="input"
+                    value={handle}
+                    onChange={(e) => setHandle(e.target.value)}
+                    autoComplete="username"
+                    placeholder="your-name"
+                    required
+                  />
+                </div>
+                {fieldError("handle") ? (
+                  <p className="mt-1 text-[12px]" style={{ color: "var(--color-accent)" }}>
+                    {fieldError("handle")}
+                  </p>
+                ) : (
+                  <p className="text-muted mt-1 text-[12px]">
+                    Lowercase letters, numbers and hyphens. Your pages live under it —{" "}
+                    <strong>
+                      {pageAddress(handle.trim().toLowerCase() || "your-name", "your-page")}
+                    </strong>.
+                  </p>
+                )}
+              </div>
+            )}
+
             <div className="field">
               <label htmlFor="email">Email</label>
               <input
@@ -159,10 +201,36 @@ export function SignIn() {
                 </p>
               )}
             </div>
+
+            {mode === "up" && (
+              <div className="field">
+                <label htmlFor="confirm-password">Confirm password</label>
+                <PasswordField
+                  id="confirm-password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  autoComplete="new-password"
+                  aria-invalid={mismatch || undefined}
+                  required
+                />
+                {/* Only once they have typed something to compare — an alarm
+                    on the first keystroke of a field still being filled is
+                    noise. */}
+                {mismatch && (
+                  <p className="mt-1 text-[12px]" style={{ color: "var(--color-accent)" }}>
+                    Those two do not match.
+                  </p>
+                )}
+              </div>
+            )}
           </>
         )}
 
-        {error && !fieldError("email") && !fieldError("password") && !fieldError("name") && (
+        {error &&
+          !fieldError("email") &&
+          !fieldError("password") &&
+          !fieldError("name") &&
+          !fieldError("handle") && (
           <p
             className="border-l-2 py-2 pl-3 text-[13px]"
             style={{ borderColor: "var(--color-accent)" }}
@@ -172,7 +240,11 @@ export function SignIn() {
           </p>
         )}
 
-        <button className="btn btn-primary btn-block" type="submit" disabled={busy}>
+        <button
+          className="btn btn-primary btn-block"
+          type="submit"
+          disabled={busy || (mode === "up" && !challenge && !signUpReady)}
+        >
           {busy
             ? "Working…"
             : challenge
@@ -206,6 +278,9 @@ export function SignIn() {
             style={{ color: "var(--color-ink)" }}
             onClick={() => {
               setMode(mode === "in" ? "up" : "in");
+              // Sign-in has no second field, so a confirmation left over from
+              // an abandoned sign-up would block the button on the way back.
+              setConfirmPassword("");
               setError(null);
             }}
           >

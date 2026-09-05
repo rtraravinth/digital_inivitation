@@ -13,39 +13,33 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.errors import NotFound, ValidationFailed
 from app.models import Asset, Portfolio, Section
-from app.models.enums import BlockKind
+from app.models.enums import DEFAULT_TAB
 from app.schemas.section import SectionOrder, SectionPatch
 from app.services.asset import AssetService
 
-#: The add-block picker's starting titles, matching KIND_TITLE in
-#: src/lib/store.tsx. A kind only chooses the glyph and this first line —
-#: every block is still the same four fields underneath.
-KIND_TITLE: dict[str, str] = {
-    "link": "",
-    "venture": "A business you run",
-    "contact": "How to reach you",
-    "booking": "Book a time",
-    "testimonial": "What a client said",
-    "gallery": "Photographs",
-    "numbers": "By the numbers",
-    "document": "A document to download",
-}
+
+def first_tab(portfolio: Portfolio) -> str:
+    """The tab a new section files under.
+
+    Whatever the page already uses, so adding a section does not silently open
+    a tab of its own; ``DEFAULT_TAB`` only for a page with no sections yet.
+    """
+    for section in sorted(portfolio.sections, key=lambda s: s.position):
+        if section.tab.strip():
+            return section.tab
+    return DEFAULT_TAB
 
 
 class SectionService:
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
 
-    async def add(self, portfolio: Portfolio, kind: BlockKind = "link") -> Section:
+    async def add(self, portfolio: Portfolio) -> Section:
         section = Section(
             portfolio_id=portfolio.id,
             position=len(portfolio.sections),
-            title=KIND_TITLE.get(kind, ""),
-            kind=kind,
-            tags=[],
+            tab=first_tab(portfolio),
             links=[],
-            numbers=[],
-            dates=[],
         )
         self.session.add(section)
         await self._normalise(portfolio)
@@ -67,12 +61,12 @@ class SectionService:
         section = await self.get(portfolio, section_id)
         provided = patch.model_fields_set
 
-        for field in ("title", "description", "hidden", "kind"):
+        for field in ("title", "description", "tab", "hidden"):
             value = getattr(patch, field)
             if value is not None:
                 setattr(section, field, value)
 
-        for field in ("tags", "links", "numbers", "dates"):
+        for field in ("links",):
             value = getattr(patch, field)
             if value is not None:
                 setattr(section, field, _dump_list(value))

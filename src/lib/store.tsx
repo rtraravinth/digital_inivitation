@@ -2,7 +2,7 @@
 
 import { useSyncExternalStore } from "react";
 import { ApiError, api, messageFor } from "./api";
-import { normalize, type BlockKind, type Portfolio, type Section } from "./types";
+import { normalize, type Portfolio, type Section } from "./types";
 
 export function newId(): string {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
@@ -175,9 +175,12 @@ export async function createPortfolioAsync(
   name: string,
   slug: string,
   startFrom: StartFrom,
+  summary = "",
 ): Promise<Portfolio> {
   clearError();
-  const created = normalize(await api.post<Portfolio>("/portfolios", { name, slug, startFrom }));
+  const created = normalize(
+    await api.post<Portfolio>("/portfolios", { name, slug, summary, startFrom }),
+  );
   setState([created, ...state]);
   return created;
 }
@@ -204,9 +207,11 @@ function updatePortfolio(id: string, recipe: (p: Portfolio) => Portfolio) {
 
   schedule(`portfolio:${id}`, () =>
     persist(async () => {
-      if (after.status !== before.status) {
-        const verb = after.status === "live" ? "publish" : "unpublish";
-        replace(await api.post<Portfolio>(`/portfolios/${id}/${verb}`));
+      // A live portfolio refuses every edit, so the order of these calls is
+      // load-bearing: unpublish first to open the page up, publish last so
+      // the edits in the same batch land while it is still a draft.
+      if (before.status === "live" && after.status !== "live") {
+        replace(await api.post<Portfolio>(`/portfolios/${id}/unpublish`));
       }
 
       if (coreChanged(before, after)) {
@@ -214,6 +219,7 @@ function updatePortfolio(id: string, recipe: (p: Portfolio) => Portfolio) {
           await api.patch<Portfolio>(`/portfolios/${id}`, {
             name: after.name,
             slug: after.slug,
+            summary: after.summary,
             theme: after.theme,
             accent: after.accent,
             ground: after.ground,
@@ -224,7 +230,8 @@ function updatePortfolio(id: string, recipe: (p: Portfolio) => Portfolio) {
       }
 
       if (JSON.stringify(before.header) !== JSON.stringify(after.header)) {
-        const { name, current, description, tags, links, portrait } = after.header;
+        const { name, current, description, tags, links, numbers, dates, portrait } =
+          after.header;
         replace(
           await api.patch<Portfolio>(`/portfolios/${id}/header`, {
             name,
@@ -232,9 +239,15 @@ function updatePortfolio(id: string, recipe: (p: Portfolio) => Portfolio) {
             description,
             tags,
             links,
+            numbers,
+            dates,
             ...assetFields(portrait, "portraitAssetId", "clearPortrait"),
           }),
         );
+      }
+
+      if (before.status !== "live" && after.status === "live") {
+        replace(await api.post<Portfolio>(`/portfolios/${id}/publish`));
       }
     }),
   );
@@ -244,6 +257,7 @@ function coreChanged(before: Portfolio, after: Portfolio): boolean {
   return (
     before.name !== after.name ||
     before.slug !== after.slug ||
+    before.summary !== after.summary ||
     before.theme !== after.theme ||
     before.accent !== after.accent ||
     before.ground !== after.ground ||
@@ -265,13 +279,10 @@ function sectionPayload(section: Section) {
   return {
     title: section.title,
     description: section.description,
-    tags: section.tags,
+    tab: section.tab,
     links: section.links,
-    numbers: section.numbers,
-    dates: section.dates,
     quote: section.quote,
     hidden: section.hidden,
-    kind: section.kind,
     ...assetFields(section.image, "imageAssetId", "clearImage"),
     ...assetFields(section.file, "fileAssetId", "clearFile"),
   };
@@ -306,15 +317,12 @@ function updateSection(
 /**
  * The server mints section ids, so this returns the id of the section it
  * appends locally only after the request resolves. Callers that navigate to
- * a new section await `addBlockAsync`.
+ * a new section await `addSectionAsync`.
  */
-export async function addBlockAsync(
-  portfolioId: string,
-  kind: BlockKind = "link",
-): Promise<string | null> {
+export async function addSectionAsync(portfolioId: string): Promise<string | null> {
   clearError();
   try {
-    const created = await api.post<Section>(`/portfolios/${portfolioId}/sections`, { kind });
+    const created = await api.post<Section>(`/portfolios/${portfolioId}/sections`, {});
     setState(mapPortfolio(portfolioId, (p) => ({ ...p, sections: [...p.sections, created] })));
     return created.id;
   } catch (error) {
@@ -326,12 +334,8 @@ export async function addBlockAsync(
   }
 }
 
-function addBlock(portfolioId: string, kind: BlockKind): void {
-  void addBlockAsync(portfolioId, kind);
-}
-
 function addSection(portfolioId: string): void {
-  void addBlockAsync(portfolioId, "link");
+  void addSectionAsync(portfolioId);
 }
 
 function toggleSectionHidden(portfolioId: string, sectionId: string) {
@@ -417,8 +421,7 @@ export function usePortfolios() {
     updatePortfolio,
     updateSection,
     addSection,
-    addBlock,
-    addBlockAsync,
+    addSectionAsync,
     toggleSectionHidden,
     deleteSection,
     moveSection,

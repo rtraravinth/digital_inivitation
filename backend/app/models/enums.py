@@ -26,13 +26,6 @@ FONTS: Final[tuple[str, ...]] = ("archivo", "fraunces", "space-grotesk")
 PortfolioStatus = Literal["live", "draft", "empty"]
 STATUSES: Final[tuple[str, ...]] = ("live", "draft", "empty")
 
-BlockKind = Literal[
-    "link", "venture", "contact", "booking", "testimonial", "gallery", "numbers", "document"
-]
-BLOCK_KINDS: Final[tuple[str, ...]] = (
-    "link", "venture", "contact", "booking", "testimonial", "gallery", "numbers", "document",
-)
-
 RoleNav = Literal["tabs", "rail", "scroll", "lens"]
 ROLE_NAVS: Final[tuple[str, ...]] = ("tabs", "rail", "scroll", "lens")
 
@@ -59,6 +52,11 @@ PRIVACY_KEYS: Final[tuple[str, ...]] = ("indexable", "showContact", "countVisits
 #: The one accent that ships as the default, from SWATCHES[0].
 DEFAULT_ACCENT: Final[str] = "#ec3013"
 DEFAULT_TRACKING: Final[str] = "-0.015em"
+
+#: What a section files under when the page has no tabs yet. Every section
+#: needs one — it is the only route a visitor has to the section.
+DEFAULT_TAB: Final[str] = "Work"
+TAB_MAX_LENGTH: Final[int] = 60
 
 
 def sql_in(values: tuple[str, ...]) -> str:

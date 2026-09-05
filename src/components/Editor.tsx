@@ -3,11 +3,18 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { LinkEditor } from "./LinkEditor";
+import { TabField } from "./TabField";
 import { TagEditor } from "./TagEditor";
-import { PortraitField, SectionExtras } from "./SectionExtras";
-import { ThemePanel } from "./ThemePanel";
+import { PortfolioExtras, PortraitField, SectionExtras } from "./SectionExtras";
+import { PublishedLock } from "./PublishedLock";
 import { usePortfolios } from "@/lib/store";
-import type { LinkItem, Portfolio, PortfolioHeader, Section } from "@/lib/types";
+import {
+  previewPath,
+  type LinkItem,
+  type Portfolio,
+  type PortfolioHeader,
+  type Section,
+} from "@/lib/types";
 
 const HEADER_KEY = "header";
 
@@ -32,9 +39,12 @@ function LinkList({ links }: { links: LinkItem[] }) {
 
 function SectionFields({
   section,
+  tabOptions,
   onChange,
 }: {
   section: Section;
+  /** Every tab already on the page, so the field offers them before a new one. */
+  tabOptions: string[];
   onChange: (recipe: (s: Section) => Section) => void;
 }) {
   return (
@@ -63,10 +73,12 @@ function SectionFields({
       </div>
 
       <div className="field">
-        <label>Tags</label>
-        <TagEditor
-          tags={section.tags}
-          onChange={(tags) => onChange((s) => ({ ...s, tags }))}
+        <label htmlFor={`tab-${section.id}`}>Tab</label>
+        <TabField
+          id={`tab-${section.id}`}
+          value={section.tab}
+          options={tabOptions}
+          onChange={(tab) => onChange((s) => ({ ...s, tab }))}
         />
       </div>
 
@@ -147,6 +159,8 @@ function HeaderFields({
         portrait={header.portrait}
         onChange={(portrait) => onChange((h) => ({ ...h, portrait }))}
       />
+
+      <PortfolioExtras header={header} onChange={onChange} />
     </>
   );
 }
@@ -210,7 +224,7 @@ export function Editor({ id }: { id: string }) {
     getPortfolio,
     updatePortfolio,
     updateSection,
-    addBlockAsync,
+    addSectionAsync,
     deleteSection,
     moveSection,
   } = usePortfolios();
@@ -218,8 +232,6 @@ export function Editor({ id }: { id: string }) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [reordering, setReordering] = useState(false);
   const [mobileOpen, setMobileOpen] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
-  const [themeOpen, setThemeOpen] = useState(false);
 
   const editingRef = useRef<HTMLDivElement>(null);
   /** Refs, not state — this must not cause a render of its own. */
@@ -252,7 +264,18 @@ export function Editor({ id }: { id: string }) {
     );
   }
 
+  // A live page is frozen — the API refuses every write to it — so this
+  // screen steps aside for Preview and Unpublish rather than rendering
+  // controls that can only fail.
+  if (portfolio.status === "live") {
+    return <PublishedLock portfolio={portfolio} />;
+  }
+
   const p: Portfolio = portfolio;
+
+  // Hidden sections count: their tab is still a tab the author is using, and
+  // dropping it from the picker would make it unpickable for anything else.
+  const pageTabs = [...new Set(p.sections.map((s) => s.tab.trim()).filter(Boolean))];
 
   const setHeader = (recipe: (h: PortfolioHeader) => PortfolioHeader) =>
     updatePortfolio(p.id, (prev) => ({ ...prev, header: recipe(prev.header) }));
@@ -263,20 +286,10 @@ export function Editor({ id }: { id: string }) {
   async function addAndEdit() {
     // The server mints the id, so the new section can only be focused once
     // it answers.
-    const added = await addBlockAsync(p.id);
+    const added = await addSectionAsync(p.id);
     if (!added) return;
     justAddedRef.current = added;
     setEditingId(added);
-  }
-
-  async function share() {
-    try {
-      await navigator.clipboard.writeText(`https://facet.page/${p.slug}`);
-      setCopied(true);
-      window.setTimeout(() => setCopied(false), 1600);
-    } catch {
-      // Clipboard blocked — leave the button silent rather than lying about it.
-    }
   }
 
   const openSection = mobileOpen
@@ -292,29 +305,20 @@ export function Editor({ id }: { id: string }) {
           ← Portfolios
         </Link>
         <span className="nav-brand mr-0 hidden text-[15px] sm:inline">{p.name}</span>
-        <span className="tag tag-neutral mr-auto">
-          {p.status === "live" ? "Live" : "Saved"}
-        </span>
-        <Link href={`/builder/${p.id}`} className="btn btn-secondary hidden sm:inline-flex">
+        <span className="status status-draft mr-auto">Not published — saved</span>
+        <Link href={`/builder/${p.id}`} className="btn btn-secondary">
           Builder
         </Link>
-        <Link href={`/p/${p.slug}`} className="btn btn-secondary">
+        <Link
+          href={previewPath(p.id)}
+          className="btn btn-secondary"
+          // A new tab, because the point of a preview is seeing the page
+          // with nothing of the app around it — exactly what a visitor gets.
+          target="_blank"
+          rel="noopener noreferrer"
+        >
           Preview
         </Link>
-        <button
-          type="button"
-          className="btn btn-secondary"
-          onClick={share}
-        >
-          {copied ? "Copied" : "Share"}
-        </button>
-        <button
-          type="button"
-          className={`btn lg:hidden ${themeOpen ? "btn-primary" : "btn-secondary"}`}
-          onClick={() => setThemeOpen((v) => !v)}
-        >
-          Theme
-        </button>
         <button type="button" className="btn btn-primary" onClick={publish}>
           Publish
         </button>
@@ -328,14 +332,6 @@ export function Editor({ id }: { id: string }) {
         >
           {storageError}
         </div>
-      )}
-
-      {themeOpen && (
-        <ThemePanel
-          portfolio={p}
-          onChange={(recipe) => updatePortfolio(p.id, recipe)}
-          onClose={() => setThemeOpen(false)}
-        />
       )}
 
       {/* ══ desktop — the document ═══════════════════════════════════ */}
@@ -357,13 +353,6 @@ export function Editor({ id }: { id: string }) {
             }}
           >
             Reorder
-          </button>
-          <button
-            type="button"
-            className={`btn ${themeOpen ? "btn-primary" : "btn-ghost"}`}
-            onClick={() => setThemeOpen((v) => !v)}
-          >
-            Theme
           </button>
           <span className="mono-label ml-auto">
             1 header · {p.sections.length} section{p.sections.length === 1 ? "" : "s"}
@@ -499,6 +488,7 @@ export function Editor({ id }: { id: string }) {
                     <>
                       <SectionFields
                         section={s}
+                        tabOptions={pageTabs}
                         onChange={(recipe) => updateSection(p.id, s.id, recipe)}
                       />
                       <div className="flex gap-2">
@@ -535,15 +525,9 @@ export function Editor({ id }: { id: string }) {
                           </span>
                         )}
                       </p>
-                      {s.tags.length > 0 && (
-                        <div className="flex flex-wrap gap-1.5">
-                          {s.tags.map((t) => (
-                            <span key={t} className="tag tag-neutral">
-                              {t}
-                            </span>
-                          ))}
-                        </div>
-                      )}
+                      <div className="flex flex-wrap gap-1.5">
+                        <span className="tag tag-neutral">{s.tab}</span>
+                      </div>
                       <LinkList links={s.links} />
                     </>
                   )}
@@ -597,6 +581,7 @@ export function Editor({ id }: { id: string }) {
             <div className="flex flex-col gap-3.5 p-4">
               <SectionFields
                 section={openSection}
+                tabOptions={pageTabs}
                 onChange={(recipe) => updateSection(p.id, openSection.id, recipe)}
               />
               <button
@@ -693,8 +678,7 @@ export function Editor({ id }: { id: string }) {
                     )}
                   </span>
                   <span className="text-neutral-700 text-[11px]">
-                    {s.tags.length} tag{s.tags.length === 1 ? "" : "s"} ·{" "}
-                    {s.links.length} link{s.links.length === 1 ? "" : "s"}
+                    {s.tab} · {s.links.length} link{s.links.length === 1 ? "" : "s"}
                   </span>
                 </span>
 
@@ -736,7 +720,7 @@ export function Editor({ id }: { id: string }) {
               <button
                 type="button"
                 className="btn btn-primary btn-block"
-                onClick={async () => setMobileOpen(await addBlockAsync(p.id))}
+                onClick={async () => setMobileOpen(await addSectionAsync(p.id))}
               >
                 + Add section
               </button>

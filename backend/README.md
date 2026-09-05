@@ -112,6 +112,11 @@ empty. Recording answers 202 whether or not it counted, so a visitor never
 sees an analytics decision — including the owner's "count visits" switch
 being off, which means no row is written at all.
 
+**An owner's asset URL carries its own signature.** `GET /api/v1/assets/{id}`
+accepts either `?t=` — the token `asset_out()` signed the id with — or a bearer
+token. The browser fetches these from `<img src>`, which cannot send an
+`Authorization` header. `FACET_ASSET_URL_TTL_MINUTES` sets how long one lasts.
+
 **Privacy is enforced here, not in the page.** `GET /api/v1/public/p/{slug}`
 applies all four switches: `showContact` off removes header links from the
 response body, `indexable` off sets `X-Robots-Tag: noindex`, hidden sections

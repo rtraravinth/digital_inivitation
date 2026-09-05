@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.errors import Conflict, NotFound
 from app.models import AccountProfile, Asset, RecoveryCode, User
 from app.schemas.account import (
+    RESERVED_HANDLES,
     AccountOut,
     DomainPatch,
     NotificationsPatch,
@@ -22,6 +23,28 @@ from app.schemas.account import (
 )
 from app.schemas.asset import asset_out
 from app.services.asset import AssetService
+
+
+async def assert_handle_available(
+    session: AsyncSession, handle: str, *, exclude_user_id: uuid.UUID | None = None
+) -> None:
+    """Raise unless ``handle`` is free to claim.
+
+    Registration and a later rename both land here, so the reserved list and
+    the uniqueness rule cannot drift apart between them.
+    """
+    if handle in RESERVED_HANDLES:
+        raise Conflict(
+            "That address is reserved.", code="handle_reserved", details={"handle": handle}
+        )
+
+    query = select(AccountProfile).where(AccountProfile.handle == handle)
+    if exclude_user_id is not None:
+        query = query.where(AccountProfile.user_id != exclude_user_id)
+    if await session.scalar(query) is not None:
+        raise Conflict(
+            "That handle is already taken.", code="handle_taken", details={"handle": handle}
+        )
 
 
 class AccountService:
@@ -101,15 +124,7 @@ class AccountService:
         return await self.get(user)
 
     async def _assert_handle_free(self, handle: str, user_id: uuid.UUID) -> None:
-        taken = await self.session.scalar(
-            select(AccountProfile).where(
-                AccountProfile.handle == handle, AccountProfile.user_id != user_id
-            )
-        )
-        if taken is not None:
-            raise Conflict(
-                "That handle is already taken.", code="handle_taken", details={"handle": handle}
-            )
+        await assert_handle_available(self.session, handle, exclude_user_id=user_id)
 
     async def _assert_owns_asset(self, user: User, asset_id: uuid.UUID) -> Asset:
         asset = await self.session.scalar(

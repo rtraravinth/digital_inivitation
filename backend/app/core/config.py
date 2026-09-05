@@ -40,6 +40,10 @@ class Settings(BaseSettings):
     refresh_token_ttl_days: int = Field(default=30, ge=1, le=365)
     # How long a two-step login challenge stays usable.
     challenge_ttl_seconds: int = Field(default=300, ge=30, le=3600)
+    # How long a signed upload URL keeps opening. Longer than an access
+    # token on purpose: the URL is baked into a response the editor may
+    # hold on screen for hours, and it names one asset and nothing else.
+    asset_url_ttl_minutes: int = Field(default=60 * 24, ge=5, le=60 * 24 * 30)
 
     cors_origins: list[str] = ["http://localhost:3000", "http://127.0.0.1:3000"]
     public_base_url: str = "http://localhost:8000"

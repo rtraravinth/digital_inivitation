@@ -17,6 +17,30 @@ from app.schemas.common import CamelModel, StrictCamelModel
 
 HANDLE_PATTERN = r"^[a-z0-9][a-z0-9-]{1,30}[a-z0-9]$"
 
+#: Handles that can never be claimed, because the address is
+#: ``facet.com/<handle>/<slug>`` and these are, or may become, something else
+#: at that position — an app route, a hostname, or a word a support page will
+#: want. This list can only ever grow: once an account holds a handle, taking
+#: it back breaks every link already shared, so anything doubtful belongs here
+#: on the first day rather than the second.
+RESERVED_HANDLES: frozenset[str] = frozenset(
+    {
+        # routes this app already serves
+        "account", "stats", "signin", "signout", "signup", "p", "print",
+        "editor", "builder", "themes", "blocks", "portfolios",
+        # hostnames and infrastructure
+        "api", "www", "app", "admin", "cdn", "static", "assets", "media",
+        "mail", "smtp", "imap", "ftp", "ns", "ns1", "ns2", "webmail", "status",
+        # the product itself
+        "facet", "official", "team", "staff", "support", "help", "root",
+        "system", "security", "billing", "legal", "privacy", "terms",
+        # things a marketing site grows
+        "about", "blog", "docs", "pricing", "careers", "press", "contact",
+        "login", "logout", "register", "settings", "dashboard", "explore",
+        "new", "edit", "me", "you", "null", "undefined", "true", "false",
+    }
+)
+
 
 class LinkItem(StrictCamelModel):
     id: str = Field(max_length=64)

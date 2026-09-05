@@ -102,8 +102,13 @@ function adopt(response: AuthResponse) {
   emit({ user: response.user, status: "in" });
 }
 
-export async function register(email: string, password: string, name: string) {
-  adopt(await api.post<AuthResponse>("/auth/register", { email, password, name }));
+export async function register(
+  email: string,
+  password: string,
+  name: string,
+  handle: string,
+) {
+  adopt(await api.post<AuthResponse>("/auth/register", { email, password, name, handle }));
 }
 
 /**

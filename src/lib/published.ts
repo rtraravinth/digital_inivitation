@@ -24,10 +24,13 @@ export type Published = {
 
 type PublicPayload = Omit<Portfolio, "status" | "summary" | "meta"> & PublishedPrivacy;
 
-export async function fetchPublished(slug: string): Promise<Published | null> {
+export async function fetchPublished(
+  handle: string,
+  slug: string,
+): Promise<Published | null> {
   let response: Response;
   try {
-    response = await fetch(`${API_BASE}/api/v1/public/p/${slug}`, {
+    response = await fetch(`${API_BASE}/api/v1/public/p/${encodeURIComponent(handle)}/${encodeURIComponent(slug)}`, {
       // Always current: a page edited a moment ago must not be served stale.
       cache: "no-store",
     });

@@ -28,7 +28,7 @@ because the connection never arrives. Pass flags through when you need them:
 ```
 npm run build
 npm run lint
-cd backend && .venv/bin/python -m pytest    # 229 tests (.venv/Scripts on Windows)
+cd backend && .venv/bin/python -m pytest    # 236 tests (.venv/Scripts on Windows)
 ```
 
 `NEXT_PUBLIC_API_URL` points the frontend at the API; see
@@ -139,6 +139,15 @@ it, but two rules matter from this side:
 - **The frontend needs it up.** With the API down, every authenticated page
   shows its error banner and `/p/[slug]` returns a 404 — there is no local
   fallback and there should not be one.
+- **An owner's asset URL is signed, not merely authenticated.** `asset_out()`
+  appends `?t=<jwt>` to `/api/v1/assets/{id}`, and the route takes that
+  signature *or* a bearer token. An `<img>` cannot send an `Authorization`
+  header, and the access token lives in memory in `src/lib/api.ts` and never
+  reaches the markup — without the signature every owner-side image (editor,
+  builder canvas, `/preview`, `/blocks`, `/print`) is a 401 and renders
+  broken. The token names one asset and expires
+  (`FACET_ASSET_URL_TTL_MINUTES`, 24h). Published pages are unaffected: they
+  use `/api/v1/public/assets/{id}`, which needs nothing.
 - **`src/lib/api.ts` is the only module that knows the API exists.** It owns
   the access token, one silent refresh-and-retry on a 401, and turning an
   error envelope into an `ApiError` with a `code` a caller can branch on.
@@ -216,6 +225,6 @@ a signed-in one had their own settings applied to somebody else's page.
 - **Slugs are global.** Two accounts cannot both hold `rohan`, because the
   address is `facet.page/<slug>` with nothing in front of it. The create
   dialog surfaces the 409 as a message.
-- **The frontend has no test runner.** The backend has 229 pytest tests;
+- **The frontend has no test runner.** The backend has 236 pytest tests;
   changes here are checked with `npm run lint`, `npm run build` and by
   actually opening the app.

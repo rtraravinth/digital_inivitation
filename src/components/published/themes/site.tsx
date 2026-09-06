@@ -89,20 +89,30 @@ const SPY_OFFSET = 128;
 const SPY_THRESHOLDS = Array.from({ length: 21 }, (_, i) => i / 20);
 
 /**
- * Every chapter section, in document order — which is reading order.
+ * Every chapter section of *this* page, in document order — reading order.
+ *
+ * Scoped to the theme's own root rather than the whole document, because
+ * `/print` stacks every published page into one document: two portfolios on
+ * Site put two sets of chapters in it, and a document-wide query had each
+ * page's nav highlighting — and its anchors scrolling to — whichever page
+ * came first.
  *
  * Scrolled to the very bottom is forced to the last chapter outright, rather
  * than left to the "top past the line" rule below: when trailing content
  * after the last chapter (the timeline, the footer) is shorter than the
  * viewport, the page runs out of scroll room before that chapter's own top
  * ever reaches `SPY_OFFSET`, and the rule would otherwise leave the
- * *second*-to-last chapter active even at maximum scroll.
+ * *second*-to-last chapter active even at maximum scroll. That only holds
+ * where there is scroll room at all: a page shorter than the viewport is
+ * *always* at maximum scroll, and would otherwise open on its last chapter.
  */
-function currentChapterId(doc: Document): string {
-  const sections = Array.from(doc.querySelectorAll<HTMLElement>('[id^="chapter-"]'));
+function currentChapterId(root: HTMLElement): string {
+  const sections = Array.from(root.querySelectorAll<HTMLElement>('[id^="chapter-"]'));
   if (sections.length === 0) return "";
+  const doc = root.ownerDocument;
   const scroller = doc.scrollingElement ?? doc.documentElement;
-  if (scroller.scrollTop + scroller.clientHeight >= scroller.scrollHeight - 1) {
+  const scrolls = scroller.scrollHeight > scroller.clientHeight + 1;
+  if (scrolls && scroller.scrollTop + scroller.clientHeight >= scroller.scrollHeight - 1) {
     return sections[sections.length - 1].id;
   }
   let current = sections[0].id;
@@ -113,7 +123,11 @@ function currentChapterId(doc: Document): string {
 }
 
 export function Site({ p }: { p: Portfolio }) {
-  const chapters = chaptersOf(p).map((c, i) => ({ ...c, id: `chapter-${i}` }));
+  // The portfolio's own id is in there because `/print` renders every page
+  // into one document, and two Site pages would otherwise both own
+  // `chapter-0`: every nav highlighted the same chapter and a click on the
+  // second page scrolled to the first page's content.
+  const chapters = chaptersOf(p).map((c, i) => ({ ...c, id: `chapter-${p.id}-${i}` }));
   const numbers = allNumbers(p);
   const dates = allDates(p);
   const [active, setActive] = useState("");
@@ -165,10 +179,13 @@ export function Site({ p }: { p: Portfolio }) {
   const spyRef = useCallback((node: HTMLElement | null) => {
     const view = node?.ownerDocument.defaultView;
     if (!node || !view || typeof view.IntersectionObserver === "undefined") return;
-    const io = new view.IntersectionObserver(
-      () => setActive(currentChapterId(node.ownerDocument)),
-      { threshold: SPY_THRESHOLDS },
-    );
+    // The theme's own wrapper, so the measuring never reaches another
+    // portfolio's chapters stacked into the same document by /print.
+    const root =
+      node.closest<HTMLElement>("[data-site-root]") ?? node.ownerDocument.documentElement;
+    const io = new view.IntersectionObserver(() => setActive(currentChapterId(root)), {
+      threshold: SPY_THRESHOLDS,
+    });
     io.observe(node);
     return () => io.disconnect();
   }, []);
@@ -187,7 +204,7 @@ export function Site({ p }: { p: Portfolio }) {
   };
 
   return (
-    <div style={groundStyle(p)}>
+    <div data-site-root="" style={groundStyle(p)}>
       <nav
         className="sticky top-0 z-10 flex flex-wrap items-center justify-between gap-x-6 gap-y-2 px-6 py-3 md:px-10"
         style={{

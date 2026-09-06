@@ -82,7 +82,23 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="en" className={`${fontVariables} h-full antialiased`}>
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="min-h-full flex flex-col">
+        {/*
+          Site's reveal-on-scroll starts every block at `opacity: 0` and a
+          client-side observer adds `.in`. `/p/[...slug]` is a server
+          component on purpose and every other theme degrades to
+          static-but-readable, so without this a visitor with JavaScript off
+          — or a page whose hydration failed — got a sticky nav over a blank
+          page. The reduced-motion and print escapes in globals.css are the
+          same idea; this is the third. It needs no `!important`: `.reveal`
+          lives in `@layer components`, and an unlayered rule beats a layered
+          one whatever the specificity.
+        */}
+        <noscript>
+          <style>{".reveal, .reveal.in { opacity: 1; transform: none; }"}</style>
+        </noscript>
+        {children}
+      </body>
     </html>
   );
 }

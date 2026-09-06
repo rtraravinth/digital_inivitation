@@ -20,10 +20,12 @@ import typer
 from pydantic import ValidationError
 from sqlalchemy import select
 
+from app.core.errors import AppError
 from app.core.security import hash_password
 from app.db.session import dispose_engine, get_sessionmaker
 from app.models import AccountProfile, AccountSettings, User
 from app.schemas.auth import RegisterRequest
+from app.services.account import assert_handle_available
 from app.services.transfer import TransferService
 
 app = typer.Typer(help="FACET backend development commands.", no_args_is_help=True)
@@ -41,14 +43,22 @@ def _run(coro):
     return asyncio.run(wrapper())
 
 
-async def _create_user(email: str, password: str, name: str) -> str:
+async def _create_user(email: str, password: str, name: str, handle: str) -> str:
     async with get_sessionmaker()() as session:
         email = email.strip().lower()
         if await session.scalar(select(User).where(User.email == email)):
             raise typer.BadParameter(f"{email} already has an account.")
 
+        # The same check registration makes, and for the same reason: the
+        # handle is the front of every address the account will publish, so
+        # two accounts cannot hold one.
+        try:
+            await assert_handle_available(session, handle)
+        except AppError as exc:
+            raise typer.BadParameter(exc.message) from exc
+
         user = User(email=email, password_hash=hash_password(password))
-        user.profile = AccountProfile(name=name, tags=[], links=[])
+        user.profile = AccountProfile(name=name, handle=handle, tags=[], links=[])
         user.settings = AccountSettings()
         session.add(user)
         await session.commit()
@@ -59,6 +69,7 @@ async def _create_user(email: str, password: str, name: str) -> str:
 def create_user(
     email: str = typer.Option(..., help="Sign-in address"),
     password: str = typer.Option(..., help="At least 12 characters"),
+    handle: str = typer.Option(..., help="The account's address: facet.page/<handle>/<slug>"),
     name: str = typer.Option("", help="Display name"),
 ) -> None:
     """Create an account without going through the API."""
@@ -67,14 +78,18 @@ def create_user(
 
     # Validate exactly as the API does, or this can mint an account that
     # cannot sign in — a reserved TLD like .test gets past a naive check and
-    # is then refused at login.
+    # is then refused at login. Registration requires a handle, so this must
+    # send one: without it every invocation failed validation, and an account
+    # with no handle has no address to publish under.
     try:
-        email = str(RegisterRequest(email=email, password=password, name=name).email)
+        request = RegisterRequest(email=email, password=password, name=name, handle=handle)
     except ValidationError as exc:
-        raise typer.BadParameter(exc.errors()[0]["msg"]) from exc
+        error = exc.errors()[0]
+        field = ".".join(str(part) for part in error["loc"]) or "input"
+        raise typer.BadParameter(f"{field}: {error['msg']}") from exc
 
-    user_id = _run(_create_user(email, password, name))
-    typer.echo(f"created {email} ({user_id})")
+    user_id = _run(_create_user(str(request.email), password, name, request.handle))
+    typer.echo(f"created {request.email} ({user_id}) at {request.handle}/")
 
 
 async def _seed(email: str, mode: str) -> int:

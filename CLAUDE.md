@@ -28,7 +28,7 @@ because the connection never arrives. Pass flags through when you need them:
 ```
 npm run build
 npm run lint
-cd backend && .venv/bin/python -m pytest    # 244 tests (.venv/Scripts on Windows)
+cd backend && .venv/bin/python -m pytest    # 258 tests (.venv/Scripts on Windows)
 ```
 
 `NEXT_PUBLIC_API_URL` points the frontend at the API; see
@@ -97,6 +97,25 @@ your browser keeps hitting the stale server on 3000. Kill it (`taskkill //F
 - `src/app/globals.css` — the Modernist design system: tokens in `@theme`,
   component classes in `@layer components`.
 
+**The live canvas is an iframe, and it has to be.** A theme's `md:` and `lg:`
+utilities are media queries, and a media query answers about the *window* — so
+a 390px box inside a 1440px window still got the desktop layout, crammed and
+overflowing sideways. An iframe has a window of its own, so `Desktop`/`Mobile`
+finally previews what the device actually renders. `CanvasFrame` copies this
+document's stylesheets into the frame — rendered through a portal, never
+appended, because the React Compiler rule rejects mutating a document held in
+state — and re-reads them on a `MutationObserver` so dev HMR keeps working.
+The page itself is portaled into the frame's body, so it stays in this React
+tree: same context, same live edits.
+
+**The phone canvas refuses horizontal swipes.** `Canvas` takes `panX`, and the
+mobile sheet passes `false`, which puts `touch-action: pan-y` on the wrapper
+*inside* the iframe — the parent cannot govern a gesture that starts in
+another document. The canvas fills the middle of that screen and the page
+inside it has its own sideways tab row, so a swipe meant to scroll the builder
+dragged that row instead. Taps still land: `touch-action` does not affect
+them, and `pointer-events: none` (which does) is the wrong tool here.
+
 **The live canvas scales with a CSS transform, not `zoom`.** A transform does
 not change layout size, so the inner element gets the unscaled height it needs
 and scrolls itself while the outer box shows a shrunken window onto it.
@@ -149,6 +168,96 @@ Two rules worth repeating because they are easy to break:
 The published page swaps the design system's own CSS variables on a wrapper
 (`groundStyle`), so every `.btn` and `.tag` follows the chosen accent and
 ground with no per-theme restyling.
+
+**Accent and ground are both any colour, and the ground carries two fields.**
+The builder's Colour panel draws an always-visible picker for each —
+`ColourPicker` in `builder/ColourPicker.tsx`, a saturation/value box over a
+hue slider with a hex field under it. Hand-rolled because `<input
+type="color">` is only a button: it shows a swatch and opens the operating
+system's dialog, and cannot render its controls inline. It holds **hue in
+state** rather than reading it back from the colour every time, because a
+grey has no hue and black has neither hue nor saturation — without that the
+marker snaps to red the moment you drag the value down to black. Accent has
+no preset swatches; ground keeps Light/Dark/Paper, and picking a colour
+overrides whichever is selected. `p.ground` still names one of three presets
+and `p.groundHex` overrides it; empty means "use the preset", which is why
+the preset is never cleared and always has something to fall back to.
+A preset supplies six variables — paper, surface, ink, divider and two
+neutrals — so a picked colour has to supply the same six: `derivedGround()`
+in `published/themes.tsx` works them out, choosing whichever ink contrasts
+better rather than thresholding on luminance, because a threshold gets
+mid-tones wrong. The presets keep their hand-tuned maps; derivation runs only
+for a picked colour. Contrast is derived, not enforced — a mid-grey ground
+tops out around 4.2:1 whichever ink it gets.
+
+**Fourteen headline faces, and only Archivo is preloaded.** `layout.tsx`
+declares them all through `next/font/google`; the thirteen alternates carry
+`preload: false`. Preloading is per-family rather than per-page, so with it
+on, every face would be fetched on every page load to serve the one a
+portfolio picked — the three faces we started with cost ~93KB that way, and
+all fourteen preloaded would be far worse. Without it a face is fetched only
+when text renders in it, which is what `display: swap` covers. One preload
+link is emitted, for Archivo, the body face every page uses.
+
+**A face has to reach 700 to be offered at all.** `globals.css` sets
+`font-weight: 800` on every heading and the themes add `font-extrabold` 22
+times, so a single-weight family would be faux-bolded by the browser into a
+smear. That is why Anton, Bebas Neue and Instrument Serif are not in the
+list, however well they would suit a poster. Every face in `FONTS` is
+variable; where a family stops short — Space Grotesk, Lora and Oswald cap at
+700 — the axis clamps to a real instance rather than synthesising one. Adding
+a face means editing `FontId` and `FONTS` on both sides plus a migration for
+the `font_is_known` check constraint; that constraint stays, because making
+drift loud is the point of it.
+
+**Every radio group needs a `useId()` suffix, because the builder mounts its
+controls twice.** The desktop inspector and the mobile sheet are both in the
+DOM at once — the sheet is `lg:hidden`, not unmounted — so `ColourControl`,
+`TypeControl` and `LayoutControl` each render twice. A radio `name` is scoped
+to the *document*, so a fixed name put all eight `rolenav` inputs in one
+native group, and a native group allows exactly one checked member: React set
+`checked` on the visible copy and the browser immediately moved it to the
+hidden one. Since `.radio input:checked + .dot` and `.seg-opt:has(input:checked)`
+both key off the *native* state, the selection silently stopped showing while
+the page itself kept updating — the state was never wrong, only the dot. Name
+every radio group `` `<group>-${useId()}` ``.
+
+**Type pairing is two faces, and `font` is only the headline.** `p.font` sets
+`--font-heading`, which drives `h1`-`h6`, `.btn`, `.mono-label`, `.status`,
+`.nav-brand`, `.dialog-title` and every `.font-heading` element in the
+themes. `p.bodyFont` sets `--font-body` **and** `--font-sans` — both, because
+`--font-sans` is what Tailwind's `font-sans` utility resolves to, and leaving
+it behind would split the page between two faces depending on whether an
+element happens to name one. The body used to be Archivo always, which made
+a "pairing" panel with one half missing: picking Playfair moved the headings
+and left every description in Archivo. `bodyFont` defaults to `archivo`, so
+an untouched portfolio renders exactly as before. `font` keeps its name for
+the same reason `roleNav` does — it is the wire format and a stored value.
+
+**The face is a dropdown, not a `<select>`** (`builder/FontSelect.tsx`, used
+by both the inspector and the mobile sheet). `font-family` on an `<option>`
+is ignored on macOS and unreliable in Chrome, so a native list would name
+fourteen fonts in the system font and show none of them — and seeing the face
+is the whole point of the control. **It closes on a backdrop, not a listener
+on `document`.** Most of the builder is the live canvas and that canvas is an
+iframe, so a `pointerdown` inside it never reaches this document: a document
+listener leaves the dropdown open when you click the page you are styling.
+
+**The Type panel's specimens load lazily** (`builder/FontSample.tsx`). A font
+downloads when text renders in it, so a list drawing all fourteen at once
+fetches all fourteen at once. Each row renders in the inherited face and
+names no family until it scrolls within 200px of the viewport — inside the
+dropdown's own scrolling panel as much as anywhere. The observer is wired in
+a **ref callback, not an effect**: the React Compiler lint rejects `setState`
+called straight from an effect body (`react-hooks/set-state-in-effect`),
+which the no-observer fallback has to do. The row for the face already in use
+passes `eager` — the canvas is rendering it anyway.
+
+**A hex field must not write every keystroke into the store.** The accent
+field used to, so typing `#ec3013` sent `#e`, `#ec`, `#ec3` — the API
+rejects those, and the first characters of any hand-typed colour raised a
+save-failed banner. `ColourField` keeps a local draft and commits only a
+complete `#rrggbb`, dropping the draft on blur.
 
 ## The backend
 
@@ -224,6 +333,16 @@ contact is hidden, hidden sections are absent — and reach the themes through
 the *visitor's* account, which meant a signed-out visitor saw the defaults and
 a signed-in one had their own settings applied to somebody else's page.
 
+**A preview knows it is one, and every theme asks.** `PreviewProvider` wraps
+`PublishedBody` wherever it is *not* the published page — `/preview/[id]`,
+the builder canvas and `/print` — and two things read that context.
+`useRecordClick` goes quiet, so the owner's own clicks never reach analytics.
+`usePageHref` returns `/preview/<id>` instead of `/p/<handle>/<slug>`, because
+the public address does not resolve until the portfolio is published: a
+section title inside a draft preview used to link straight to a 404. Render
+`PublishedBody` anywhere new and wrap it in both providers, or it will quietly
+claim to be the live page.
+
 ## Known gaps
 
 - **Artboard 3b — the block manager, at `/blocks/[id]` — is deliberately not
@@ -253,6 +372,6 @@ a signed-in one had their own settings applied to somebody else's page.
 - **Slugs are global.** Two accounts cannot both hold `rohan`, because the
   address is `facet.page/<slug>` with nothing in front of it. The create
   dialog surfaces the 409 as a message.
-- **The frontend has no test runner.** The backend has 244 pytest tests;
+- **The frontend has no test runner.** The backend has 258 pytest tests;
   changes here are checked with `npm run lint`, `npm run build` and by
   actually opening the app.

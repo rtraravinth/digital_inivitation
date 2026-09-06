@@ -24,7 +24,9 @@ class PublicPortfolioOut(CamelModel):
     theme: ThemeId
     accent: str
     ground: Ground
+    ground_hex: str
     font: FontId
+    body_font: FontId
     layout: Layout
     header: HeaderOut
     sections: list[SectionOut]

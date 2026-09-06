@@ -15,9 +15,11 @@ type SeedHeader = Omit<PortfolioHeader, HeaderOpt> &
 
 type SeedPortfolio = Omit<
   Portfolio,
-  "theme" | "accent" | "ground" | "font" | "layout" | "sections" | "header"
+  "theme" | "accent" | "ground" | "groundHex" | "font" | "bodyFont" | "layout" | "sections" | "header"
 > &
-  Partial<Pick<Portfolio, "theme" | "accent" | "ground" | "font" | "layout">> & {
+  Partial<
+    Pick<Portfolio, "theme" | "accent" | "ground" | "groundHex" | "font" | "bodyFont" | "layout">
+  > & {
     sections: SeedSection[];
     header: SeedHeader;
   };

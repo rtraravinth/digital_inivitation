@@ -106,7 +106,9 @@ class PortfolioService:
             theme=portfolio.theme,
             accent=portfolio.accent,
             ground=portfolio.ground,
+            ground_hex=portfolio.ground_hex,
             font=portfolio.font,
+            body_font=portfolio.body_font,
             layout=Layout.model_validate(portfolio.layout),
             header=header_out(portfolio.header),
             sections=[section_out(section) for section in portfolio.sections],
@@ -155,7 +157,9 @@ class PortfolioService:
                 theme=portfolio.theme,
                 accent=portfolio.accent,
                 ground=portfolio.ground,
+                ground_hex=portfolio.ground_hex,
                 font=portfolio.font,
+                body_font=portfolio.body_font,
                 section_count=total,
                 published_at=portfolio.published_at,
                 updated_at=portfolio.updated_at,
@@ -259,7 +263,10 @@ class PortfolioService:
                 portfolio.user_id, changes["slug"], exclude_id=portfolio.id
             )
 
-        for field in ("name", "slug", "summary", "theme", "accent", "ground", "font"):
+        for field in (
+            "name", "slug", "summary", "theme", "accent",
+            "ground", "ground_hex", "font", "body_font",
+        ):
             if field in changes:
                 setattr(portfolio, field, changes[field])
 

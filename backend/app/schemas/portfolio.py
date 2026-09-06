@@ -38,6 +38,11 @@ SlugField = Annotated[str, Field(pattern=SLUG_PATTERN, min_length=2, max_length=
 #: Any CSS colour the swatch row can produce.
 ACCENT_PATTERN = r"^#[0-9a-fA-F]{6}$"
 
+#: The same, plus the empty string, which means "fall back to the `ground`
+#: preset". Empty rather than null because a null in a PATCH already means
+#: "field not sent", so there would be no way left to clear a custom ground.
+GROUND_HEX_PATTERN = r"^(#[0-9a-fA-F]{6})?$"
+
 
 class Layout(StrictCamelModel):
     role_nav: RoleNav = "tabs"
@@ -89,7 +94,9 @@ class PortfolioOut(CamelModel):
     theme: ThemeId
     accent: str
     ground: Ground
+    ground_hex: str
     font: FontId
+    body_font: FontId
     layout: Layout
     header: HeaderOut
     sections: list[SectionOut]
@@ -109,7 +116,9 @@ class PortfolioSummaryOut(CamelModel):
     theme: ThemeId
     accent: str
     ground: Ground
+    ground_hex: str
     font: FontId
+    body_font: FontId
     section_count: int
     published_at: datetime | None
     updated_at: datetime
@@ -149,7 +158,9 @@ class PortfolioPatch(StrictCamelModel):
     theme: ThemeId | None = None
     accent: str | None = Field(default=None, pattern=ACCENT_PATTERN)
     ground: Ground | None = None
+    ground_hex: str | None = Field(default=None, pattern=GROUND_HEX_PATTERN)
     font: FontId | None = None
+    body_font: FontId | None = None
     layout: Layout | None = None
 
 

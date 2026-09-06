@@ -209,7 +209,9 @@
     "theme": "editorial",
     "accent": "#ec3013",
     "ground": "light",
+    "groundHex": "",
     "font": "archivo",
+    "bodyFont": "archivo",
     "layout": {
       "roleNav": "tabs",
       "grid": 2,
@@ -301,7 +303,9 @@
     "theme": "editorial",
     "accent": "#ec3013",
     "ground": "light",
+    "groundHex": "",
     "font": "archivo",
+    "bodyFont": "archivo",
     "layout": {
       "roleNav": "tabs",
       "grid": 2,
@@ -398,7 +402,9 @@
     "theme": "editorial",
     "accent": "#ec3013",
     "ground": "light",
+    "groundHex": "",
     "font": "archivo",
+    "bodyFont": "archivo",
     "layout": {
       "roleNav": "tabs",
       "grid": 2,
@@ -472,7 +478,9 @@
     ],
     "accent": "#ec3013",
     "ground": "light",
+    "groundHex": "",
     "font": "archivo",
+    "bodyFont": "archivo",
     "layout": {
       "roleNav": "tabs",
       "grid": 2,
@@ -540,7 +548,9 @@
     ],
     "accent": "#ec3013",
     "ground": "light",
+    "groundHex": "",
     "font": "archivo",
+    "bodyFont": "archivo",
     "layout": {
       "roleNav": "tabs",
       "grid": 2,

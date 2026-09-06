@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { useAccount } from "@/lib/account";
 import { usePortfolios } from "@/lib/store";
 import type { PublishedPrivacy } from "@/lib/published";
@@ -10,6 +11,7 @@ import {
   PrivacyProvider,
   PublishedBody,
   PublishedHandleProvider,
+  SectionDetail,
 } from "./themes";
 
 /**
@@ -25,10 +27,15 @@ import {
  * privacy switches, applied here the way the server applies them, and the
  * absence of analytics — previewing your own page must not count as a visit
  * or a click.
+ *
+ * `?section=` is answered here the same way the published page answers it,
+ * because the themes link to it: a title inside a preview opens that entry's
+ * own page (artboard 1d) without leaving the preview.
  */
 export function DraftPreview({ id }: { id: string }) {
   const { ready, getPortfolio } = usePortfolios();
   const { account } = useAccount();
+  const sectionId = useSearchParams().get("section");
   const portfolio = getPortfolio(id);
 
   if (!portfolio) {
@@ -58,11 +65,21 @@ export function DraftPreview({ id }: { id: string }) {
     sections: portfolio.sections.filter((s) => !s.hidden),
   };
 
+  // Hidden sections are already gone from `shown`, so a link to one cannot
+  // be followed here either — the same answer the published page gives.
+  const section = sectionId
+    ? shown.sections.find((s) => s.id === sectionId)
+    : undefined;
+
   return (
     <PreviewProvider value>
       <PrivacyProvider value={privacy}>
         <PublishedHandleProvider value={account.profile.handle}>
-          <PublishedBody p={shown} />
+          {section ? (
+            <SectionDetail p={shown} section={section} />
+          ) : (
+            <PublishedBody p={shown} />
+          )}
         </PublishedHandleProvider>
       </PrivacyProvider>
     </PreviewProvider>

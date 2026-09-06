@@ -103,7 +103,9 @@ async def read_published(
         theme=portfolio.theme,
         accent=portfolio.accent,
         ground=portfolio.ground,
+        ground_hex=portfolio.ground_hex,
         font=portfolio.font,
+        body_font=portfolio.body_font,
         layout=Layout.model_validate(portfolio.layout),
         header=header_out(portfolio.header, public=True, links=show_contact),
         # Hidden sections never reach a visitor, whatever the theme does.

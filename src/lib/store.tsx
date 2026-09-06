@@ -223,7 +223,9 @@ function updatePortfolio(id: string, recipe: (p: Portfolio) => Portfolio) {
             theme: after.theme,
             accent: after.accent,
             ground: after.ground,
+            groundHex: after.groundHex,
             font: after.font,
+            bodyFont: after.bodyFont,
             layout: after.layout,
           }),
         );
@@ -261,7 +263,9 @@ function coreChanged(before: Portfolio, after: Portfolio): boolean {
     before.theme !== after.theme ||
     before.accent !== after.accent ||
     before.ground !== after.ground ||
+    before.groundHex !== after.groundHex ||
     before.font !== after.font ||
+    before.bodyFont !== after.bodyFont ||
     JSON.stringify(before.layout) !== JSON.stringify(after.layout)
   );
 }

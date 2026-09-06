@@ -18,6 +18,7 @@ import {
   assetSrc,
   pageAddress,
   pagePath,
+  previewPath,
 } from "@/lib/types";
 
 const HATCH =
@@ -51,14 +52,92 @@ const GROUNDS: Record<Ground, Record<string, string>> = {
   },
 };
 
+/* ── a picked ground ──────────────────────────────────────────────────── */
+
+type Rgb = [number, number, number];
+
+function parseHex(hex: string): Rgb {
+  const n = parseInt(hex.slice(1), 16);
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+}
+
+function toHex([r, g, b]: Rgb): string {
+  return `#${[r, g, b].map((c) => Math.round(c).toString(16).padStart(2, "0")).join("")}`;
+}
+
+function mix(a: Rgb, b: Rgb, amount: number): Rgb {
+  return [0, 1, 2].map((i) => a[i] + (b[i] - a[i]) * amount) as Rgb;
+}
+
+/** WCAG relative luminance, which is what decides whether ink goes light. */
+function luminance([r, g, b]: Rgb): number {
+  const channel = (c: number) => {
+    const v = c / 255;
+    return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
+  };
+  return 0.2126 * channel(r) + 0.7152 * channel(g) + 0.0722 * channel(b);
+}
+
+/** WCAG contrast between two luminances, which is the usual (L+0.05) ratio. */
+function contrast(a: number, b: number): number {
+  const [hi, lo] = a > b ? [a, b] : [b, a];
+  return (hi + 0.05) / (lo + 0.05);
+}
+
+const INK_DARK: Rgb = [0x20, 0x1e, 0x1d];
+const INK_LIGHT: Rgb = [0xf3, 0xf2, 0xf2];
+
+/**
+ * The rest of the palette, worked out from one picked colour.
+ *
+ * A preset supplies six variables and these have to supply the same six from
+ * the one the picker produces. The 6% surface shift is calibrated against the
+ * presets rather than guessed: it turns the dark preset's #201e1d into
+ * #2d2b2a, one point off its hand-tuned #2d2b2b. The presets keep their own
+ * maps regardless — this runs only for a picked colour.
+ */
+export function derivedGround(hex: string): Record<string, string> {
+  const bg = parseHex(hex);
+  // Whichever ink reads better against this paper, rather than a luminance
+  // threshold. A threshold has to be guessed and gets mid-tones wrong: at
+  // #808080 the ink that looks "obviously" right scores 3.53 where the other
+  // scores 4.22. Comparing the two contrasts needs no guess.
+  const l = luminance(bg);
+  const ink =
+    contrast(l, luminance(INK_DARK)) >= contrast(l, luminance(INK_LIGHT))
+      ? INK_DARK
+      : INK_LIGHT;
+  return {
+    "--color-bg": hex,
+    "--color-surface": toHex(mix(bg, ink, 0.06)),
+    "--color-ink": toHex(ink),
+    // The presets write divider as ink at 40%, which is the `…66` suffix.
+    "--color-divider": `${toHex(ink)}66`,
+    "--color-neutral-700": toHex(mix(ink, bg, 0.35)),
+    "--color-neutral-800": toHex(mix(ink, bg, 0.2)),
+  };
+}
+
+/** A picked ground wins over the preset; an empty one leaves the preset alone. */
+function palette(p: Portfolio): Record<string, string> {
+  return p.groundHex ? derivedGround(p.groundHex) : GROUNDS[p.ground];
+}
+
 /** Overriding the system's own variables lets every .btn/.tag follow along. */
 export function groundStyle(p: Portfolio): CSSProperties {
   const face = FONTS.find((x) => x.id === p.font) ?? FONTS[0];
+  const body = FONTS.find((x) => x.id === p.bodyFont) ?? FONTS[0];
   const scale = TYPE_SCALES.find((s) => s.id === p.layout.scale) ?? TYPE_SCALES[1];
   return {
-    ...GROUNDS[p.ground],
+    ...palette(p),
     "--color-accent": p.accent,
     "--font-heading": `var(${face.cssVar}), system-ui, sans-serif`,
+    // Both, because `--font-sans` is what Tailwind's `font-sans` utility
+    // resolves to; leaving it on Archivo would split the page between two
+    // faces depending on whether an element names one.
+    "--font-body": `var(${body.cssVar}), system-ui, sans-serif`,
+    "--font-sans": `var(${body.cssVar}), system-ui, sans-serif`,
+    fontFamily: "var(--font-body)",
     // Read by globals.css's heading rule and by headline() below.
     "--tracking": p.layout.tracking || DEFAULT_TRACKING,
     "--type-scale": String(scale.factor),
@@ -497,6 +576,24 @@ function useRecordClick() {
   return useContext(PreviewContext) ? noRecord : recordClick;
 }
 
+export function useIsPreview() {
+  return useContext(PreviewContext);
+}
+
+/**
+ * Where this page lives, from inside it.
+ *
+ * A preview is served from `/preview/<id>`, and the public address does not
+ * resolve at all until the portfolio is published — the API answers 404 for
+ * a draft on purpose. A section link that always pointed at
+ * `/p/<handle>/<slug>` was therefore a dead end for exactly the drafts the
+ * preview exists to show.
+ */
+function usePageHref(p: Portfolio): string {
+  const handle = usePublishedHandle();
+  return useIsPreview() ? previewPath(p.id) : pagePath(handle, p.slug);
+}
+
 
 
 /** The header's links, unless the owner has hidden them from strangers. */
@@ -568,10 +665,10 @@ function SectionTitleLink({
   section: Section;
   className: string;
 }) {
-  const handle = usePublishedHandle();
+  const pageHref = usePageHref(p);
   return (
     <Link
-      href={`${pagePath(handle, p.slug)}?section=${section.id}`}
+      href={`${pageHref}?section=${section.id}`}
       className={className}
       style={{ color: "inherit", textDecoration: "none" }}
     >
@@ -1042,6 +1139,7 @@ export function Poster({ p }: { p: Portfolio }) {
 
 export function Links({ p }: { p: Portfolio }) {
   const handle = usePublishedHandle();
+  const pageHref = usePageHref(p);
   const record = useRecordClick();
   const { tab, setTab, shown, nav, gated } = useTabFilter(p);
   const showContact = usePublishedPrivacy().showContact;
@@ -1147,7 +1245,7 @@ export function Links({ p }: { p: Portfolio }) {
           ) : (
             <Link
               key={s.id}
-              href={`${pagePath(handle, p.slug)}?section=${s.id}`}
+              href={`${pageHref}?section=${s.id}`}
               className={rowClass}
               style={rowStyle}
             >
@@ -1479,7 +1577,7 @@ export function Broadsheet({ p }: { p: Portfolio }) {
 /* ── 1d Section detail — one entry on its own page ────────────────────── */
 
 export function SectionDetail({ p, section }: { p: Portfolio; section: Section }) {
-  const handle = usePublishedHandle();
+  const pageHref = usePageHref(p);
   const index = visibleSections(p).findIndex((s) => s.id === section.id);
   const total = visibleSections(p).length;
 
@@ -1489,7 +1587,7 @@ export function SectionDetail({ p, section }: { p: Portfolio; section: Section }
         className="flex items-center gap-2.5 px-4 py-3"
         style={{ borderBottom: "2px solid var(--color-divider)" }}
       >
-        <Link href={pagePath(handle, p.slug)} className="btn btn-secondary">
+        <Link href={pageHref} className="btn btn-secondary">
           ← Back
         </Link>
         <span

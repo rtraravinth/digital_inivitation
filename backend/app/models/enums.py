@@ -20,8 +20,38 @@ THEMES: Final[tuple[str, ...]] = (
 Ground = Literal["light", "dark", "paper"]
 GROUNDS: Final[tuple[str, ...]] = ("light", "dark", "paper")
 
-FontId = Literal["archivo", "fraunces", "space-grotesk"]
-FONTS: Final[tuple[str, ...]] = ("archivo", "fraunces", "space-grotesk")
+FontId = Literal[
+    "archivo",
+    "inter",
+    "dm-sans",
+    "space-grotesk",
+    "manrope",
+    "fraunces",
+    "playfair-display",
+    "source-serif-4",
+    "lora",
+    "roboto-slab",
+    "bitter",
+    "oswald",
+    "syne",
+    "jetbrains-mono",
+]
+FONTS: Final[tuple[str, ...]] = (
+    "archivo",
+    "inter",
+    "dm-sans",
+    "space-grotesk",
+    "manrope",
+    "fraunces",
+    "playfair-display",
+    "source-serif-4",
+    "lora",
+    "roboto-slab",
+    "bitter",
+    "oswald",
+    "syne",
+    "jetbrains-mono",
+)
 
 PortfolioStatus = Literal["live", "draft", "empty"]
 STATUSES: Final[tuple[str, ...]] = ("live", "draft", "empty")

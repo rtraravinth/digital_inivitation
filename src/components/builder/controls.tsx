@@ -1,12 +1,13 @@
 "use client";
 
+import { useId } from "react";
+import { ColourPicker } from "@/components/builder/ColourPicker";
+import { FontSelect } from "@/components/builder/FontSelect";
 import {
   DEFAULT_TRACKING,
   DENSITIES,
-  FONTS,
   GROUNDS,
   ROLE_NAVS,
-  SWATCHES,
   THEMES,
   TYPE_SCALES,
   type GridCols,
@@ -212,55 +213,58 @@ export function ThemeControl({ p, onChange }: { p: Portfolio; onChange: Recipe }
 }
 
 export function ColourControl({ p, onChange }: { p: Portfolio; onChange: Recipe }) {
+  // Same document-scoped `name` problem as LayoutControl: one group per
+  // mounted panel, so a second copy cannot steal this one's checked state.
+  const group = useId();
+  const preset = GROUNDS.find((g) => g.id === p.ground) ?? GROUNDS[0];
+  const custom = p.groundHex !== "";
+
   return (
     <>
       <h6 className="mb-1.5">Accent</h6>
-      <p className="text-neutral-700 text-xs">
+      <p className="text-neutral-700 mb-2.5 text-xs">
         One accent runs the page — buttons, kickers and the closing banner.
       </p>
-      <div className="mb-5 flex flex-wrap gap-2">
-        {SWATCHES.map((hex) => (
-          <button
-            key={hex}
-            type="button"
-            title={hex}
-            aria-label={`Accent ${hex}`}
-            onClick={() => onChange((prev) => ({ ...prev, accent: hex }))}
-            className="h-8 w-8 cursor-pointer"
-            style={{
-              background: hex,
-              boxShadow:
-                p.accent === hex
-                  ? "inset 0 0 0 2px var(--color-bg), 0 0 0 2px var(--color-ink)"
-                  : "none",
-            }}
-          />
-        ))}
-      </div>
-      <div className="field mb-5">
-        <label htmlFor="accent-hex">Hex</label>
-        <input
+      <div className="mb-5">
+        <ColourPicker
           id="accent-hex"
-          className="input"
+          name="Accent"
           value={p.accent}
-          onChange={(e) => onChange((prev) => ({ ...prev, accent: e.target.value }))}
+          onPick={(hex) => onChange((prev) => ({ ...prev, accent: hex }))}
         />
       </div>
 
       <h6 className="mb-2.5">Ground</h6>
-      <div className="seg mb-5">
+      <div className="seg mb-3">
         {GROUNDS.map((g) => (
           <label key={g.id} className="seg-opt">
             <input
               type="radio"
-              name="ground"
-              checked={p.ground === g.id}
-              onChange={() => onChange((prev) => ({ ...prev, ground: g.id }))}
+              name={`ground-${group}`}
+              // A preset is only showing while no colour has been picked: its
+              // palette is hand-tuned, and derivation only approximates it.
+              checked={!custom && p.ground === g.id}
+              onChange={() =>
+                onChange((prev) => ({ ...prev, ground: g.id, groundHex: "" }))
+              }
             />
             {g.name}
           </label>
         ))}
       </div>
+      <ColourPicker
+        id="ground-hex"
+        name="Ground"
+        // The picker always shows something, so before a colour is picked it
+        // shows the preset's own paper and touching it takes over from there.
+        value={custom ? p.groundHex : preset.hex}
+        onPick={(hex) => onChange((prev) => ({ ...prev, groundHex: hex }))}
+      />
+      <p className="text-neutral-700 mt-1.5 mb-5 text-[11px]">
+        {custom
+          ? "Text, dividers and panels are worked out from this colour — the ink flips to light once the ground is dark enough."
+          : "Pick a colour to replace the preset. A preset sets the ink, panels and dividers to match its paper."}
+      </p>
 
       <div className="border-divider border-t pt-3.5">
         <div className="mb-2 flex items-center gap-2.5">
@@ -276,33 +280,36 @@ export function ColourControl({ p, onChange }: { p: Portfolio; onChange: Recipe 
 }
 
 export function TypeControl({ p, onChange }: { p: Portfolio; onChange: Recipe }) {
+  const group = useId();
   return (
     <>
       <h6 className="mb-1.5">Type pairing</h6>
-      <p className="text-neutral-700 text-xs">
-        Headline over body. Applies everywhere at once — the body stays Archivo,
-        which is the system default.
+      <p className="text-neutral-700 mb-2.5 text-xs">
+        Two faces: one for headings, tabs and buttons, one for everything you
+        write. Set both to the same family to run one face throughout.
       </p>
-      <div className="mb-5 flex flex-col gap-0.5" style={stack}>
-        {FONTS.map((face) => (
-          <Row
-            key={face.id}
-            on={p.font === face.id}
-            onClick={() => onChange((prev) => ({ ...prev, font: face.id }))}
-          >
-            <span
-              className="w-[46px] flex-none text-2xl font-extrabold leading-none"
-              style={{ fontFamily: `var(${face.cssVar})` }}
-            >
-              Aa
-            </span>
-            <span className="flex flex-col gap-0.5">
-              <span className="font-heading text-sm font-extrabold">{face.name}</span>
-              <span className="text-neutral-700 text-[11px]">{face.sample}</span>
-            </span>
-          </Row>
-        ))}
+      <div className="field mb-3">
+        <label htmlFor="headline-face">Headline</label>
+        <FontSelect
+          id="headline-face"
+          label="Headline face"
+          value={p.font}
+          onPick={(id) => onChange((prev) => ({ ...prev, font: id }))}
+        />
       </div>
+      <div className="field mb-2">
+        <label htmlFor="body-face">Body</label>
+        <FontSelect
+          id="body-face"
+          label="Body face"
+          value={p.bodyFont}
+          onPick={(id) => onChange((prev) => ({ ...prev, bodyFont: id }))}
+        />
+      </div>
+      <p className="text-neutral-700 mb-5 text-[11px]">
+        Syne, Oswald, Playfair Display and JetBrains Mono are display faces —
+        they carry a headline well and are hard going for a paragraph.
+      </p>
 
       <h6 className="mb-2.5">Headline scale</h6>
       <div className="seg mb-5">
@@ -310,7 +317,7 @@ export function TypeControl({ p, onChange }: { p: Portfolio; onChange: Recipe })
           <label key={s.id} className="seg-opt">
             <input
               type="radio"
-              name="typescale"
+              name={`typescale-${group}`}
               checked={p.layout.scale === s.id}
               onChange={() =>
                 onChange((prev) => ({ ...prev, layout: { ...prev.layout, scale: s.id } }))
@@ -348,6 +355,14 @@ export function TypeControl({ p, onChange }: { p: Portfolio; onChange: Recipe })
 const NAV_AWARE: ThemeId[] = ["editorial", "links", "ledger", "broadsheet"];
 
 export function LayoutControl({ p, onChange }: { p: Portfolio; onChange: Recipe }) {
+  // A radio `name` is scoped to the document, not to the component. The
+  // builder mounts this panel twice — the desktop inspector and the mobile
+  // sheet, which is `lg:hidden` rather than unmounted — so a fixed name put
+  // all eight inputs in one native group. The DOM allows one checked member,
+  // so React's `checked` on the visible copy was undone by the hidden one,
+  // and `.radio input:checked + .dot` had nothing to style. The state was
+  // always right; only the dot was missing.
+  const group = useId();
   const navApplies = NAV_AWARE.includes(p.theme);
   const themeName = THEMES.find((t) => t.id === p.theme)?.name ?? p.theme;
 
@@ -372,7 +387,7 @@ export function LayoutControl({ p, onChange }: { p: Portfolio; onChange: Recipe 
           <label key={n.id} className="radio">
             <input
               type="radio"
-              name="rolenav"
+              name={`rolenav-${group}`}
               checked={p.layout.roleNav === n.id}
               onChange={() =>
                 onChange((prev) => ({
@@ -393,7 +408,7 @@ export function LayoutControl({ p, onChange }: { p: Portfolio; onChange: Recipe 
           <label key={n} className="seg-opt">
             <input
               type="radio"
-              name="gridcols"
+              name={`gridcols-${group}`}
               checked={p.layout.grid === n}
               onChange={() =>
                 onChange((prev) => ({ ...prev, layout: { ...prev.layout, grid: n } }))
@@ -410,7 +425,7 @@ export function LayoutControl({ p, onChange }: { p: Portfolio; onChange: Recipe 
           <label key={d.id} className="radio">
             <input
               type="radio"
-              name="density"
+              name={`density-${group}`}
               checked={p.layout.density === d.id}
               onChange={() =>
                 onChange((prev) => ({

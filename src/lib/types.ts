@@ -102,7 +102,21 @@ export type ThemeId =
   | "broadsheet";
 
 export type Ground = "light" | "dark" | "paper";
-export type FontId = "archivo" | "fraunces" | "space-grotesk";
+export type FontId =
+  | "archivo"
+  | "inter"
+  | "dm-sans"
+  | "space-grotesk"
+  | "manrope"
+  | "fraunces"
+  | "playfair-display"
+  | "source-serif-4"
+  | "lora"
+  | "roboto-slab"
+  | "bitter"
+  | "oswald"
+  | "syne"
+  | "jetbrains-mono";
 
 /** The gallery filters by who a theme suits, not by what it looks like. */
 export type ThemeAudience = "founders" | "advisers" | "office" | "writers" | "multi";
@@ -175,29 +189,90 @@ export const THEMES: Array<{
   },
 ];
 
-export const GROUNDS: Array<{ id: Ground; name: string }> = [
-  { id: "light", name: "Light" },
-  { id: "dark", name: "Dark" },
-  { id: "paper", name: "Paper" },
+/**
+ * `hex` is the paper each preset paints, duplicated from the palette map in
+ * `published/themes.tsx` so the picker can show a preset as a swatch and can
+ * hand the custom field somewhere to start from. The map there stays the
+ * authority on the other five variables a preset sets.
+ */
+export const GROUNDS: Array<{ id: Ground; name: string; hex: string }> = [
+  { id: "light", name: "Light", hex: "#f3f2f2" },
+  { id: "dark", name: "Dark", hex: "#201e1d" },
+  { id: "paper", name: "Paper", hex: "#efe9dd" },
 ];
 
 /**
  * Headline faces over an Archivo body. Archivo/Archivo is the Modernist
- * default and stays the default — the alternates are opt-in per portfolio.
+ * default and stays the default — the alternates are opt-in per portfolio,
+ * and the body never changes.
+ *
+ * Every face here is variable and reaches at least 700. That is the entry
+ * requirement, not a coincidence: `globals.css` sets `font-weight: 800` on
+ * every heading, so a single-weight family would be faux-bolded by the
+ * browser and come out smeared. It is why the obvious display picks —
+ * Anton, Bebas Neue, Instrument Serif — are absent.
+ *
+ * Ordered by kind rather than alphabetically, so scanning the list moves
+ * through sans, serif, slab, condensed, display, mono.
  */
 export const FONTS: Array<{ id: FontId; name: string; sample: string; cssVar: string }> = [
   { id: "archivo", name: "Archivo", sample: "One family throughout", cssVar: "--font-archivo" },
-  { id: "fraunces", name: "Fraunces", sample: "Serif headline", cssVar: "--font-fraunces" },
+  { id: "inter", name: "Inter", sample: "Neutral sans", cssVar: "--font-inter" },
+  { id: "dm-sans", name: "DM Sans", sample: "Geometric sans", cssVar: "--font-dm-sans" },
   {
     id: "space-grotesk",
     name: "Space Grotesk",
-    sample: "Geometric headline",
+    sample: "Sans with a quirk",
     cssVar: "--font-space-grotesk",
+  },
+  { id: "manrope", name: "Manrope", sample: "Humanist sans", cssVar: "--font-manrope" },
+  { id: "fraunces", name: "Fraunces", sample: "Soft serif", cssVar: "--font-fraunces" },
+  {
+    id: "playfair-display",
+    name: "Playfair Display",
+    sample: "High-contrast serif",
+    cssVar: "--font-playfair-display",
+  },
+  {
+    id: "source-serif-4",
+    name: "Source Serif 4",
+    sample: "Transitional serif",
+    cssVar: "--font-source-serif-4",
+  },
+  { id: "lora", name: "Lora", sample: "Bookish serif", cssVar: "--font-lora" },
+  { id: "roboto-slab", name: "Roboto Slab", sample: "Slab serif", cssVar: "--font-roboto-slab" },
+  { id: "bitter", name: "Bitter", sample: "Contemporary slab", cssVar: "--font-bitter" },
+  { id: "oswald", name: "Oswald", sample: "Condensed headline", cssVar: "--font-oswald" },
+  { id: "syne", name: "Syne", sample: "Display, wide", cssVar: "--font-syne" },
+  {
+    id: "jetbrains-mono",
+    name: "JetBrains Mono",
+    sample: "Monospace headline",
+    cssVar: "--font-jetbrains-mono",
   },
 ];
 
 /** One accent runs the page — buttons, kickers and the closing banner. */
 export const SWATCHES = ["#ec3013", "#201e1d", "#1d4ed8", "#0f7b52", "#b45309"];
+
+/**
+ * Both pickers write straight into a style attribute on the published page,
+ * so a value that is not exactly `#rrggbb` is never stored. This is also
+ * what lets a hex field hold a half-typed value without saving it.
+ */
+export function isHexColour(value: unknown): value is string {
+  return typeof value === "string" && /^#[0-9a-fA-F]{6}$/.test(value);
+}
+
+/**
+ * What a hex field should commit as the user types. Accepts a missing `#`
+ * and any case, and returns null while the value is still incomplete.
+ */
+export function readHexColour(value: string): string | null {
+  const trimmed = value.trim();
+  const hex = trimmed.startsWith("#") ? trimmed : `#${trimmed}`;
+  return isHexColour(hex) ? hex.toLowerCase() : null;
+}
 
 /* ── layout ───────────────────────────────────────────────────────────── */
 
@@ -264,7 +339,16 @@ export type Portfolio = {
   theme: ThemeId;
   accent: string;
   ground: Ground;
+  /**
+   * A picked ground colour, which wins over the `ground` preset. Empty means
+   * "use the preset" — the preset always stays set, so clearing a custom
+   * colour has somewhere to fall back to.
+   */
+  groundHex: string;
+  /** The headline face. Kept as `font` because it is the wire format and a
+   *  stored value; the body face is `bodyFont`. */
   font: FontId;
+  bodyFont: FontId;
   layout: Layout;
   header: PortfolioHeader;
   sections: Section[];
@@ -282,7 +366,9 @@ export function normalize(p: Portfolio): Portfolio {
     theme: THEME_IDS.has(p.theme) ? p.theme : "editorial",
     accent: p.accent ?? SWATCHES[0],
     ground: p.ground ?? "light",
+    groundHex: isHexColour(p.groundHex) ? p.groundHex : "",
     font: p.font ?? "archivo",
+    bodyFont: p.bodyFont ?? "archivo",
     layout: {
       roleNav: layout.roleNav ?? "tabs",
       grid: layout.grid ?? 2,

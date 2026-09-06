@@ -61,7 +61,9 @@ class TransferService:
             "theme": portfolio.theme,
             "accent": portfolio.accent,
             "ground": portfolio.ground,
+            "groundHex": portfolio.ground_hex,
             "font": portfolio.font,
+            "bodyFont": portfolio.body_font,
             "layout": dict(portfolio.layout or default_layout()),
             "header": {
                 "name": header.name,
@@ -146,7 +148,9 @@ class TransferService:
             theme=_one_of(raw.get("theme"), THEMES, "editorial"),
             accent=str(raw.get("accent") or DEFAULT_ACCENT)[:32],
             ground=_one_of(raw.get("ground"), GROUNDS, "light"),
+            ground_hex=_hex_or_blank(raw.get("groundHex")),
             font=_one_of(raw.get("font"), FONTS, "archivo"),
+            body_font=_one_of(raw.get("bodyFont"), FONTS, "archivo"),
             layout={**default_layout(), **(raw.get("layout") or {})},
         )
 
@@ -280,10 +284,22 @@ def _asset_dict(asset: Asset | None) -> dict[str, Any] | None:
     return out.model_dump(by_alias=True, mode="json") if out else None
 
 
+HEX_COLOUR = re.compile(r"#[0-9a-fA-F]{6}")
+
+
 def _one_of(value: Any, allowed: tuple[str, ...], fallback: str) -> str:
     # An unknown value means data from a build that offered something we have
     # since dropped. Fall back rather than refuse the import.
     return value if isinstance(value, str) and value in allowed else fallback
+
+
+def _hex_or_blank(value: Any) -> str:
+    # This lands in a style attribute on the published page, so anything that
+    # is not exactly #rrggbb becomes "" and the ground falls back to its
+    # preset. An import is user-supplied text like any other.
+    if isinstance(value, str) and HEX_COLOUR.fullmatch(value):
+        return value
+    return ""
 
 
 def _clean_slug(value: str) -> str:

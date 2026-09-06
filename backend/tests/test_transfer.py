@@ -227,6 +227,65 @@ async def test_an_unknown_theme_in_an_import_falls_back(auth_client):
     assert imported["theme"] == "editorial"
 
 
+async def test_a_custom_ground_survives_an_export_and_import(auth_client, portfolio):
+    await auth_client.patch(
+        f"/api/v1/portfolios/{portfolio['id']}", json={"groundHex": "#2b3a67"}
+    )
+    exported = (await auth_client.get("/api/v1/export")).json()
+
+    await auth_client.post(
+        "/api/v1/import", json={"mode": "replace", "portfolios": exported}
+    )
+
+    restored = (await auth_client.get("/api/v1/portfolios")).json()[0]
+    assert restored["groundHex"] == "#2b3a67"
+
+
+async def test_both_faces_survive_an_export_and_import(auth_client, portfolio):
+    await auth_client.patch(
+        f"/api/v1/portfolios/{portfolio['id']}",
+        json={"font": "syne", "bodyFont": "lora"},
+    )
+    exported = (await auth_client.get("/api/v1/export")).json()
+    await auth_client.post(
+        "/api/v1/import", json={"mode": "replace", "portfolios": exported}
+    )
+
+    restored = (await auth_client.get("/api/v1/portfolios")).json()[0]
+    assert restored["font"] == "syne"
+    assert restored["bodyFont"] == "lora"
+
+
+async def test_a_legacy_export_with_no_body_font_lands_on_archivo(auth_client):
+    """Anything exported before the column existed has no bodyFont at all."""
+    payload = legacy_export()
+    payload[0]["slug"] = "no-body-font"
+    assert "bodyFont" not in payload[0]
+
+    await auth_client.post("/api/v1/import", json={"mode": "merge", "portfolios": payload})
+
+    imported = next(
+        p for p in (await auth_client.get("/api/v1/portfolios")).json()
+        if p["slug"] == "no-body-font"
+    )
+    assert imported["bodyFont"] == "archivo"
+
+
+async def test_a_junk_ground_colour_in_an_import_falls_back(auth_client):
+    """The value lands in a style attribute, so anything but #rrggbb is dropped."""
+    payload = legacy_export()
+    payload[0]["groundHex"] = "red; background-image: url(x)"
+    payload[0]["slug"] = "junk-ground"
+
+    await auth_client.post("/api/v1/import", json={"mode": "merge", "portfolios": payload})
+
+    imported = next(
+        p for p in (await auth_client.get("/api/v1/portfolios")).json()
+        if p["slug"] == "junk-ground"
+    )
+    assert imported["groundHex"] == ""
+
+
 async def test_a_corrupt_data_uri_does_not_fail_the_import(auth_client):
     payload = legacy_export()
     payload[0]["sections"][0]["image"]["dataUrl"] = "data:image/png;base64,!!!not-base64!!!"

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from app.models.enums import FONTS
+
 
 async def test_create_blank_portfolio_starts_with_one_empty_section(auth_client):
     response = await auth_client.post(
@@ -15,7 +17,9 @@ async def test_create_blank_portfolio_starts_with_one_empty_section(auth_client)
     assert body["theme"] == "editorial"
     assert body["accent"] == "#ec3013"
     assert body["ground"] == "light"
+    assert body["groundHex"] == ""
     assert body["font"] == "archivo"
+    assert body["bodyFont"] == "archivo"
     assert body["layout"] == {
         "roleNav": "tabs",
         "grid": 2,
@@ -171,6 +175,87 @@ async def test_patch_updates_theme_accent_and_layout(auth_client, portfolio):
     assert body["font"] == "fraunces"
     assert body["layout"]["grid"] == 3
     assert body["layout"]["roleNav"] == "lens"
+
+
+async def test_patch_sets_a_custom_ground_colour(auth_client, portfolio):
+    response = await auth_client.patch(
+        f"/api/v1/portfolios/{portfolio['id']}", json={"groundHex": "#2b3a67"}
+    )
+    assert response.status_code == 200
+
+    body = response.json()
+    assert body["groundHex"] == "#2b3a67"
+    # The preset is an override target, not a replacement: it stays put so
+    # clearing the custom colour has somewhere to fall back to.
+    assert body["ground"] == "light"
+
+
+async def test_patch_clears_a_custom_ground_back_to_the_preset(auth_client, portfolio):
+    await auth_client.patch(
+        f"/api/v1/portfolios/{portfolio['id']}", json={"groundHex": "#2b3a67"}
+    )
+    response = await auth_client.patch(
+        f"/api/v1/portfolios/{portfolio['id']}", json={"groundHex": ""}
+    )
+    assert response.status_code == 200
+    assert response.json()["groundHex"] == ""
+
+
+async def test_patch_rejects_a_non_hex_ground(auth_client, portfolio):
+    response = await auth_client.patch(
+        f"/api/v1/portfolios/{portfolio['id']}", json={"groundHex": "rebeccapurple"}
+    )
+    assert response.status_code == 422
+
+
+async def test_patch_accepts_every_headline_face(auth_client, portfolio):
+    """The check constraint mirrors FONTS, so a face missing from it 500s."""
+    for face in FONTS:
+        response = await auth_client.patch(
+            f"/api/v1/portfolios/{portfolio['id']}", json={"font": face}
+        )
+        assert response.status_code == 200, f"{face}: {response.text}"
+        assert response.json()["font"] == face
+
+
+async def test_headline_and_body_faces_are_set_apart(auth_client, portfolio):
+    """The panel is a pairing, so the two halves must not move together."""
+    response = await auth_client.patch(
+        f"/api/v1/portfolios/{portfolio['id']}",
+        json={"font": "playfair-display", "bodyFont": "inter"},
+    )
+    assert response.status_code == 200
+
+    body = response.json()
+    assert body["font"] == "playfair-display"
+    assert body["bodyFont"] == "inter"
+
+    # Changing one leaves the other where it was.
+    again = await auth_client.patch(
+        f"/api/v1/portfolios/{portfolio['id']}", json={"font": "oswald"}
+    )
+    assert again.json()["font"] == "oswald"
+    assert again.json()["bodyFont"] == "inter"
+
+
+async def test_body_font_defaults_to_archivo(auth_client, portfolio):
+    """Existing portfolios predate the column, so the default has to hold."""
+    response = await auth_client.get(f"/api/v1/portfolios/{portfolio['id']}")
+    assert response.json()["bodyFont"] == "archivo"
+
+
+async def test_patch_rejects_an_unknown_body_font(auth_client, portfolio):
+    response = await auth_client.patch(
+        f"/api/v1/portfolios/{portfolio['id']}", json={"bodyFont": "comic-sans"}
+    )
+    assert response.status_code == 422
+
+
+async def test_patch_rejects_an_unknown_font(auth_client, portfolio):
+    response = await auth_client.patch(
+        f"/api/v1/portfolios/{portfolio['id']}", json={"font": "comic-sans"}
+    )
+    assert response.status_code == 422
 
 
 async def test_patch_rejects_an_unknown_theme(auth_client, portfolio):

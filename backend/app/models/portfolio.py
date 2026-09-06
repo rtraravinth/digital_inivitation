@@ -63,6 +63,7 @@ class Portfolio(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         CheckConstraint(f"theme IN ({sql_in(THEMES)})", name="theme_is_known"),
         CheckConstraint(f"ground IN ({sql_in(GROUNDS)})", name="ground_is_known"),
         CheckConstraint(f"font IN ({sql_in(FONTS)})", name="font_is_known"),
+        CheckConstraint(f"body_font IN ({sql_in(FONTS)})", name="body_font_is_known"),
         CheckConstraint(f"status IN ({sql_in(STATUSES)})", name="status_is_known"),
         Index("ix_portfolios_user_id_created_at", "user_id", "created_at"),
         # The address is facet.page/<handle>/<slug>, so a slug only has to be
@@ -85,7 +86,19 @@ class Portfolio(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     theme: Mapped[str] = mapped_column(String(24), nullable=False, default="editorial")
     accent: Mapped[str] = mapped_column(String(32), nullable=False, default=DEFAULT_ACCENT)
     ground: Mapped[str] = mapped_column(String(16), nullable=False, default="light")
+    # A custom ground colour, which wins over the preset named in `ground`.
+    # Empty means "use the preset" — an empty string rather than NULL so a
+    # PATCH can clear it, since a null there already means "not sent".
+    ground_hex: Mapped[str] = mapped_column(
+        String(7), nullable=False, default="", server_default=""
+    )
     font: Mapped[str] = mapped_column(String(24), nullable=False, default="archivo")
+    # The body face. Separate from `font`, which is the headline: the panel is
+    # called "Type pairing" and a pairing needs both halves. Defaults to
+    # Archivo, the Modernist body face, so an untouched portfolio is unchanged.
+    body_font: Mapped[str] = mapped_column(
+        String(24), nullable=False, default="archivo", server_default="archivo"
+    )
     layout: Mapped[dict[str, Any]] = mapped_column(
         JSONB, nullable=False, default=default_layout
     )

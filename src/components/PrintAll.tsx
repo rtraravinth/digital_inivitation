@@ -3,7 +3,12 @@
 import Link from "next/link";
 import { useEffect } from "react";
 import { useSearchParams } from "next/navigation";
-import { PublishedBody } from "./published/themes";
+import {
+  PreviewProvider,
+  PublishedBody,
+  PublishedHandleProvider,
+} from "./published/themes";
+import { useAccount } from "@/lib/account";
 import { usePortfolios } from "@/lib/store";
 
 /**
@@ -14,6 +19,7 @@ import { usePortfolios } from "@/lib/store";
  */
 export function PrintAll() {
   const { portfolios, ready } = usePortfolios();
+  const handle = useAccount().account.profile.handle;
   const params = useSearchParams();
   const only = params.get("p");
 
@@ -46,11 +52,17 @@ export function PrintAll() {
         Each portfolio starts on a new page.
       </p>
 
-      {pages.map((p) => (
-        <section key={p.id} className="page-break">
-          <PublishedBody p={p} />
-        </section>
-      ))}
+      {/* The owner's own copy of every page: no click belongs in the
+          analytics, and nothing here is a visitor. */}
+      <PreviewProvider value>
+        <PublishedHandleProvider value={handle}>
+          {pages.map((p) => (
+            <section key={p.id} className="page-break">
+              <PublishedBody p={p} />
+            </section>
+          ))}
+        </PublishedHandleProvider>
+      </PreviewProvider>
 
       {ready && pages.length === 0 && (
         <p className="p-10">Nothing to print — no portfolios yet.</p>

@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { AuthGuard } from "@/components/AuthGuard";
 import { DraftPreview } from "@/components/published/DraftPreview";
 
@@ -9,7 +10,11 @@ export default async function PreviewPage({ params }: PageProps<"/preview/[id]">
   const { id } = await params;
   return (
     <AuthGuard>
-      <DraftPreview id={id} />
+      {/* useSearchParams (the ?section= entry view) needs a boundary to fall
+          back to while the client bundle is still arriving. */}
+      <Suspense fallback={<div className="p-10">Loading…</div>}>
+        <DraftPreview id={id} />
+      </Suspense>
     </AuthGuard>
   );
 }

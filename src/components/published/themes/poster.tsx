@@ -15,7 +15,7 @@ import {
   useTabFilter,
 } from "../shared";
 
-/* ── 1c Poster — accent field hero, tabs as a statement ───────────────── */
+/* ── 1c Poster — an accent field hero over a numbered record ─────────── */
 
 export function Poster({ p }: { p: Portfolio }) {
   const { tab, setTab, shown } = useTabFilter(p);

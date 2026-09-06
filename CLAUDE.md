@@ -28,7 +28,7 @@ because the connection never arrives. Pass flags through when you need them:
 ```
 npm run build
 npm run lint
-cd backend && .venv/bin/python -m pytest    # 258 tests (.venv/Scripts on Windows)
+cd backend && .venv/bin/python -m pytest    # 269 tests (.venv/Scripts on Windows)
 ```
 
 `NEXT_PUBLIC_API_URL` points the frontend at the API; see
@@ -149,7 +149,11 @@ and Site carry their own navigation — Poster its numbered list, Résumé every
 tab as a heading, Site its sticky nav. The rail and lens options still on
 offer live on Editorial, since that is where Index rail and Dossier went.
 The Layout panel says so on screen rather than offering a control that
-silently does nothing.
+silently does nothing — and it says the same about its other two controls,
+which are just as theme-specific: "Content grid" is read by Editorial alone
+(`gridCols`), and "Rules & density" by Editorial and Site (`pad`). `IGNORED`
+in `builder/controls.tsx` carries one reason per theme per control; grep
+those two helpers in `src/components/published/` before editing it.
 
 ## Design system: Modernist
 
@@ -369,11 +373,11 @@ claim to be the live page.
 - **Reordering is buttons, not drag.** The canvas draws a drag handle and says
   "hold to reorder"; the implementation uses up/down buttons, which are
   keyboard-reachable and need no pointer heuristics.
-- **The canvas says "all 12 themes"; there are seven.** Seven are built and
+- **The canvas says "all 12 themes"; there are five.** Five are built and
   real. Do not pad the gallery to hit the number in the artboard.
 - **Slugs are global.** Two accounts cannot both hold `rohan`, because the
   address is `facet.page/<slug>` with nothing in front of it. The create
   dialog surfaces the 409 as a message.
-- **The frontend has no test runner.** The backend has 258 pytest tests;
+- **The frontend has no test runner.** The backend has 269 pytest tests;
   changes here are checked with `npm run lint`, `npm run build` and by
   actually opening the app.

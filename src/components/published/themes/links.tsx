@@ -207,5 +207,3 @@ export function Links({ p }: { p: Portfolio }) {
   );
 }
 
-/* ── Ledger — everything as one long table ────────────────────────────── */
-

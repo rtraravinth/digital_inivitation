@@ -444,37 +444,9 @@
     gap: 0.5rem;
     margin-top: 0.5rem;
   }
-}
 
-/* ── print ─────────────────────────────────────────────────────────────
-   /print stacks every published page for the browser's own Save as PDF.
-   Chrome drops background colours unless the user ticks "Background
-   graphics", so ask for them: the accent bands are the design, not decoration.
-   ──────────────────────────────────────────────────────────────────── */
-@media print {
-  .no-print {
-    display: none !important;
-  }
-  .page-break {
-    break-after: page;
-  }
-  .page-break:last-child {
-    break-after: auto;
-  }
-  body {
-    -webkit-print-color-adjust: exact;
-    print-color-adjust: exact;
-  }
-}
-
-@media print {
-  .resume-entry {
-    break-inside: avoid;
-    page-break-inside: avoid;
-  }
-}
-
-@layer components {
+  /* Site's reveal on scroll. The observer adds `.in`; the escapes for print,
+     reduced motion and no JavaScript all restore the finished state. */
   .reveal {
     opacity: 0;
     transform: translateY(12px);
@@ -497,7 +469,31 @@
   }
 }
 
+/* ── print ─────────────────────────────────────────────────────────────
+   /print stacks every published page for the browser's own Save as PDF.
+   Chrome drops background colours unless the user ticks "Background
+   graphics", so ask for them: the accent bands are the design, not decoration.
+   ──────────────────────────────────────────────────────────────────── */
 @media print {
+  .no-print {
+    display: none !important;
+  }
+  .page-break {
+    break-after: page;
+  }
+  .page-break:last-child {
+    break-after: auto;
+  }
+  body {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  /* A résumé entry stays whole on one sheet. */
+  .resume-entry {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+  /* Nothing reveals on paper: there is no scrolling to reveal it. */
   .reveal,
   .reveal.in {
     opacity: 1;

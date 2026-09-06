@@ -760,31 +760,3 @@ export function SectionTitleLink({
     </Link>
   );
 }
-
-/* ── 1a Editorial — tabs across a modular grid ────────────────────────── */
-
-/** One card in the Editorial grid. */
-export function SectionCard({ p, section }: { p: Portfolio; section: Section }) {
-  return (
-    <div
-      className={`flex flex-col gap-2.5 ${pad(p).card}`}
-      style={{
-        background: "var(--color-bg)",
-        borderRight: "1px solid var(--color-divider)",
-        borderBottom: "1px solid var(--color-divider)",
-      }}
-    >
-      {section.image && <Media asset={section.image} className="mb-1 h-[150px] w-full" />}
-      <span className="card-kicker">{section.tab}</span>
-      <SectionTitleLink
-        p={p}
-        section={section}
-        className="font-heading text-[21px] font-extrabold leading-tight hover:underline"
-      />
-      <p className="m-0 flex-1 text-sm opacity-80">{section.description}</p>
-      <SectionAside p={p} section={section} />
-      <SectionLinks p={p} section={section} />
-    </div>
-  );
-}
-

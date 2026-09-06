@@ -27,7 +27,7 @@ export function Resume({ p }: { p: Portfolio }) {
 
   return (
     <div style={groundStyle(p)}>
-      <div className="resume-page mx-auto w-full max-w-[46rem] px-6 py-10 md:px-10">
+      <div className="mx-auto w-full max-w-[46rem] px-6 py-10 md:px-10">
         <header className="pb-6" style={{ borderBottom: "2px solid var(--color-divider)" }}>
           <div className="flex items-start justify-between gap-6">
             <div className="min-w-0">

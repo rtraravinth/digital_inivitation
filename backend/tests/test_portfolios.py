@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from app.models.enums import FONTS
+from app.models.enums import FONTS, THEMES
 
 
 async def test_create_blank_portfolio_starts_with_one_empty_section(auth_client):
@@ -218,6 +218,21 @@ async def test_patch_accepts_every_headline_face(auth_client, portfolio):
         )
         assert response.status_code == 200, f"{face}: {response.text}"
         assert response.json()["font"] == face
+
+
+@pytest.mark.parametrize("theme", THEMES)
+async def test_patch_accepts_every_theme(auth_client, portfolio, theme):
+    """The check constraint mirrors THEMES, so a theme missing from it 500s.
+
+    The narrow version of this — the two themes the branch added — passed
+    while nothing checked that the tuple and the constraint still agreed on
+    the other three, which is the drift the constraint exists to make loud.
+    """
+    response = await auth_client.patch(
+        f"/api/v1/portfolios/{portfolio['id']}", json={"theme": theme}
+    )
+    assert response.status_code == 200, f"{theme}: {response.text}"
+    assert response.json()["theme"] == theme
 
 
 @pytest.mark.parametrize("theme", ["resume", "site"])

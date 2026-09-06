@@ -6,6 +6,7 @@
     "status": "live",
     "summary": "Everything: both businesses, the advisory practice, the letter and the clinic.",
     "meta": "6 sections · updated 2 days ago",
+    "theme": "site",
     "header": {
       "name": "Rohan Mehta",
       "current": "Founder, Northwell Kitchens · SEBI-registered investment adviser · Bengaluru",
@@ -206,7 +207,6 @@
         "hidden": false
       }
     ],
-    "theme": "editorial",
     "accent": "#ec3013",
     "ground": "light",
     "groundHex": "",
@@ -512,8 +512,50 @@
           "url": "rohan@northwell.in"
         }
       ],
-      "numbers": [],
-      "dates": [],
+      "numbers": [
+        {
+          "id": "bn1",
+          "value": "3",
+          "label": "Schools"
+        },
+        {
+          "id": "bn2",
+          "value": "1,400",
+          "label": "Pupils"
+        },
+        {
+          "id": "bn3",
+          "value": "6",
+          "label": "Board meetings a year"
+        },
+        {
+          "id": "bn4",
+          "value": "5",
+          "label": "Years a trustee"
+        }
+      ],
+      "dates": [
+        {
+          "id": "bd1",
+          "year": "2020",
+          "text": "Joined the Sanjeevani Schools Trust board"
+        },
+        {
+          "id": "bd2",
+          "year": "2022",
+          "text": "Elected chair of the finance committee"
+        },
+        {
+          "id": "bd3",
+          "year": "2023",
+          "text": "Audit and reserves policy rewritten"
+        },
+        {
+          "id": "bd4",
+          "year": "2024",
+          "text": "Third school opens, in Ballari"
+        }
+      ],
       "portrait": null
     },
     "sections": [

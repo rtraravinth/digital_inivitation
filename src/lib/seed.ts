@@ -37,6 +37,11 @@ const RAW: SeedPortfolio[] = [
     summary:
       "Everything: both businesses, the advisory practice, the letter and the clinic.",
     meta: "6 sections · updated 2 days ago",
+    // The fullest page carries Site: a sticky nav, a numbers band and a
+    // timeline all want content behind them, and a seeded set where nothing
+    // is on the flagship theme leaves the gallery's "New" badge opening on
+    // an empty page.
+    theme: "site",
     header: {
       name: "Rohan Mehta",
       current:
@@ -263,6 +268,20 @@ const RAW: SeedPortfolio[] = [
       description:
         "I sit on one board and chair its finance committee. I take governance work seriously and I take very little of it.",
       tags: ["Trustee", "Governance"],
+      // Résumé draws a numbers row and a timeline. Without these the theme
+      // that shows both had the least to show of any seed.
+      numbers: [
+        { id: "bn1", value: "3", label: "Schools" },
+        { id: "bn2", value: "1,400", label: "Pupils" },
+        { id: "bn3", value: "6", label: "Board meetings a year" },
+        { id: "bn4", value: "5", label: "Years a trustee" },
+      ],
+      dates: [
+        { id: "bd1", year: "2020", text: "Joined the Sanjeevani Schools Trust board" },
+        { id: "bd2", year: "2022", text: "Elected chair of the finance committee" },
+        { id: "bd3", year: "2023", text: "Audit and reserves policy rewritten" },
+        { id: "bd4", year: "2024", text: "Third school opens, in Ballari" },
+      ],
       links: [{ id: "bh1", label: "Email", url: "rohan@northwell.in" }],
     },
     sections: [

@@ -155,7 +155,7 @@ async def test_patch_updates_theme_accent_and_layout(auth_client, portfolio):
     response = await auth_client.patch(
         f"/api/v1/portfolios/{portfolio['id']}",
         json={
-            "theme": "dossier",
+            "theme": "editorial",
             "accent": "#1d4ed8",
             "ground": "paper",
             "font": "fraunces",
@@ -171,7 +171,7 @@ async def test_patch_updates_theme_accent_and_layout(auth_client, portfolio):
     assert response.status_code == 200
 
     body = response.json()
-    assert body["theme"] == "dossier"
+    assert body["theme"] == "editorial"
     assert body["accent"] == "#1d4ed8"
     assert body["ground"] == "paper"
     assert body["font"] == "fraunces"
@@ -228,6 +228,15 @@ async def test_patch_accepts_new_themes(auth_client, portfolio, theme):
     )
     assert response.status_code == 200, f"{theme}: {response.text}"
     assert response.json()["theme"] == theme
+
+
+@pytest.mark.parametrize("theme", ["index", "ledger", "dossier", "broadsheet"])
+async def test_patch_rejects_removed_themes(auth_client, portfolio, theme):
+    """The five-theme set narrows the constraint; the old four are gone."""
+    response = await auth_client.patch(
+        f"/api/v1/portfolios/{portfolio['id']}", json={"theme": theme}
+    )
+    assert response.status_code == 422, f"{theme}: {response.text}"
 
 
 async def test_headline_and_body_faces_are_set_apart(auth_client, portfolio):

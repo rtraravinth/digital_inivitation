@@ -10,14 +10,8 @@ from __future__ import annotations
 
 from typing import Final, Literal
 
-ThemeId = Literal[
-    "editorial", "index", "poster", "links", "ledger", "dossier", "broadsheet",
-    "resume", "site",
-]
-THEMES: Final[tuple[str, ...]] = (
-    "editorial", "index", "poster", "links", "ledger", "dossier", "broadsheet",
-    "resume", "site",
-)
+ThemeId = Literal["resume", "editorial", "poster", "links", "site"]
+THEMES: Final[tuple[str, ...]] = ("resume", "editorial", "poster", "links", "site")
 
 Ground = Literal["light", "dark", "paper"]
 GROUNDS: Final[tuple[str, ...]] = ("light", "dark", "paper")

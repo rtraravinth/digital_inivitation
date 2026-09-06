@@ -150,6 +150,20 @@ export function ThemeThumb({
           </span>
         </span>
       );
+    case "site":
+      return (
+        <span className={`${box} flex flex-col ${gap} ${pad}`} style={frame}>
+          <span className="flex items-center justify-between">
+            {bar("22%", "var(--color-ink)")}
+            {bar("34%", accent)}
+          </span>
+          <span className="grid flex-1 grid-cols-2 gap-[2px]">
+            <span className="col-span-2" style={{ background: grey }} />
+            <span style={{ background: grey }} />
+            <span style={{ background: grey }} />
+          </span>
+        </span>
+      );
     default:
       return (
         <span className={`${box} flex flex-col ${gap} ${pad}`} style={frame}>

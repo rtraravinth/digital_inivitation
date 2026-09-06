@@ -100,7 +100,8 @@ export type ThemeId =
   | "ledger"
   | "dossier"
   | "broadsheet"
-  | "resume";
+  | "resume"
+  | "site";
 
 export type Ground = "light" | "dark" | "paper";
 export type FontId =
@@ -165,6 +166,14 @@ export const THEMES: Array<{
     desc: "Accent field hero, tabs as a statement",
     long: "A colour field and display type. Loud, for people who present a lot.",
     audiences: ["founders", "writers"],
+  },
+  {
+    id: "site",
+    name: "Site",
+    desc: "A real website: sticky nav, hero, work grid",
+    long: "A full personal website — a sticky nav that follows you down the page, a hero, and the work in a grid.",
+    badge: "New",
+    audiences: ["multi", "founders"],
   },
   {
     id: "links",

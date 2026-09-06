@@ -9,10 +9,11 @@ import { Ledger } from "./themes/ledger";
 import { Links } from "./themes/links";
 import { Poster } from "./themes/poster";
 import { Resume } from "./themes/resume";
+import { Site } from "./themes/site";
 
 export * from "./shared";
 export { SectionDetail } from "./section-detail";
-export { Broadsheet, Dossier, Editorial, IndexRail, Ledger, Links, Poster, Resume };
+export { Broadsheet, Dossier, Editorial, IndexRail, Ledger, Links, Poster, Resume, Site };
 
 export function PublishedBody({ p }: { p: Portfolio }) {
   switch (p.theme) {
@@ -30,6 +31,8 @@ export function PublishedBody({ p }: { p: Portfolio }) {
       return <Broadsheet p={p} />;
     case "resume":
       return <Resume p={p} />;
+    case "site":
+      return <Site p={p} />;
     default:
       return <Editorial p={p} />;
   }

@@ -2,23 +2,19 @@
 
 import type { Portfolio } from "@/lib/types";
 import {
-  Media,
   SectionAside,
   SectionLinks,
   SectionTitleLink,
   StatRow,
   Tabs,
-  allDates,
-  gridCols,
   groundStyle,
   headline,
-  pad,
+  tabs,
   useTabFilter,
 } from "../shared";
 
 export function Poster({ p }: { p: Portfolio }) {
   const { tab, setTab, shown } = useTabFilter(p);
-  const dates = allDates(p);
 
   return (
     <div style={groundStyle(p)}>
@@ -27,7 +23,10 @@ export function Poster({ p }: { p: Portfolio }) {
         style={{ background: "var(--color-accent)", color: "var(--color-bg)" }}
       >
 
-        <h1 className="m-0 mb-5 leading-[0.92] tracking-[-0.03em]" style={headline("clamp(56px, 10vw, 104px)")}>
+        <h1
+          className="m-0 mb-5 font-extrabold leading-[0.9]"
+          style={{ ...headline("clamp(3rem, 10vw, 9rem)"), letterSpacing: "-0.04em" }}
+        >
           {p.header.name.split(" ").map((w, i) => (
             <span key={`${w}-${i}`} className="block">
               {w}
@@ -43,60 +42,48 @@ export function Poster({ p }: { p: Portfolio }) {
 
       <StatRow p={p} big />
 
-      <div
-        className={`grid ${gridCols(p)}`}
-        style={{ borderTop: "2px solid var(--color-divider)" }}
-      >
-        {shown.map((s) => (
-          <div
-            key={s.id}
-            className={`flex flex-col gap-3 ${pad(p).card}`}
-            style={{
-              background: "var(--color-bg)",
-              borderRight: "1px solid var(--color-divider)",
-              borderBottom: "1px solid var(--color-divider)",
-            }}
-          >
-            <div className="h-[150px]">
-              <Media asset={s.image} className="h-full w-full" caption="image — 16:9" />
-            </div>
-            <span className="card-kicker">{s.tab}</span>
-            <h3 className="m-0">
-              <SectionTitleLink p={p} section={s} className="hover:underline" />
-            </h3>
-            <p className="m-0 text-sm" style={{ color: "var(--color-neutral-800)" }}>
-              {s.description}
-            </p>
-            <SectionAside p={p} section={s} />
-            <SectionLinks p={p} section={s} />
-          </div>
-        ))}
-      </div>
-
-      {dates.length > 0 && (
-        <div
-          className="px-6 py-9 md:px-11"
-          style={{ borderTop: "2px solid var(--color-divider)" }}
-        >
-          <div className="grid gap-8 md:grid-cols-[200px_1fr]">
-            <h6 className="m-0">Career</h6>
-            <div>
-              {dates.map((e) => (
-                <div
-                  key={e.id}
-                  className="flex gap-6 py-3.5"
-                  style={{ borderBottom: "1px solid var(--color-divider)" }}
+      <div className="grid gap-10 px-6 py-12 md:grid-cols-[minmax(180px,240px)_1fr] md:px-10">
+        <nav className="md:sticky md:top-6 md:self-start">
+          <ol className="m-0 list-none p-0">
+            {tabs(p).map((t, i) => (
+              <li key={t} style={{ borderBottom: "1px solid var(--color-divider)" }}>
+                <button
+                  type="button"
+                  onClick={() => setTab(t)}
+                  className="font-heading flex w-full cursor-pointer items-baseline gap-3 py-3 text-left font-extrabold"
+                  style={{
+                    color: t === tab ? "var(--color-accent)" : "inherit",
+                    fontSize: 20,
+                  }}
                 >
-                  <span className="font-heading w-20 flex-none text-xl font-extrabold">
-                    {e.year}
-                  </span>
-                  <span className="text-base">{e.text}</span>
-                </div>
-              ))}
-            </div>
-          </div>
+                  <span className="mono-label flex-none">{String(i + 1).padStart(2, "0")}</span>
+                  <span>{t}</span>
+                </button>
+              </li>
+            ))}
+          </ol>
+        </nav>
+        <div style={{ borderTop: "1px solid var(--color-divider)" }}>
+          {shown.map((s) => (
+            <article
+              key={s.id}
+              className="py-6"
+              style={{ borderBottom: "1px solid var(--color-divider)" }}
+            >
+              <SectionTitleLink
+                p={p}
+                section={s}
+                className="font-heading text-[24px] font-extrabold leading-tight hover:underline"
+              />
+              <p className="m-0 mt-2 text-sm leading-relaxed opacity-80">{s.description}</p>
+              <SectionAside p={p} section={s} />
+              <div className="mt-2">
+                <SectionLinks p={p} section={s} />
+              </div>
+            </article>
+          ))}
         </div>
-      )}
+      </div>
     </div>
   );
 }

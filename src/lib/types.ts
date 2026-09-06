@@ -163,8 +163,8 @@ export const THEMES: Array<{
   {
     id: "poster",
     name: "Poster",
-    desc: "Accent field hero, tabs as a statement",
-    long: "A colour field and display type. Loud, for people who present a lot.",
+    desc: "A colour field, then the record",
+    long: "A colour field and display type over the work, listed. A résumé for people who present.",
     audiences: ["founders", "writers"],
   },
   {

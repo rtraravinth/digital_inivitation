@@ -171,6 +171,20 @@ export function tabs(p: Portfolio): string[] {
   return seen;
 }
 
+/**
+ * The page grouped into chapters: each tab with the visible sections filed
+ * under it, in section order, with an empty tab dropped.
+ *
+ * Three callers want exactly this — the "scroll" navigation below, Résumé and
+ * Site — so it is computed once here rather than retyped in each of them.
+ */
+export function chaptersOf(p: Portfolio): Array<{ tab: string; sections: Section[] }> {
+  const all = visibleSections(p);
+  return tabs(p)
+    .map((tab) => ({ tab, sections: all.filter((s) => s.tab === tab) }))
+    .filter((c) => c.sections.length > 0);
+}
+
 /** The page's own extras: one row of numbers, one timeline, from the header. */
 export function allNumbers(p: Portfolio) {
   return p.header.numbers.filter((n) => n.value.trim());
@@ -182,39 +196,68 @@ export function allDates(p: Portfolio) {
     .sort((a, b) => a.year.localeCompare(b.year));
 }
 
-export function StatRow({ p, big }: { p: Portfolio; big?: boolean }) {
+/** A rule between cells on the accent field: the page's own paper, thinned. */
+const RULE_ON_ACCENT = "1px solid color-mix(in srgb, var(--color-bg) 25%, transparent)";
+
+/**
+ * The numbers row.
+ *
+ * `big` sets the figures at display size. `onAccent` paints the whole row on
+ * the accent field, where — as on Editorial's band and Poster's hero — every
+ * colour is drawn from `--color-bg` rather than a hardcoded white, so a dark
+ * ground puts its own ink on the accent instead of diverging from every other
+ * theme in the product.
+ */
+export function StatRow({
+  p,
+  big,
+  onAccent,
+}: {
+  p: Portfolio;
+  big?: boolean;
+  onAccent?: boolean;
+}) {
   const nums = allNumbers(p);
   if (nums.length === 0) return null;
+  const background = onAccent ? "var(--color-accent)" : "var(--color-bg)";
+  const rule = onAccent ? RULE_ON_ACCENT : "1px solid var(--color-divider)";
   return (
     // Cell borders rather than gap-bleed: a partly-filled last row would
     // otherwise show the divider ground as empty grey blocks.
     <div
       className="grid grid-cols-2 md:grid-cols-4"
       style={{
-        background: "var(--color-bg)",
-        borderTop: "2px solid var(--color-divider)",
+        background,
+        borderTop: onAccent ? "none" : "2px solid var(--color-divider)",
       }}
     >
       {nums.slice(0, 8).map((n) => (
         <div
           key={n.id}
-          className="px-5 py-6"
-          style={{
-            background: "var(--color-bg)",
-            borderRight: "1px solid var(--color-divider)",
-            borderBottom: "1px solid var(--color-divider)",
-          }}
+          className={onAccent ? "px-6 py-8" : "px-5 py-6"}
+          style={{ background, borderRight: rule, borderBottom: rule }}
         >
           <div
             className="font-heading font-extrabold leading-none"
             style={{
               fontSize: big ? 40 : 32,
-              color: big ? "var(--color-accent)" : "inherit",
+              color: onAccent
+                ? "var(--color-bg)"
+                : big
+                  ? "var(--color-accent)"
+                  : "inherit",
             }}
           >
             {n.value}
           </div>
-          <div className="mt-1 text-xs" style={{ color: "var(--color-neutral-700)" }}>
+          <div
+            className="mt-1 text-xs"
+            style={{
+              color: onAccent
+                ? "color-mix(in srgb, var(--color-bg) 80%, transparent)"
+                : "var(--color-neutral-700)",
+            }}
+          >
             {n.label}
           </div>
         </div>
@@ -281,12 +324,7 @@ export function useTabFilter(p: Portfolio) {
     setAnswered(true);
   };
 
-  const chapters =
-    nav === "scroll"
-      ? options
-          .map((t) => ({ tab: t, sections: all.filter((s) => s.tab === t) }))
-          .filter((c) => c.sections.length > 0)
-      : [];
+  const chapters = nav === "scroll" ? chaptersOf(p) : [];
 
   return {
     tab,

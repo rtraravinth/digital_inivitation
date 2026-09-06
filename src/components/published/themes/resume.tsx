@@ -9,10 +9,9 @@ import {
   SectionTitleLink,
   allDates,
   allNumbers,
+  chaptersOf,
   groundStyle,
   headline,
-  tabs,
-  visibleSections,
 } from "../shared";
 
 /**
@@ -22,10 +21,7 @@ import {
  * Resume therefore ignores `p.layout.roleNav`, as Poster already does.
  */
 export function Resume({ p }: { p: Portfolio }) {
-  const all = visibleSections(p);
-  const chapters = tabs(p)
-    .map((tab) => ({ tab, sections: all.filter((s) => s.tab === tab) }))
-    .filter((c) => c.sections.length > 0);
+  const chapters = chaptersOf(p);
   const numbers = allNumbers(p);
   const dates = allDates(p);
 

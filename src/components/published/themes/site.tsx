@@ -8,13 +8,13 @@ import {
   SectionAside,
   SectionLinks,
   SectionTitleLink,
+  StatRow,
   allDates,
   allNumbers,
+  chaptersOf,
   groundStyle,
   headline,
   pad,
-  tabs,
-  visibleSections,
 } from "../shared";
 
 /**
@@ -74,9 +74,6 @@ function revealRef(node: HTMLElement | null) {
   return () => io.disconnect();
 }
 
-/** A cell rule on the accent field: the page's own paper, thinned. */
-const RULE_ON_ACCENT = "1px solid color-mix(in srgb, var(--color-bg) 25%, transparent)";
-
 /**
  * How far below the sticky nav a chapter counts as "reached" — the same
  * 128px as the `scroll-mt-32` on each chapter section, so a nav click and a
@@ -116,11 +113,7 @@ function currentChapterId(doc: Document): string {
 }
 
 export function Site({ p }: { p: Portfolio }) {
-  const all = visibleSections(p);
-  const options = tabs(p);
-  const chapters = options
-    .map((tab, i) => ({ tab, id: `chapter-${i}`, sections: all.filter((s) => s.tab === tab) }))
-    .filter((c) => c.sections.length > 0);
+  const chapters = chaptersOf(p).map((c, i) => ({ ...c, id: `chapter-${i}` }));
   const numbers = allNumbers(p);
   const dates = allDates(p);
   const [active, setActive] = useState("");
@@ -252,38 +245,8 @@ export function Site({ p }: { p: Portfolio }) {
       </header>
 
       {numbers.length > 0 && (
-        <div
-          ref={revealRef}
-          className="reveal grid grid-cols-2 md:grid-cols-4"
-          style={{ background: "var(--color-accent)" }}
-        >
-          {numbers.slice(0, 8).map((n) => (
-            <div
-              key={n.id}
-              className="px-6 py-8"
-              style={{
-                // Everything on an accent field is drawn in --color-bg, the
-                // way Editorial's band and Poster's hero already are: a
-                // hardcoded white would be the one place in the product where
-                // a dark ground's accent band stops matching its own page.
-                borderRight: RULE_ON_ACCENT,
-                borderBottom: RULE_ON_ACCENT,
-              }}
-            >
-              <div
-                className="font-heading font-extrabold leading-none"
-                style={{ fontSize: 40, color: "var(--color-bg)" }}
-              >
-                {n.value}
-              </div>
-              <div
-                className="mt-1.5 text-xs"
-                style={{ color: "color-mix(in srgb, var(--color-bg) 80%, transparent)" }}
-              >
-                {n.label}
-              </div>
-            </div>
-          ))}
+        <div ref={revealRef} className="reveal">
+          <StatRow p={p} big onAccent />
         </div>
       )}
 

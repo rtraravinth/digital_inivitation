@@ -466,3 +466,10 @@
     print-color-adjust: exact;
   }
 }
+
+@media print {
+  .resume-entry {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+}

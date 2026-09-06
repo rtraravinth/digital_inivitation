@@ -597,13 +597,40 @@ export function usePageHref(p: Portfolio): string {
 
 
 /** The header's links, unless the owner has hidden them from strangers. */
-export function HeaderLinks({ p, block }: { p: Portfolio; block?: boolean }) {
+export function HeaderLinks({
+  p,
+  block,
+  inline,
+}: {
+  p: Portfolio;
+  block?: boolean;
+  inline?: boolean;
+}) {
   const privacy = usePublishedPrivacy();
   if (!privacy.showContact) {
     return (
       <p className="m-0 text-[12px]" style={{ color: "var(--color-neutral-700)" }}>
         Contact details are hidden. Ask {p.header.name.split(" ")[0] || "the owner"} for
         them directly.
+      </p>
+    );
+  }
+  if (inline) {
+    return (
+      <p className="m-0 flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px]">
+        {p.header.links.map((l, i) => (
+          <span key={l.id} className="flex items-center gap-2">
+            {i > 0 && <span aria-hidden="true" style={{ color: "var(--color-neutral-700)" }}>·</span>}
+            <a
+              href={href(l.url)}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{ color: "var(--color-accent)" }}
+            >
+              {l.label || l.url}
+            </a>
+          </span>
+        ))}
       </p>
     );
   }

@@ -49,6 +49,17 @@ export function ThemeThumb({
   const gap = size === "lg" ? "gap-1.5" : "gap-[3px]";
 
   switch (theme) {
+    case "resume":
+      return (
+        <span className={`${box} flex flex-col ${gap} ${pad}`} style={frame}>
+          {bar("55%", "var(--color-ink)")}
+          {bar("35%", grey)}
+          <span className="mt-[2px] block h-[2px] w-full" style={{ background: accent }} />
+          {bar("100%", grey)}
+          {bar("100%", grey)}
+          {bar("72%", grey)}
+        </span>
+      );
     case "index":
       return (
         <span className={`${box} grid`} style={{ ...frame, gridTemplateColumns: "30% 1fr" }}>

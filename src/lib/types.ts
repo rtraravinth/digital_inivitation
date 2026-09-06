@@ -99,7 +99,8 @@ export type ThemeId =
   | "links"
   | "ledger"
   | "dossier"
-  | "broadsheet";
+  | "broadsheet"
+  | "resume";
 
 export type Ground = "light" | "dark" | "paper";
 export type FontId =
@@ -137,6 +138,13 @@ export const THEMES: Array<{
   badge?: string;
   audiences: ThemeAudience[];
 }> = [
+  {
+    id: "resume",
+    name: "Résumé",
+    desc: "One column, rules, made to print",
+    long: "A plain document with every tab as a heading. The one to attach to an application.",
+    audiences: ["advisers", "office", "multi"],
+  },
   {
     id: "editorial",
     name: "Editorial",

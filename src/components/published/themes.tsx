@@ -8,10 +8,11 @@ import { IndexRail } from "./themes/index-rail";
 import { Ledger } from "./themes/ledger";
 import { Links } from "./themes/links";
 import { Poster } from "./themes/poster";
+import { Resume } from "./themes/resume";
 
 export * from "./shared";
 export { SectionDetail } from "./section-detail";
-export { Broadsheet, Dossier, Editorial, IndexRail, Ledger, Links, Poster };
+export { Broadsheet, Dossier, Editorial, IndexRail, Ledger, Links, Poster, Resume };
 
 export function PublishedBody({ p }: { p: Portfolio }) {
   switch (p.theme) {
@@ -27,6 +28,8 @@ export function PublishedBody({ p }: { p: Portfolio }) {
       return <Dossier p={p} />;
     case "broadsheet":
       return <Broadsheet p={p} />;
+    case "resume":
+      return <Resume p={p} />;
     default:
       return <Editorial p={p} />;
   }

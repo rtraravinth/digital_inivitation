@@ -2,6 +2,7 @@
 
 import type { Portfolio } from "@/lib/types";
 import {
+  Media,
   SectionAside,
   SectionLinks,
   SectionTitleLink,
@@ -71,18 +72,29 @@ export function Poster({ p }: { p: Portfolio }) {
           {shown.map((s) => (
             <article
               key={s.id}
-              className="py-6"
+              className="flex gap-5 py-6"
               style={{ borderBottom: "1px solid var(--color-divider)" }}
             >
-              <SectionTitleLink
-                p={p}
-                section={s}
-                className="font-heading text-[24px] font-extrabold leading-tight hover:underline"
-              />
-              <p className="m-0 mt-2 text-sm leading-relaxed opacity-80">{s.description}</p>
-              <SectionAside p={p} section={s} />
-              <div className="mt-2">
-                <SectionLinks p={p} section={s} />
+              {/* A section's own image, as a thumbnail down the left: the
+                  entry is a résumé line now, and an author who uploaded a
+                  picture must not find it silently dropped. Only drawn when
+                  there is one — no hatched placeholder in a list. */}
+              {s.image && (
+                <div className="h-[88px] w-[88px] flex-none sm:h-[120px] sm:w-[120px]">
+                  <Media asset={s.image} className="h-full w-full" />
+                </div>
+              )}
+              <div className="flex min-w-0 flex-1 flex-col">
+                <SectionTitleLink
+                  p={p}
+                  section={s}
+                  className="font-heading text-[24px] font-extrabold leading-tight hover:underline"
+                />
+                <p className="m-0 mt-2 text-sm leading-relaxed opacity-80">{s.description}</p>
+                <SectionAside p={p} section={s} />
+                <div className="mt-2">
+                  <SectionLinks p={p} section={s} />
+                </div>
               </div>
             </article>
           ))}

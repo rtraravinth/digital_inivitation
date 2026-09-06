@@ -7,6 +7,7 @@ import {
   SectionTitleLink,
   StatRow,
   Tabs,
+  allDates,
   groundStyle,
   headline,
   tabs,
@@ -15,6 +16,7 @@ import {
 
 export function Poster({ p }: { p: Portfolio }) {
   const { tab, setTab, shown } = useTabFilter(p);
+  const dates = allDates(p);
 
   return (
     <div style={groundStyle(p)}>
@@ -84,6 +86,30 @@ export function Poster({ p }: { p: Portfolio }) {
           ))}
         </div>
       </div>
+
+      {dates.length > 0 && (
+        <div
+          className="px-6 py-12 md:px-10"
+          style={{ borderTop: "2px solid var(--color-divider)" }}
+        >
+          <h2 className="mono-label m-0 mb-6">Timeline</h2>
+          <div>
+            {dates.map((d, i) => (
+              <div
+                key={d.id}
+                className="flex flex-wrap items-baseline gap-x-6 gap-y-1 py-4"
+                style={{ borderBottom: "1px solid var(--color-divider)" }}
+              >
+                <span className="mono-label w-8 flex-none">{String(i + 1).padStart(2, "0")}</span>
+                <span className="font-heading w-16 flex-none text-lg font-extrabold">
+                  {d.year}
+                </span>
+                <span className="flex-1 text-sm leading-relaxed opacity-80">{d.text}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

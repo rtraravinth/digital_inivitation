@@ -322,8 +322,45 @@ export function TypeControl({ p, onChange }: { p: Portfolio; onChange: Recipe })
   );
 }
 
-/** Themes that read their navigation from the Layout panel rather than their own. */
-const NAV_AWARE: ThemeId[] = ["editorial", "links"];
+/**
+ * Why a theme ignores one of this panel's three controls.
+ *
+ * The standing rule is that the panel says so on screen rather than offering
+ * a control that silently does nothing, and only Editorial reads all three.
+ * A missing key means the theme does read that control. The facts here are
+ * `p.layout.roleNav`, `gridCols()` and `pad()` in
+ * `src/components/published/` — grep those three before editing this.
+ */
+const IGNORED: Record<ThemeId, { nav?: string; grid?: string; density?: string }> = {
+  editorial: {},
+  resume: {
+    nav: "Résumé renders every tab as a heading and shows them all at once — a CV behind a filter is a CV with most of itself missing.",
+    grid: "Résumé is one column at every width, because it is made to print.",
+    density: "Résumé sets its own spacing, so a printed page keeps its rhythm.",
+  },
+  poster: {
+    nav: "Poster carries its own navigation — the numbered list beside the entries.",
+    grid: "Poster's body is a two-column list of entries, not a grid of cards.",
+    density: "Poster sets its own spacing, around the hero.",
+  },
+  links: {
+    grid: "Links is one stack of full-width rows, one per section.",
+    density: "Links is sized for a thumb, so its rows keep their 56px minimum whatever you pick.",
+  },
+  site: {
+    nav: "Site carries its own navigation — the sticky nav that follows you down the page.",
+    grid: "Site lays its chapters out in its own grid, the first entry spanning two columns.",
+  },
+};
+
+/** Why this control does nothing on the theme the portfolio is on. */
+function IgnoredNote({ reason }: { reason: string }) {
+  return (
+    <p className="mb-3 text-[11px]" style={{ color: "var(--color-accent-700)" }} role="note">
+      {reason} The setting is stored and applies again when you switch theme.
+    </p>
+  );
+}
 
 export function LayoutControl({ p, onChange }: { p: Portfolio; onChange: Recipe }) {
   // A radio `name` is scoped to the document, not to the component. The
@@ -334,8 +371,7 @@ export function LayoutControl({ p, onChange }: { p: Portfolio; onChange: Recipe 
   // and `.radio input:checked + .dot` had nothing to style. The state was
   // always right; only the dot was missing.
   const group = useId();
-  const navApplies = NAV_AWARE.includes(p.theme);
-  const themeName = THEMES.find((t) => t.id === p.theme)?.name ?? p.theme;
+  const ignored = IGNORED[p.theme] ?? {};
 
   return (
     <>
@@ -343,17 +379,8 @@ export function LayoutControl({ p, onChange }: { p: Portfolio; onChange: Recipe 
       <p className="text-neutral-700 text-xs">
         How visitors move between your tabs.
       </p>
-      {!navApplies && (
-        <p
-          className="mb-3 text-[11px]"
-          style={{ color: "var(--color-accent-700)" }}
-          role="note"
-        >
-          {themeName} carries its own navigation — it is the reason you would pick
-          it — so this setting is stored and does nothing until you switch theme.
-        </p>
-      )}
-      <div className={`mb-5 flex flex-col gap-2.5 ${navApplies ? "" : "opacity-50"}`}>
+      {ignored.nav && <IgnoredNote reason={ignored.nav} />}
+      <div className={`mb-5 flex flex-col gap-2.5 ${ignored.nav ? "opacity-50" : ""}`}>
         {ROLE_NAVS.map((n) => (
           <label key={n.id} className="radio">
             <input
@@ -373,8 +400,9 @@ export function LayoutControl({ p, onChange }: { p: Portfolio; onChange: Recipe 
         ))}
       </div>
 
-      <h6 className="mb-2.5">Content grid</h6>
-      <div className="seg mb-5">
+      <h6 className={ignored.grid ? "mb-1.5" : "mb-2.5"}>Content grid</h6>
+      {ignored.grid && <IgnoredNote reason={ignored.grid} />}
+      <div className={`seg mb-5 ${ignored.grid ? "opacity-50" : ""}`}>
         {([1, 2, 3] as GridCols[]).map((n) => (
           <label key={n} className="seg-opt">
             <input
@@ -390,8 +418,9 @@ export function LayoutControl({ p, onChange }: { p: Portfolio; onChange: Recipe 
         ))}
       </div>
 
-      <h6 className="mb-2.5">Rules &amp; density</h6>
-      <div className="flex flex-col gap-2.5">
+      <h6 className={ignored.density ? "mb-1.5" : "mb-2.5"}>Rules &amp; density</h6>
+      {ignored.density && <IgnoredNote reason={ignored.density} />}
+      <div className={`flex flex-col gap-2.5 ${ignored.density ? "opacity-50" : ""}`}>
         {DENSITIES.map((d) => (
           <label key={d.id} className="radio">
             <input

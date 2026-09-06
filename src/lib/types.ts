@@ -92,16 +92,7 @@ export type PortfolioHeader = {
 export type PortfolioStatus = "live" | "draft" | "empty";
 
 /** The published-page structures. Content stays put; the frame changes. */
-export type ThemeId =
-  | "editorial"
-  | "index"
-  | "poster"
-  | "links"
-  | "ledger"
-  | "dossier"
-  | "broadsheet"
-  | "resume"
-  | "site";
+export type ThemeId = "resume" | "editorial" | "poster" | "links" | "site";
 
 export type Ground = "light" | "dark" | "paper";
 export type FontId =
@@ -151,14 +142,7 @@ export const THEMES: Array<{
     name: "Editorial",
     desc: "Tabs across a modular grid",
     long: "A tabbed grid with the portrait on the right. The default, and the safest.",
-    audiences: ["founders", "multi", "advisers"],
-  },
-  {
-    id: "index",
-    name: "Index rail",
-    desc: "Tabs as a numbered sidebar, content as records",
-    long: "A numbered rail of tabs beside records of the work. Good for long histories.",
-    audiences: ["advisers", "office", "multi"],
+    audiences: ["multi", "founders"],
   },
   {
     id: "poster",
@@ -180,29 +164,7 @@ export const THEMES: Array<{
     name: "Links",
     desc: "A stack of tappable rows, thumb-sized",
     long: "One shareable page of rows, sized for a thumb. The link you put in a bio.",
-    audiences: ["founders", "writers", "multi"],
-  },
-  {
-    id: "ledger",
-    name: "Ledger",
-    desc: "Everything as one long table",
-    long: "Everything as one long table. Built for people with a lot of entries.",
-    audiences: ["advisers", "office"],
-  },
-  {
-    id: "dossier",
-    name: "Dossier",
-    desc: "Visitor picks a lens, the page rewrites itself",
-    long: "The visitor picks a lens first — one of your tabs — and the page rewrites itself around it.",
-    badge: "New",
-    audiences: ["multi", "advisers", "office"],
-  },
-  {
-    id: "broadsheet",
-    name: "Broadsheet",
-    desc: "Columns of type with rules between",
-    long: "Three columns of type with rules between. Reads like a newspaper page.",
-    audiences: ["writers", "office"],
+    audiences: ["founders", "writers"],
   },
 ];
 

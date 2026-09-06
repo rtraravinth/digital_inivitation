@@ -256,7 +256,7 @@ const RAW: SeedPortfolio[] = [
     status: "draft",
     summary: "Governance work only — for trusts and boards doing diligence.",
     meta: "2 sections · updated 1 month ago",
-    theme: "index",
+    theme: "resume",
     header: {
       name: "Rohan Mehta",
       current: "Trustee, Sanjeevani Schools Trust · Chair, finance committee",

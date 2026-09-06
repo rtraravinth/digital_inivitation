@@ -12,6 +12,8 @@ import {
   visibleSections,
 } from "./shared";
 
+/* ── 1d Section detail — one entry on its own page ────────────────────── */
+
 export function SectionDetail({ p, section }: { p: Portfolio; section: Section }) {
   const pageHref = usePageHref(p);
   const index = visibleSections(p).findIndex((s) => s.id === section.id);

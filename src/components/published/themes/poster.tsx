@@ -14,6 +14,8 @@ import {
   useTabFilter,
 } from "../shared";
 
+/* ── 1c Poster — accent field hero, tabs as a statement ───────────────── */
+
 export function Poster({ p }: { p: Portfolio }) {
   const { tab, setTab, shown } = useTabFilter(p);
   const dates = allDates(p);
@@ -113,6 +115,3 @@ export function Poster({ p }: { p: Portfolio }) {
     </div>
   );
 }
-
-/* ── 3a Links — tabs over a stack of tappable rows ────────────────────── */
-

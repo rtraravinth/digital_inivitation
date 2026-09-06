@@ -60,17 +60,6 @@ export function ThemeThumb({
           {bar("72%", grey)}
         </span>
       );
-    case "index":
-      return (
-        <span className={`${box} grid`} style={{ ...frame, gridTemplateColumns: "30% 1fr" }}>
-          <span style={{ background: accent }} />
-          <span className={`flex flex-col justify-center ${gap} ${pad}`}>
-            {bar("100%", grey)}
-            {bar("100%", grey)}
-            {bar("66%", grey)}
-          </span>
-        </span>
-      );
     case "poster":
       return (
         <span className={box} style={frame}>
@@ -105,49 +94,6 @@ export function ThemeThumb({
               style={{ boxShadow: `inset 0 -1px 0 ${grey}` }}
             />
           ))}
-        </span>
-      );
-    case "ledger":
-      return (
-        <span className={`${box} flex flex-col justify-center ${gap} ${pad}`} style={frame}>
-          {bar("100%", accent)}
-          {[0, 1, 2, 3, 4].map((i) => (
-            <span key={i}>{bar("100%", grey)}</span>
-          ))}
-        </span>
-      );
-    case "dossier":
-      return (
-        <span className={`${box} flex flex-col ${gap} ${pad}`} style={frame}>
-          <span className="flex gap-1">
-            <span className="block h-[8px] w-[40%]" style={{ background: accent }} />
-            <span className="block h-[8px] w-[25%]" style={{ background: grey }} />
-          </span>
-          {bar("100%", grey)}
-          {bar("100%", grey)}
-          {bar("70%", grey)}
-        </span>
-      );
-    case "broadsheet":
-      return (
-        <span className={`${box} flex flex-col ${pad}`} style={frame}>
-          <span className="mb-1 block h-[3px] w-full" style={{ background: accent }} />
-          <span
-            className="grid flex-1 grid-cols-3"
-            style={{ gap: 3 }}
-          >
-            {[0, 1, 2].map((c) => (
-              <span
-                key={c}
-                className="flex flex-col justify-start gap-[2px]"
-                style={{ borderRight: c < 2 ? `1px solid ${grey}` : undefined }}
-              >
-                {bar("85%", grey)}
-                {bar("85%", grey)}
-                {bar("60%", grey)}
-              </span>
-            ))}
-          </span>
         </span>
       );
     case "site":
@@ -377,7 +323,7 @@ export function TypeControl({ p, onChange }: { p: Portfolio; onChange: Recipe })
 }
 
 /** Themes that read their navigation from the Layout panel rather than their own. */
-const NAV_AWARE: ThemeId[] = ["editorial", "links", "ledger", "broadsheet"];
+const NAV_AWARE: ThemeId[] = ["editorial", "links"];
 
 export function LayoutControl({ p, onChange }: { p: Portfolio; onChange: Recipe }) {
   // A radio `name` is scoped to the document, not to the component. The

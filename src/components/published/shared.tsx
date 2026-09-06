@@ -231,7 +231,7 @@ export function visibleSections(p: Portfolio): Section[] {
 }
 
 /** Density is a padding scale; it changes how much fits on a screen. */
-export const DENSITY_PAD: Record<Density, { card: string; page: string; row: string }> = {
+const DENSITY_PAD: Record<Density, { card: string; page: string; row: string }> = {
   airy: { card: "p-8", page: "px-8 py-10 md:px-12", row: "py-5" },
   standard: { card: "p-6", page: "px-6 py-8 md:px-10", row: "py-3.5" },
   dense: { card: "p-4", page: "px-4 py-5 md:px-6", row: "py-2" },
@@ -256,8 +256,8 @@ export function gridCols(p: Portfolio) {
  *
  * "scroll" drops the filter and groups the page into chapters instead;
  * "lens" makes the visitor choose a tab before anything else is shown.
- * Index rail, Poster and Dossier carry their own navigation by definition —
- * it is the reason you would pick them — so they ignore this.
+ * Poster carries its own navigation by definition — it is the reason you
+ * would pick it — so it ignores this.
  *
  * There is no "everything" state. Every section files under exactly one tab,
  * so one tab is always open — the first, until the visitor picks another.
@@ -706,7 +706,7 @@ export function SectionTitleLink({
 
 /* ── 1a Editorial — tabs across a modular grid ────────────────────────── */
 
-/** One card in the Editorial / Poster / Broadsheet grids. */
+/** One card in the Editorial grid. */
 export function SectionCard({ p, section }: { p: Portfolio; section: Section }) {
   return (
     <div

@@ -19,6 +19,8 @@ import {
   useRecordClick,
 } from "../shared";
 
+/* ── 3a Links — tabs over a stack of tappable rows ────────────────────── */
+
 export function Links({ p }: { p: Portfolio }) {
   const handle = usePublishedHandle();
   const pageHref = usePageHref(p);

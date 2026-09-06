@@ -91,9 +91,9 @@ your browser keeps hitting the stale server on 3000. Kill it (`taskkill //F
   That is what "Download all pages as PDF" on `/account` opens; generating a
   PDF in-process would mean a library, and the themes already print correctly.
 - `src/components/account/panels.tsx` + `Account.tsx` — artboards 5a and 5b.
-- `src/components/published/themes.tsx` — the published page in seven themes:
-  Editorial (1a), Index rail (1b), Poster (1c), Links (3a), Ledger, Dossier,
-  Broadsheet. Also `SectionDetail`, artboard 1d, reached at `?section=<id>`.
+- `src/components/published/themes.tsx` — the published page in five themes:
+  Résumé, Editorial (1a), Poster (1c), Links (3a), Site. Also `SectionDetail`,
+  artboard 1d, reached at `?section=<id>`.
 - `src/app/globals.css` — the Modernist design system: tokens in `@theme`,
   component classes in `@layer components`.
 
@@ -144,10 +144,12 @@ format, a stored value and in tests, so it is still `roleNav`; every label it
 shows says "tab". Renaming the key would be a migration for no user-visible
 gain.
 
-**`p.layout.roleNav` only applies to Editorial, Links, Ledger and Broadsheet.**
-Index rail, Poster and Dossier carry their own navigation — it is the reason
-you would pick them. The Layout panel says so on screen rather than offering a
-control that silently does nothing.
+**`p.layout.roleNav` only applies to Editorial and Links.** Poster, Résumé
+and Site carry their own navigation — Poster its numbered list, Résumé every
+tab as a heading, Site its sticky nav. The rail and lens options still on
+offer live on Editorial, since that is where Index rail and Dossier went.
+The Layout panel says so on screen rather than offering a control that
+silently does nothing.
 
 ## Design system: Modernist
 

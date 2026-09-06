@@ -32,7 +32,9 @@ export function Links({ p }: { p: Portfolio }) {
   if (gated) {
     return (
       <div style={groundStyle(p)}>
-        <LensGate p={p} setTab={setTab} />
+        {/* Links sizes itself for a thumb rather than from the density
+            control, so the gate takes the column's own padding. */}
+        <LensGate p={p} setTab={setTab} padClass="px-[18px] py-8" />
       </div>
     );
   }
@@ -69,22 +71,17 @@ export function Links({ p }: { p: Portfolio }) {
         </div>
 
         {nav !== "scroll" && (
-          // Tabs' "underline" variant is built for the flex + overflow-x-auto
-          // row the other themes use, so its buttons carry whitespace-nowrap
-          // and no min-width: 0 — left alone, a grid item's automatic min
-          // size is its content size, so five tab labels overrun their 1fr
-          // tracks and both overlap and push the body wider than the
-          // viewport. overflow-hidden on the child drops that automatic
-          // minimum to 0 (CSS Grid §6.6), so text-ellipsis can clip cleanly
-          // inside the fixed-width column instead.
+          // A segmented control: equal tracks across the column. The variant
+          // owns the sizing a grid cell needs, so nothing has to be cancelled
+          // from out here.
           <div
-            className="grid [&>button]:min-w-0 [&>button]:overflow-hidden [&>button]:text-ellipsis"
+            className="grid"
             style={{
               gridTemplateColumns: `repeat(${Math.max(tabs(p).length, 1)}, minmax(0, 1fr))`,
               borderBottom: "2px solid var(--color-divider)",
             }}
           >
-            <Tabs p={p} tab={tab} setTab={setTab} variant="underline" />
+            <Tabs p={p} tab={tab} setTab={setTab} variant="segment" />
           </div>
         )}
 

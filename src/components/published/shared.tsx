@@ -341,13 +341,16 @@ export function useTabFilter(p: Portfolio) {
 export function LensGate({
   p,
   setTab,
+  padClass,
 }: {
   p: Portfolio;
   setTab: (t: string) => void;
+  /** A theme that does not read the density control passes its own padding. */
+  padClass?: string;
 }) {
   const options = tabs(p);
   return (
-    <div className={`mx-auto max-w-[760px] ${pad(p).page}`}>
+    <div className={`mx-auto max-w-[760px] ${padClass ?? pad(p).page}`}>
       <h1 className="m-0 mb-3 leading-[1.05]" style={headline("40px")}>{p.header.name}</h1>
       <p className="mb-8 max-w-[46ch] text-lg" style={{ color: "var(--color-neutral-800)" }}>
         {p.header.description}
@@ -385,7 +388,12 @@ export function Tabs({
   p: Portfolio;
   tab: string;
   setTab: (t: string) => void;
-  variant: "underline" | "block";
+  /**
+   * "underline" rules a scrolling flex row; "block" is Poster's solid tab on
+   * the accent field; "segment" is the same underline in a segmented control,
+   * where the cells are grid tracks rather than flex items.
+   */
+  variant: "underline" | "block" | "segment";
 }) {
   return (
     <>
@@ -413,9 +421,20 @@ export function Tabs({
             key={t}
             type="button"
             onClick={() => setTab(t)}
-            // flex-none + nowrap: the row scrolls sideways inside its own
-            // overflow container rather than breaking a tab name in half.
-            className="font-heading flex-none cursor-pointer whitespace-nowrap py-3.5 text-sm font-extrabold"
+            className={`font-heading cursor-pointer py-3.5 text-sm font-extrabold ${
+              variant === "segment"
+                ? // A grid item's automatic minimum size is its content size,
+                  // so five tab labels would overrun their 1fr tracks, overlap
+                  // and push the page wider than the viewport. `min-w-0` plus
+                  // `overflow-hidden` drops that minimum to zero (CSS Grid
+                  // §6.6) and lets the label clip with an ellipsis inside its
+                  // own column. Owned here rather than patched on from the
+                  // parent, so the caller only picks a variant.
+                  "min-w-0 overflow-hidden text-ellipsis whitespace-nowrap"
+                : // flex-none + nowrap: the row scrolls sideways inside its own
+                  // overflow container rather than breaking a tab name in half.
+                  "flex-none whitespace-nowrap"
+            }`}
             style={{
               color: on ? "var(--color-accent)" : "var(--color-neutral-700)",
               boxShadow: on ? "inset 0 -3px 0 var(--color-accent)" : "none",

@@ -138,7 +138,10 @@ export function Links({ p }: { p: Portfolio }) {
           const pressHandlers = {
             onPointerDown: (e: React.PointerEvent<HTMLAnchorElement>) => {
               e.currentTarget.style.background = "var(--color-accent)";
-              e.currentTarget.style.color = "#fff";
+              // --color-bg, not white: the accent field is drawn in the
+              // page's own paper everywhere else in the product, and a dark
+              // ground wants ink on the accent rather than white.
+              e.currentTarget.style.color = "var(--color-bg)";
             },
             onPointerUp: clearPress,
             // A touch that ends in a scroll fires cancel, not up — without

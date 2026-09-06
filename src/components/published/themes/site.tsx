@@ -74,6 +74,9 @@ function revealRef(node: HTMLElement | null) {
   return () => io.disconnect();
 }
 
+/** A cell rule on the accent field: the page's own paper, thinned. */
+const RULE_ON_ACCENT = "1px solid color-mix(in srgb, var(--color-bg) 25%, transparent)";
+
 /**
  * How far below the sticky nav a chapter counts as "reached" — the same
  * 128px as the `scroll-mt-32` on each chapter section, so a nav click and a
@@ -258,15 +261,25 @@ export function Site({ p }: { p: Portfolio }) {
             <div
               key={n.id}
               className="px-6 py-8"
-              style={{ borderRight: "1px solid rgba(255,255,255,.25)", borderBottom: "1px solid rgba(255,255,255,.25)" }}
+              style={{
+                // Everything on an accent field is drawn in --color-bg, the
+                // way Editorial's band and Poster's hero already are: a
+                // hardcoded white would be the one place in the product where
+                // a dark ground's accent band stops matching its own page.
+                borderRight: RULE_ON_ACCENT,
+                borderBottom: RULE_ON_ACCENT,
+              }}
             >
               <div
                 className="font-heading font-extrabold leading-none"
-                style={{ fontSize: 40, color: "#fff" }}
+                style={{ fontSize: 40, color: "var(--color-bg)" }}
               >
                 {n.value}
               </div>
-              <div className="mt-1.5 text-xs" style={{ color: "rgba(255,255,255,.8)" }}>
+              <div
+                className="mt-1.5 text-xs"
+                style={{ color: "color-mix(in srgb, var(--color-bg) 80%, transparent)" }}
+              >
                 {n.label}
               </div>
             </div>

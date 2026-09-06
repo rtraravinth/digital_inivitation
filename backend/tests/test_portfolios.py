@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import pytest
+
 from app.models.enums import FONTS
 
 
@@ -216,6 +218,16 @@ async def test_patch_accepts_every_headline_face(auth_client, portfolio):
         )
         assert response.status_code == 200, f"{face}: {response.text}"
         assert response.json()["font"] == face
+
+
+@pytest.mark.parametrize("theme", ["resume", "site"])
+async def test_patch_accepts_new_themes(auth_client, portfolio, theme):
+    """The check constraint widens ahead of the UI offering these themes."""
+    response = await auth_client.patch(
+        f"/api/v1/portfolios/{portfolio['id']}", json={"theme": theme}
+    )
+    assert response.status_code == 200, f"{theme}: {response.text}"
+    assert response.json()["theme"] == theme
 
 
 async def test_headline_and_body_faces_are_set_apart(auth_client, portfolio):

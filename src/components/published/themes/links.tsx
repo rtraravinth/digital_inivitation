@@ -11,6 +11,7 @@ import {
   headline,
   href,
   saveContact,
+  tabs,
   useTabFilter,
   usePageHref,
   usePublishedHandle,
@@ -37,21 +38,24 @@ export function Links({ p }: { p: Portfolio }) {
   return (
     <div style={groundStyle(p)}>
 
-      <div className="mx-auto w-full max-w-[560px]">
+      <div className="mx-auto w-full max-w-[30rem]">
         <div
           className="px-[18px] pb-4 pt-6"
           style={{ borderBottom: "2px solid var(--color-divider)" }}
         >
-          <div className="flex items-start gap-3.5">
-            <div className="h-[72px] w-[72px] flex-none">
+          <div className="flex flex-col items-center text-center">
+            <div className="h-[96px] w-[96px] flex-none">
               <Media asset={p.header.portrait} className="h-full w-full" />
             </div>
-            <div>
-              <h2 className="m-0 mb-1" style={headline("24px")}>{p.header.name}</h2>
-              <p className="m-0 text-[13px]" style={{ color: "var(--color-neutral-800)" }}>
-                {p.header.description}
-              </p>
-            </div>
+            <h2 className="m-0 mt-3.5" style={headline("24px")}>
+              {p.header.name}
+            </h2>
+            <p
+              className="m-0 mt-1 text-[13px]"
+              style={{ color: "var(--color-neutral-800)" }}
+            >
+              {p.header.description}
+            </p>
           </div>
           <div className="mt-3 flex flex-wrap gap-1.5">
             {p.header.tags.map((t, i) => (
@@ -63,9 +67,20 @@ export function Links({ p }: { p: Portfolio }) {
         </div>
 
         {nav !== "scroll" && (
+          // Tabs' "underline" variant is built for the flex + overflow-x-auto
+          // row the other themes use, so its buttons carry whitespace-nowrap
+          // and no min-width: 0 — left alone, a grid item's automatic min
+          // size is its content size, so five tab labels overrun their 1fr
+          // tracks and both overlap and push the body wider than the
+          // viewport. overflow-hidden on the child drops that automatic
+          // minimum to 0 (CSS Grid §6.6), so text-ellipsis can clip cleanly
+          // inside the fixed-width column instead.
           <div
-            className="flex gap-[18px] overflow-x-auto px-[18px]"
-            style={{ borderBottom: "2px solid var(--color-divider)" }}
+            className="grid [&>button]:min-w-0 [&>button]:overflow-hidden [&>button]:text-ellipsis"
+            style={{
+              gridTemplateColumns: `repeat(${Math.max(tabs(p).length, 1)}, minmax(0, 1fr))`,
+              borderBottom: "2px solid var(--color-divider)",
+            }}
           >
             <Tabs p={p} tab={tab} setTab={setTab} variant="underline" />
           </div>
@@ -106,10 +121,28 @@ export function Links({ p }: { p: Portfolio }) {
           );
           // 44px minimum hit target — these rows are built for a thumb.
           const rowClass =
-            "flex min-h-[56px] items-center gap-3 px-[18px] py-3.5 no-underline";
+            "flex min-h-[56px] items-center gap-3 px-[18px] py-3 no-underline";
           const rowStyle = {
-            borderBottom: "1px solid var(--color-divider)",
+            borderBottom: "2px solid var(--color-divider)",
             color: "var(--color-ink)",
+            transition: "background 150ms ease-out, color 150ms ease-out",
+          };
+          // Direct style writes, not state — a re-render per touch would be
+          // wasteful and isn't needed since nothing else depends on this.
+          const clearPress = (e: React.PointerEvent<HTMLAnchorElement>) => {
+            e.currentTarget.style.background = "";
+            e.currentTarget.style.color = "";
+          };
+          const pressHandlers = {
+            onPointerDown: (e: React.PointerEvent<HTMLAnchorElement>) => {
+              e.currentTarget.style.background = "var(--color-accent)";
+              e.currentTarget.style.color = "#fff";
+            },
+            onPointerUp: clearPress,
+            // A touch that ends in a scroll fires cancel, not up — without
+            // this a row can get stuck showing the accent colour.
+            onPointerCancel: clearPress,
+            onPointerLeave: clearPress,
           };
           return first ? (
             <a
@@ -120,6 +153,7 @@ export function Links({ p }: { p: Portfolio }) {
               onClick={() => record(handle, p.slug, s.id)}
               className={rowClass}
               style={rowStyle}
+              {...pressHandlers}
             >
               {inner}
             </a>
@@ -129,6 +163,7 @@ export function Links({ p }: { p: Portfolio }) {
               href={`${pageHref}?section=${s.id}`}
               className={rowClass}
               style={rowStyle}
+              {...pressHandlers}
             >
               {inner}
             </Link>

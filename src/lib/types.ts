@@ -178,7 +178,7 @@ export const THEMES: Array<{
   {
     id: "links",
     name: "Links",
-    desc: "Tabs over a stack of tappable rows",
+    desc: "A stack of tappable rows, thumb-sized",
     long: "One shareable page of rows, sized for a thumb. The link you put in a bio.",
     audiences: ["founders", "writers", "multi"],
   },

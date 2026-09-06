@@ -74,6 +74,44 @@ function revealRef(node: HTMLElement | null) {
   return () => io.disconnect();
 }
 
+/**
+ * How far below the sticky nav a chapter counts as "reached" — the same
+ * 128px as the `scroll-mt-32` on each chapter section, so a nav click and a
+ * plain scroll agree on which chapter is current.
+ */
+const SPY_OFFSET = 128;
+
+/**
+ * Many small steps rather than the single crossing at `threshold: 0` — the
+ * observer here exists only to wake the callback up often enough while
+ * scrolling, not to decide anything by itself (see the comment on `spyRef`).
+ */
+const SPY_THRESHOLDS = Array.from({ length: 21 }, (_, i) => i / 20);
+
+/**
+ * Every chapter section, in document order — which is reading order.
+ *
+ * Scrolled to the very bottom is forced to the last chapter outright, rather
+ * than left to the "top past the line" rule below: when trailing content
+ * after the last chapter (the timeline, the footer) is shorter than the
+ * viewport, the page runs out of scroll room before that chapter's own top
+ * ever reaches `SPY_OFFSET`, and the rule would otherwise leave the
+ * *second*-to-last chapter active even at maximum scroll.
+ */
+function currentChapterId(doc: Document): string {
+  const sections = Array.from(doc.querySelectorAll<HTMLElement>('[id^="chapter-"]'));
+  if (sections.length === 0) return "";
+  const scroller = doc.scrollingElement ?? doc.documentElement;
+  if (scroller.scrollTop + scroller.clientHeight >= scroller.scrollHeight - 1) {
+    return sections[sections.length - 1].id;
+  }
+  let current = sections[0].id;
+  for (const section of sections) {
+    if (section.getBoundingClientRect().top <= SPY_OFFSET) current = section.id;
+  }
+  return current;
+}
+
 export function Site({ p }: { p: Portfolio }) {
   const all = visibleSections(p);
   const options = tabs(p);
@@ -85,23 +123,55 @@ export function Site({ p }: { p: Portfolio }) {
   const [active, setActive] = useState("");
   const current = active || chapters[0]?.id || "";
 
-  // Same root problem as revealRef, and the same fix — built from the
-  // observed node's own window, implicit root rather than an explicit
+  // Same root problem as revealRef, and the same fix for the window — built
+  // from the observed node's own, implicit root rather than an explicit
   // scrolling element. setState runs from the observer's callback, never
   // from an effect body.
+  //
+  // The first version used `rootMargin: "-45% 0px -45% 0px"` — a thin band
+  // across the vertical *centre* of the viewport — and set `active` to
+  // whichever chapter last reported `isIntersecting: true`. That is a
+  // one-way ratchet: nothing intersects a centred band at the very top of
+  // the page (the hero and numbers row push every chapter below it) or at
+  // the very bottom (past the last chapter), so the callback simply stops
+  // firing there, and `active` is stuck on whatever fired last — concretely,
+  // scrolling from "Writing" back up to the hero left "Writing" highlighted
+  // instead of reverting to "Work".
+  //
+  // The decision itself is `currentChapterId`, below: not "is this chapter
+  // centred", but "has this chapter's heading reached the line just under
+  // the sticky nav, and is it the last one that has." That rule is
+  // monotonic and self-correcting in both directions — at the top, no
+  // chapter has reached the line, so the first one wins by default;
+  // anywhere in between, the most recent one to cross wins, which is
+  // exactly the one being read — and it re-reads every chapter's live
+  // position fresh each time rather than accumulating from a stream of
+  // booleans, so it can't get stuck on a stale answer the way the centred
+  // band did.
+  //
+  // The observer configured here is deliberately *not* shrunk to that line
+  // with a `rootMargin`, even though that would seem like the obvious way
+  // to get a crossing event exactly when it matters: tested directly against
+  // this component, in the builder's nested iframe, a margined root —
+  // pixel or percentage, explicit or implicit — simply stops delivering
+  // after the first callback. A real scroll (mouse wheel, not just a
+  // `scrollTop` assignment) inside the canvas produced exactly one entry, at
+  // `observe()` time, and then silence all the way to the bottom of the
+  // page. An *unmargined* root kept delivering throughout the same scroll.
+  // Whatever the underlying engine reason, the fix that survives contact
+  // with the builder's iframe is to stop asking the observer to do the
+  // measuring at all: it only exists to wake this callback up often enough
+  // while scrolling — `SPY_THRESHOLDS` is many steps rather than one so
+  // that "often enough" holds for a chapter shorter than the viewport,
+  // which is every chapter in practice — and `currentChapterId` does the
+  // actual measuring itself, straight off `getBoundingClientRect()`, which
+  // carries none of the root's baggage.
   const spyRef = useCallback((node: HTMLElement | null) => {
     const view = node?.ownerDocument.defaultView;
     if (!node || !view || typeof view.IntersectionObserver === "undefined") return;
     const io = new view.IntersectionObserver(
-      (entries) => {
-        for (const entry of entries) {
-          if (entry.isIntersecting) setActive((entry.target as HTMLElement).id);
-        }
-      },
-      {
-        rootMargin: "-45% 0px -45% 0px",
-        threshold: 0,
-      },
+      () => setActive(currentChapterId(node.ownerDocument)),
+      { threshold: SPY_THRESHOLDS },
     );
     io.observe(node);
     return () => io.disconnect();

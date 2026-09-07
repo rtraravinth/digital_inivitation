@@ -14,12 +14,14 @@
  * glyph (see their issue #11372) at LinkedIn's own request, citing brand
  * guidelines that bar third-party use of the mark without prior approval —
  * a materially stricter stance than the marks Simple Icons does distribute.
- * There is no CC0 path to copy in, so `linkedin.com` / `lnkd.in` links fall
- * through to the generic `link` glyph like any other unrecognised host.
+ * There is no CC0 path to copy in, and this repo does not redistribute the
+ * mark itself, so `linkedin.com` / `lnkd.in` links resolve to `briefcase`
+ * below — a generic profile glyph, not a reproduction of the "in" mark.
+ * Do not "fix" this by pasting the LinkedIn logo back in.
  *
- * The six non-brand glyphs are drawn in this project's own stroke idiom (see
- * `PasswordField.tsx`), because Simple Icons has no generic icons. An entry
- * says which it is, and `LinkIcon` renders it accordingly.
+ * The seven non-brand glyphs are drawn in this project's own stroke idiom
+ * (see `PasswordField.tsx`), because Simple Icons has no generic icons. An
+ * entry says which it is, and `LinkIcon` renders it accordingly.
  */
 import type { CSSProperties } from "react";
 
@@ -77,6 +79,13 @@ export const ICONS = {
     kind: "stroke",
     path: "M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1.3 1.3 M14 10a4 4 0 0 0-5.7 0l-3 3A4 4 0 0 0 11 18.7l1.3-1.3",
   },
+  // Stands in for LinkedIn: see the file-level comment above for why there is
+  // no brand mark here.
+  briefcase: {
+    name: "Profile",
+    kind: "stroke",
+    path: "M3 8h18v12H3z M8 8V5.5A1.5 1.5 0 0 1 9.5 4h5A1.5 1.5 0 0 1 16 5.5V8 M3 13h18",
+  },
 } satisfies Record<string, IconDef>;
 
 export type IconId = keyof typeof ICONS;
@@ -96,6 +105,11 @@ const HOSTS: Array<[string, IconId]> = [
   ["youtube.com", "youtube"],
   ["youtu.be", "youtube"],
   ["snapchat.com", "snapchat"],
+  // LinkedIn resolves to the generic `briefcase` glyph, not a brand mark:
+  // Simple Icons dropped the LinkedIn icon at LinkedIn's own request over
+  // trademark enforcement, and this repo does not redistribute it.
+  ["linkedin.com", "briefcase"],
+  ["lnkd.in", "briefcase"],
   ["x.com", "x"],
   ["twitter.com", "x"],
   ["facebook.com", "facebook"],

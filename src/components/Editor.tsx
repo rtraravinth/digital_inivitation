@@ -7,6 +7,7 @@ import { TabField } from "./TabField";
 import { TagEditor } from "./TagEditor";
 import { PortfolioExtras, PortraitField, SectionExtras } from "./SectionExtras";
 import { PublishedLock } from "./PublishedLock";
+import { LinkIcon, iconFor } from "@/lib/icons";
 import { usePortfolios } from "@/lib/store";
 import {
   previewPath,
@@ -27,7 +28,11 @@ function LinkList({ links }: { links: LinkItem[] }) {
   return (
     <div className="flex flex-col gap-1.5 text-sm">
       {links.map((l) => (
-        <span key={l.id}>
+        // The same glyph the published page will draw, resolved the same
+        // way: the row above this one picks it, and a read-only rendering
+        // that ignored the pick would be showing a different link.
+        <span key={l.id} className="flex items-center gap-1.5">
+          <LinkIcon id={iconFor(l)} />
           {l.label || "Untitled"} — {l.url || "—"}
         </span>
       ))}

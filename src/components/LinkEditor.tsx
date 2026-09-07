@@ -1,5 +1,6 @@
 "use client";
 
+import { IconSelect } from "@/components/IconSelect";
 import { newId } from "@/lib/store";
 import type { LinkItem } from "@/lib/types";
 
@@ -18,7 +19,8 @@ export function LinkEditor({
     <div className="flex flex-col gap-1.5">
       {links.map((link) => (
         <div key={link.id} className="flex items-start gap-1.5">
-          <div className="grid flex-1 gap-1.5 sm:grid-cols-[170px_1fr]">
+          <div className="grid flex-1 gap-1.5 sm:grid-cols-[40px_170px_1fr]">
+            <IconSelect link={link} onChange={(icon) => update(link.id, { icon })} />
             <input
               className="input"
               value={link.label}

@@ -46,6 +46,11 @@ class LinkItem(StrictCamelModel):
     id: str = Field(max_length=64)
     label: str = Field(default="", max_length=200)
     url: str = Field(default="", max_length=2000)
+    #: Overrides the icon the frontend would work out from `url`. Empty means
+    #: "decide from the address", which is what almost every link wants. Not
+    #: constrained to a known set: an id this build does not recognise renders
+    #: the generic glyph, the same way an unknown theme falls back to Editorial.
+    icon: str = Field(default="", max_length=32)
 
 
 class ProfileOut(CamelModel):

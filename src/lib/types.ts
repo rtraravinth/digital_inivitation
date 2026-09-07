@@ -2,6 +2,10 @@ export type LinkItem = {
   id: string;
   label: string;
   url: string;
+  /** Overrides the icon `iconFor()` would derive from `url`. Absent means
+   *  "decide from the address" — which is what almost every link wants, so
+   *  the field is optional and `normalize()` leaves it alone. */
+  icon?: string;
 };
 
 /** Optional extras — they feed the published page's stat and timeline panels. */

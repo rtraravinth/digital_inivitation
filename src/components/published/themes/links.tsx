@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { LinkIcon, iconFor } from "@/lib/icons";
 import type { Portfolio } from "@/lib/types";
 import { pageAddress } from "@/lib/types";
 import {
@@ -88,6 +89,7 @@ export function Links({ p }: { p: Portfolio }) {
         {shown.map((s, i) => {
           const first = s.links[0];
           const sub = first?.label || s.description || s.tab;
+          const rowIcon = first ? iconFor(first) : "link";
           const inner = (
             <>
               <span
@@ -97,7 +99,11 @@ export function Links({ p }: { p: Portfolio }) {
                   boxShadow: "inset 0 0 0 2px var(--color-divider)",
                 }}
               >
-                {String(i + 1).padStart(2, "0")}
+                {rowIcon === "link" ? (
+                  String(i + 1).padStart(2, "0")
+                ) : (
+                  <LinkIcon id={rowIcon} size={20} />
+                )}
               </span>
               <span className="flex min-w-0 flex-col gap-0.5">
                 <span className="font-heading text-[15px] font-extrabold leading-tight">

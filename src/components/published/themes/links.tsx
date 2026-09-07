@@ -188,8 +188,9 @@ export function Links({ p }: { p: Portfolio }) {
                 href={href(cta.url)}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="btn btn-primary flex-1"
+                className="btn btn-primary inline-flex items-center gap-2 flex-1"
               >
+                <LinkIcon id={iconFor(cta)} />
                 {cta.label}
               </a>
             )}

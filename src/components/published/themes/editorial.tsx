@@ -1,5 +1,6 @@
 "use client";
 
+import { LinkIcon, iconFor } from "@/lib/icons";
 import type { Portfolio, Section } from "@/lib/types";
 import { pageAddress } from "@/lib/types";
 import {
@@ -266,9 +267,10 @@ export function Editorial({ p }: { p: Portfolio }) {
             href={href(cta.url)}
             target="_blank"
             rel="noopener noreferrer"
-            className="btn md:ml-auto"
+            className="btn inline-flex items-center gap-2 md:ml-auto"
             style={{ background: "var(--color-bg)", color: "var(--color-ink)" }}
           >
+            <LinkIcon id={iconFor(cta)} />
             {cta.label}
           </a>
         )}

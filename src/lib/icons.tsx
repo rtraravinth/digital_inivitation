@@ -22,6 +22,19 @@
  * The seven non-brand glyphs are drawn in this project's own stroke idiom
  * (see `PasswordField.tsx`), because Simple Icons has no generic icons. An
  * entry says which it is, and `LinkIcon` renders it accordingly.
+ *
+ * That makes the set optically uneven on purpose: twenty-three solid fills
+ * beside seven 1.7px strokes, so a link row can show a near-solid block next
+ * to a hairline. It stands. A brand mark restroked as line art is no longer
+ * the mark — the fill is the thing being reproduced — and redrawing the seven
+ * generics as fills is a design exercise with no right answer available here:
+ * a filled envelope, a filled globe and a filled chain link each want a
+ * decision about counters and weight that nothing in this file can settle.
+ * Evening it up in either direction costs more than the unevenness does.
+ *
+ * `medium` brings its own corner radius into a design system whose
+ * `--radius-*` is 0 on purpose, for the same reason: the rounded square is
+ * the mark. Not a bug, and not something to square off.
  */
 import type { CSSProperties } from "react";
 
@@ -178,6 +191,13 @@ export function isIconId(value: string): value is IconId {
  * Never throws. It runs during render in every theme, and the editor writes a
  * half-typed address on every keystroke — `new URL()` would throw on most of
  * them.
+ *
+ * The reading of the address below — trim, prefix a scheme, treat an `@` with
+ * no slash as an email, drop leading slashes — is the twin of `href()` in
+ * `src/components/published/shared.tsx`, which turns the same string into a
+ * real `href`. Duplicated deliberately: `shared.tsx` imports this module, so
+ * the dependency cannot run the other way without a cycle. Change one and
+ * check the other.
  */
 export function iconFor(link: { url: string; icon?: string }): IconId {
   const override = link.icon?.trim() ?? "";

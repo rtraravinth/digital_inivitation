@@ -127,11 +127,18 @@ Glyphs are `aria-hidden` with their name carried in text; the trigger's
 
 `HeaderLinks`' three variants and `SectionLinks`, both in
 `published/shared.tsx`, each render `<LinkIcon id={iconFor(l)} />` before the
-label at 16px, `flex-none`, inside an `inline-flex items-center gap-2`. That
-covers Editorial, Poster and Site through the buttons variant, Résumé through
-the inline variant, and `SectionDetail` — artboard 1d — through
-`SectionLinks`. The glyphs inherit the surrounding colour, so no theme needs
-per-icon colour work.
+label at 16px and `flex-none`, at the design system's own 6px icon gap — the
+`.btn` variants inherit it from `.btn`, the inline variant asks for
+`gap-1.5`.
+
+*Corrected after the build:* the buttons variant covers Site alone, and the
+inline variant Résumé alone. Editorial and Links reach neither: each draws one
+CTA of its own from `p.header.links[0]`, and those two were given the glyph
+directly. Poster renders no header links at all — a pre-existing gap the icons
+neither create nor close. `SectionLinks` covers sections on Editorial, Poster,
+Résumé and Site, plus `SectionDetail` — artboard 1d; Links draws its own rows
+instead. The glyphs inherit the surrounding colour, so no theme needs per-icon
+colour work.
 
 One theme changes beyond what it inherits. The Links rows open with a
 numbered badge — `01`, `02` — in

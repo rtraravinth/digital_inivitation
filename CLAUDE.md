@@ -28,7 +28,7 @@ because the connection never arrives. Pass flags through when you need them:
 ```
 npm run build
 npm run lint
-cd backend && .venv/bin/python -m pytest    # 269 tests (.venv/Scripts on Windows)
+cd backend && .venv/bin/python -m pytest    # 271 tests (.venv/Scripts on Windows)
 ```
 
 `NEXT_PUBLIC_API_URL` points the frontend at the API; see
@@ -85,7 +85,13 @@ your browser keeps hitting the stale server on 3000. Kill it (`taskkill //F
   theme while the editor writes a half-typed address on every keystroke.
   Hostname matching is on the registrable domain, never a substring, or
   `mysite.com/instagram-clone` takes the Instagram mark. Adding a brand is one
-  line in `ICONS` and one in `HOSTS`.
+  line in `ICONS` and one in `HOSTS` — **except LinkedIn.** Simple Icons
+  permanently removed that mark at LinkedIn's own request over trademark
+  enforcement, so there is no CC0 path to copy and this repo does not
+  redistribute it; `linkedin.com` and `lnkd.in` resolve to the generic
+  `briefcase` glyph, display name "Profile". Do not add a LinkedIn icon. The
+  reasoning is in the `icons.tsx` file header, along with why twenty-three
+  solid brand marks sit beside seven stroked generics and stay that way.
 - `src/lib/seed.ts` — the five seeded portfolios. `backend/scripts/dump_seed.mjs`
   transpiles this file and writes `backend/app/seed_data.json`, so the seed is
   not maintained twice; re-run it whenever this changes.
@@ -387,6 +393,6 @@ claim to be the live page.
 - **Slugs are global.** Two accounts cannot both hold `rohan`, because the
   address is `facet.page/<slug>` with nothing in front of it. The create
   dialog surfaces the 409 as a message.
-- **The frontend has no test runner.** The backend has 269 pytest tests;
+- **The frontend has no test runner.** The backend has 271 pytest tests;
   changes here are checked with `npm run lint`, `npm run build` and by
   actually opening the app.

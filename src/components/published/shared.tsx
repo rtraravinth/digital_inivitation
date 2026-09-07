@@ -460,7 +460,15 @@ export function Kicker({ children }: { children: React.ReactNode }) {
   );
 }
 
-/** Seed URLs are written bare ("northwell.in"), so fill in a scheme. */
+/**
+ * Seed URLs are written bare ("northwell.in"), so fill in a scheme.
+ *
+ * Twin of `iconFor()` in `src/lib/icons.tsx`, which reads the same shapes — a
+ * bare host, a `mailto:`, an `@` with no slash, a leading slash — to pick a
+ * glyph rather than an address. Duplicated deliberately: this module imports
+ * `icons.tsx`, so the dependency cannot run the other way without a cycle.
+ * Change one and check the other.
+ */
 export function href(url: string) {
   const trimmed = url.trim();
   const lower = trimmed.toLowerCase();

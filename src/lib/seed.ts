@@ -67,7 +67,7 @@ const RAW: SeedPortfolio[] = [
       ],
       links: [
         { id: "h1", label: "Email", url: "rohan@northwell.in" },
-        { id: "h2", label: "LinkedIn", url: "/in/rohanmehta" },
+        { id: "h2", label: "LinkedIn", url: "/in/rohanmehta", icon: "briefcase" },
         { id: "h3", label: "Newsletter", url: "slowcompounding.in" },
       ],
     },

@@ -77,6 +77,15 @@ your browser keeps hitting the stale server on 3000. Kill it (`taskkill //F
   mask 0). It exists because the print code on `/stats` has to actually scan
   and the CSP rules out a CDN. Verified against published Reed–Solomon
   generator polynomials and by round-tripping through an independent decoder.
+- `src/lib/icons.tsx` — link icons. The brand marks are Simple Icons (CC0),
+  copied in as path data rather than added as a dependency: the published
+  page's CSP rules out a CDN and thirty paths cost ~15KB. `iconFor()` reads a
+  link's stored `icon` override, then its hostname, then falls back to a
+  generic glyph — and never throws, because it runs during render in every
+  theme while the editor writes a half-typed address on every keystroke.
+  Hostname matching is on the registrable domain, never a substring, or
+  `mysite.com/instagram-clone` takes the Instagram mark. Adding a brand is one
+  line in `ICONS` and one in `HOSTS`.
 - `src/lib/seed.ts` — the five seeded portfolios. `backend/scripts/dump_seed.mjs`
   transpiles this file and writes `backend/app/seed_data.json`, so the seed is
   not maintained twice; re-run it whenever this changes.

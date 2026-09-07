@@ -26,7 +26,8 @@
         {
           "id": "h2",
           "label": "LinkedIn",
-          "url": "/in/rohanmehta"
+          "url": "/in/rohanmehta",
+          "icon": "briefcase"
         },
         {
           "id": "h3",

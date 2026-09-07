@@ -685,7 +685,7 @@ export function HeaderLinks({
               href={href(l.url)}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-2"
+              className="inline-flex items-center gap-1.5"
               style={{ color: "var(--color-accent)" }}
             >
               <LinkIcon id={iconFor(l)} />
@@ -704,7 +704,7 @@ export function HeaderLinks({
           href={href(l.url)}
           target="_blank"
           rel="noopener noreferrer"
-          className={`btn btn-secondary inline-flex items-center gap-2 ${block ? "btn-block" : ""}`}
+          className={`btn btn-secondary ${block ? "btn-block" : ""}`}
         >
           <LinkIcon id={iconFor(l)} />
           {l.label}

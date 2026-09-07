@@ -193,14 +193,46 @@ export function Site({ p }: { p: Portfolio }) {
   // scroll-behavior would have to sit on the scroll container to work, and
   // the published wrapper is not one. Doing it here keeps it scoped to this
   // theme and lets the motion preference be honoured.
+  //
+  // It scrolls this document's own scroller rather than calling
+  // `scrollIntoView`, which walks *every* ancestor scrollport and does not
+  // stop at an iframe boundary: in the builder's canvas it scrolled the
+  // parent page too, aligning the iframe's top edge with the top of the
+  // window and taking the builder's own sticky header off screen. Scrolling
+  // `scrollingElement` cannot leave the frame. Same reason as the footer's
+  // back-to-top below.
+  //
+  // A manual scroll does not honour `scroll-margin`, so SPY_OFFSET is
+  // subtracted here — it is the same 128px the chapters carry as
+  // `scroll-mt-32` for the no-JS fragment path, and the same line the
+  // scroll-spy measures against, so the chapter a click lands on is the
+  // chapter the nav then marks.
   const jump = (event: React.MouseEvent<HTMLAnchorElement>, id: string) => {
-    const target = event.currentTarget.ownerDocument.getElementById(id);
-    if (!target) return;
+    const doc = event.currentTarget.ownerDocument;
+    const target = doc.getElementById(id);
+    const scroller = doc.scrollingElement;
+    const root = event.currentTarget.closest<HTMLElement>("[data-site-root]");
+    if (!target || !scroller) return;
     event.preventDefault();
-    const reduced = event.currentTarget.ownerDocument.defaultView?.matchMedia(
-      "(prefers-reduced-motion: reduce)",
-    ).matches;
-    target.scrollIntoView({ behavior: reduced ? "auto" : "smooth", block: "start" });
+    const view = doc.defaultView;
+    const reduced = view?.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    scroller.scrollTo({
+      top: Math.max(0, target.getBoundingClientRect().top + scroller.scrollTop - SPY_OFFSET),
+      behavior: reduced ? "auto" : "smooth",
+    });
+
+    // Recompute once the scroll settles. The observer only wakes the spy while
+    // ratios are changing, and a jump can finish without crossing another
+    // threshold step — so the nav kept marking the chapter you left. Clicking
+    // "Writing" scrolled to Writing and highlighted the one above it.
+    // `scrollend` is the exact signal; the timeout covers browsers without it.
+    if (!root || !view) return;
+    // Both, deliberately: `scrollend` is the exact signal but is not in every
+    // browser, and the timeout covers the ones without it. Whichever lands
+    // second recomputes the same answer, so a second call costs nothing.
+    const settle = () => setActive(currentChapterId(root));
+    view.addEventListener("scrollend", settle, { once: true });
+    view.setTimeout(settle, 700);
   };
 
   return (

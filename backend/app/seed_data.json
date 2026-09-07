@@ -32,7 +32,8 @@
         {
           "id": "h3",
           "label": "Newsletter",
-          "url": "slowcompounding.in"
+          "url": "slowcompounding.in",
+          "icon": "globe"
         }
       ],
       "numbers": [
@@ -96,12 +97,14 @@
           {
             "id": "s1l1",
             "label": "Company",
-            "url": "northwell.in"
+            "url": "northwell.in",
+            "icon": "globe"
           },
           {
             "id": "s1l2",
             "label": "Press",
-            "url": "northwell.in/press"
+            "url": "northwell.in/press",
+            "icon": "document"
           }
         ],
         "image": null,
@@ -118,7 +121,8 @@
           {
             "id": "s2l1",
             "label": "Company",
-            "url": "meridiansupply.in"
+            "url": "meridiansupply.in",
+            "icon": "globe"
           }
         ],
         "image": null,
@@ -135,12 +139,14 @@
           {
             "id": "s3l1",
             "label": "Read the letter",
-            "url": "slowcompounding.in"
+            "url": "slowcompounding.in",
+            "icon": "globe"
           },
           {
             "id": "s3l2",
             "label": "Subscribe",
-            "url": "slowcompounding.in/join"
+            "url": "slowcompounding.in/join",
+            "icon": "globe"
           }
         ],
         "image": null,
@@ -160,7 +166,8 @@
           {
             "id": "s4l1",
             "label": "How it works",
-            "url": "slowcompounding.in/advisory"
+            "url": "slowcompounding.in/advisory",
+            "icon": "document"
           },
           {
             "id": "s4l2",
@@ -182,7 +189,8 @@
           {
             "id": "s5l1",
             "label": "Where and when",
-            "url": "slowcompounding.in/clinic"
+            "url": "slowcompounding.in/clinic",
+            "icon": "calendar"
           }
         ],
         "image": null,
@@ -199,7 +207,8 @@
           {
             "id": "s6l1",
             "label": "Trust",
-            "url": "sanjeevanitrust.org"
+            "url": "sanjeevanitrust.org",
+            "icon": "globe"
           }
         ],
         "image": null,
@@ -258,7 +267,8 @@
           {
             "id": "i1l1",
             "label": "Deck",
-            "url": "northwell.in/deck"
+            "url": "northwell.in/deck",
+            "icon": "document"
           }
         ],
         "image": null,
@@ -275,7 +285,8 @@
           {
             "id": "i2l1",
             "label": "Deck",
-            "url": "meridiansupply.in/deck"
+            "url": "meridiansupply.in/deck",
+            "icon": "document"
           }
         ],
         "image": null,
@@ -340,7 +351,8 @@
         {
           "id": "ah2",
           "label": "Newsletter",
-          "url": "slowcompounding.in"
+          "url": "slowcompounding.in",
+          "icon": "globe"
         }
       ],
       "numbers": [],
@@ -357,7 +369,8 @@
           {
             "id": "a1l1",
             "label": "How it works",
-            "url": "slowcompounding.in/advisory"
+            "url": "slowcompounding.in/advisory",
+            "icon": "document"
           }
         ],
         "image": null,
@@ -374,7 +387,8 @@
           {
             "id": "a2l1",
             "label": "Read",
-            "url": "slowcompounding.in"
+            "url": "slowcompounding.in",
+            "icon": "globe"
           }
         ],
         "image": null,
@@ -391,7 +405,8 @@
           {
             "id": "a3l1",
             "label": "Where and when",
-            "url": "slowcompounding.in/clinic"
+            "url": "slowcompounding.in/clinic",
+            "icon": "calendar"
           }
         ],
         "image": null,
@@ -434,7 +449,8 @@
         {
           "id": "wh1",
           "label": "Newsletter",
-          "url": "slowcompounding.in"
+          "url": "slowcompounding.in",
+          "icon": "globe"
         }
       ],
       "numbers": [],
@@ -451,7 +467,8 @@
           {
             "id": "w1l1",
             "label": "Archive",
-            "url": "slowcompounding.in/archive"
+            "url": "slowcompounding.in/archive",
+            "icon": "document"
           }
         ],
         "image": null,
@@ -569,7 +586,8 @@
           {
             "id": "b1l1",
             "label": "Trust",
-            "url": "sanjeevanitrust.org"
+            "url": "sanjeevanitrust.org",
+            "icon": "globe"
           }
         ],
         "image": null,

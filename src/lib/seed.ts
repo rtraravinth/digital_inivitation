@@ -68,7 +68,7 @@ const RAW: SeedPortfolio[] = [
       links: [
         { id: "h1", label: "Email", url: "rohan@northwell.in" },
         { id: "h2", label: "LinkedIn", url: "/in/rohanmehta", icon: "briefcase" },
-        { id: "h3", label: "Newsletter", url: "slowcompounding.in" },
+        { id: "h3", label: "Newsletter", url: "slowcompounding.in", icon: "globe" },
       ],
     },
     sections: [
@@ -79,8 +79,8 @@ const RAW: SeedPortfolio[] = [
           "A cloud-kitchen company running eleven brands out of four Bengaluru facilities. Founded 2019, profitable since 2022, forty-two people on payroll.",
         tab: "Operating",
         links: [
-          { id: "s1l1", label: "Company", url: "northwell.in" },
-          { id: "s1l2", label: "Press", url: "northwell.in/press" },
+          { id: "s1l1", label: "Company", url: "northwell.in", icon: "globe" },
+          { id: "s1l2", label: "Press", url: "northwell.in/press", icon: "document" },
         ],
       },
       {
@@ -89,7 +89,9 @@ const RAW: SeedPortfolio[] = [
         description:
           "Cold-chain logistics for small food businesses that cannot afford their own fleet. Started as Northwell's own supply arm and spun out in 2023.",
         tab: "Operating",
-        links: [{ id: "s2l1", label: "Company", url: "meridiansupply.in" }],
+        links: [
+          { id: "s2l1", label: "Company", url: "meridiansupply.in", icon: "globe" },
+        ],
       },
       {
         id: "s3",
@@ -98,8 +100,8 @@ const RAW: SeedPortfolio[] = [
           "A fortnightly letter on household finance for people who don't work in finance. Eighty-two issues, 14,200 subscribers, no advertising.",
         tab: "Writing",
         links: [
-          { id: "s3l1", label: "Read the letter", url: "slowcompounding.in" },
-          { id: "s3l2", label: "Subscribe", url: "slowcompounding.in/join" },
+          { id: "s3l1", label: "Read the letter", url: "slowcompounding.in", icon: "globe" },
+          { id: "s3l2", label: "Subscribe", url: "slowcompounding.in/join", icon: "globe" },
         ],
         quote: {
           text: "The only letter about money my parents actually finish.",
@@ -113,7 +115,12 @@ const RAW: SeedPortfolio[] = [
           "SEBI-registered investment adviser to sixty households, fee-only, no commissions and no product sales. Taking four new families a year.",
         tab: "Advisory",
         links: [
-          { id: "s4l1", label: "How it works", url: "slowcompounding.in/advisory" },
+          {
+            id: "s4l1",
+            label: "How it works",
+            url: "slowcompounding.in/advisory",
+            icon: "document",
+          },
           { id: "s4l2", label: "Book an intro call", url: "cal.com/rohanmehta" },
         ],
       },
@@ -123,7 +130,14 @@ const RAW: SeedPortfolio[] = [
         description:
           "A free money clinic for gig workers, every Sunday morning in Indiranagar. Two hours, no appointment, whatever you want to ask. Running since 2022.",
         tab: "Community",
-        links: [{ id: "s5l1", label: "Where and when", url: "slowcompounding.in/clinic" }],
+        links: [
+          {
+            id: "s5l1",
+            label: "Where and when",
+            url: "slowcompounding.in/clinic",
+            icon: "calendar",
+          },
+        ],
       },
       {
         id: "s6",
@@ -131,7 +145,9 @@ const RAW: SeedPortfolio[] = [
         description:
           "On the board of a trust running three low-fee schools in north Karnataka. I chair the finance committee.",
         tab: "Community",
-        links: [{ id: "s6l1", label: "Trust", url: "sanjeevanitrust.org" }],
+        links: [
+          { id: "s6l1", label: "Trust", url: "sanjeevanitrust.org", icon: "globe" },
+        ],
       },
     ],
   },
@@ -157,7 +173,9 @@ const RAW: SeedPortfolio[] = [
         description:
           "Eleven brands, four facilities, profitable since 2022. ₹18 Cr revenue run rate.",
         tab: "Operating",
-        links: [{ id: "i1l1", label: "Deck", url: "northwell.in/deck" }],
+        links: [
+          { id: "i1l1", label: "Deck", url: "northwell.in/deck", icon: "document" },
+        ],
       },
       {
         id: "i2",
@@ -165,7 +183,9 @@ const RAW: SeedPortfolio[] = [
         description:
           "Cold-chain logistics, spun out of Northwell in 2023. Two hundred and forty customers.",
         tab: "Operating",
-        links: [{ id: "i2l1", label: "Deck", url: "meridiansupply.in/deck" }],
+        links: [
+          { id: "i2l1", label: "Deck", url: "meridiansupply.in/deck", icon: "document" },
+        ],
       },
       {
         id: "i3",
@@ -192,7 +212,7 @@ const RAW: SeedPortfolio[] = [
       tags: ["SEBI RIA", "Fee-only", "Writer"],
       links: [
         { id: "ah1", label: "Email", url: "rohan@slowcompounding.in" },
-        { id: "ah2", label: "Newsletter", url: "slowcompounding.in" },
+        { id: "ah2", label: "Newsletter", url: "slowcompounding.in", icon: "globe" },
       ],
     },
     sections: [
@@ -202,21 +222,37 @@ const RAW: SeedPortfolio[] = [
         description:
           "Fee-only, SEBI-registered, sixty households. Taking four new families a year.",
         tab: "Advisory",
-        links: [{ id: "a1l1", label: "How it works", url: "slowcompounding.in/advisory" }],
+        links: [
+          {
+            id: "a1l1",
+            label: "How it works",
+            url: "slowcompounding.in/advisory",
+            icon: "document",
+          },
+        ],
       },
       {
         id: "a2",
         title: "The Slow Compounding letter",
         description: "A fortnightly letter on household finance. Eighty-two issues.",
         tab: "Writing",
-        links: [{ id: "a2l1", label: "Read", url: "slowcompounding.in" }],
+        links: [
+          { id: "a2l1", label: "Read", url: "slowcompounding.in", icon: "globe" },
+        ],
       },
       {
         id: "a3",
         title: "The Sunday clinic",
         description: "Free, every Sunday morning in Indiranagar. No appointment.",
         tab: "Community",
-        links: [{ id: "a3l1", label: "Where and when", url: "slowcompounding.in/clinic" }],
+        links: [
+          {
+            id: "a3l1",
+            label: "Where and when",
+            url: "slowcompounding.in/clinic",
+            icon: "calendar",
+          },
+        ],
       },
     ],
   },
@@ -234,7 +270,9 @@ const RAW: SeedPortfolio[] = [
       description:
         "I write a fortnightly letter about household finance for people who don't work in finance.",
       tags: ["Writer", "Newsletter"],
-      links: [{ id: "wh1", label: "Newsletter", url: "slowcompounding.in" }],
+      links: [
+        { id: "wh1", label: "Newsletter", url: "slowcompounding.in", icon: "globe" },
+      ],
     },
     sections: [
       {
@@ -242,7 +280,14 @@ const RAW: SeedPortfolio[] = [
         title: "The Slow Compounding letter",
         description: "Eighty-two issues, 14,200 subscribers, no advertising.",
         tab: "The letter",
-        links: [{ id: "w1l1", label: "Archive", url: "slowcompounding.in/archive" }],
+        links: [
+          {
+            id: "w1l1",
+            label: "Archive",
+            url: "slowcompounding.in/archive",
+            icon: "document",
+          },
+        ],
       },
       {
         id: "w2",
@@ -291,7 +336,9 @@ const RAW: SeedPortfolio[] = [
         description:
           "Three low-fee schools in north Karnataka. Trustee since 2020, chair of the finance committee since 2022.",
         tab: "The trust",
-        links: [{ id: "b1l1", label: "Trust", url: "sanjeevanitrust.org" }],
+        links: [
+          { id: "b1l1", label: "Trust", url: "sanjeevanitrust.org", icon: "globe" },
+        ],
       },
       {
         id: "b2",

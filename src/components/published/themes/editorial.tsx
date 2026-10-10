@@ -28,25 +28,38 @@ import {
 
 /* ── 1a Editorial — tabs across a modular grid ────────────────────────── */
 
-/** One card in the Editorial grid. */
+/**
+ * One card in the Editorial grid.
+ *
+ * A rule across the top and nothing else. The card used to close itself on
+ * the right and the bottom as well, which drew a complete 1px lattice over
+ * the page: three columns of boxes that read as a table of contents rather
+ * than as a magazine, and left a half-filled last row ruled into empty cells.
+ * The column gap does that work now, so only the head of each column is
+ * stated.
+ */
 function SectionCard({ p, section }: { p: Portfolio; section: Section }) {
   return (
     <div
-      className={`flex flex-col gap-2.5 ${pad(p).card}`}
+      className={`flex flex-col items-start gap-3.5 ${pad(p).card}`}
       style={{
         background: "var(--color-bg)",
-        borderRight: "1px solid var(--color-divider)",
-        borderBottom: "1px solid var(--color-divider)",
+        borderTop: "2px solid var(--color-divider)",
       }}
     >
-      {section.image && <Media asset={section.image} className="mb-1 h-[150px] w-full" />}
+      {section.image && <Media asset={section.image} className="mb-2 h-[232px] w-full" />}
       <span className="card-kicker">{section.tab}</span>
       <SectionTitleLink
         p={p}
         section={section}
-        className="font-heading text-[21px] font-extrabold leading-tight hover:underline"
+        className="font-heading text-[28px] leading-[1.08] font-extrabold hover:underline"
       />
-      <p className="m-0 flex-1 text-sm opacity-80">{section.description}</p>
+      <p
+        className="m-0 flex-1 text-base leading-[1.6]"
+        style={{ color: "var(--color-neutral-800)" }}
+      >
+        {section.description}
+      </p>
       <SectionAside p={p} section={section} />
       <SectionLinks p={p} section={section} />
     </div>
@@ -71,10 +84,7 @@ export function Editorial({ p }: { p: Portfolio }) {
   }
 
   const cards = (
-    <div
-      className={`grid ${gridCols(p)}`}
-      style={{ borderRight: "1px solid var(--color-divider)" }}
-    >
+    <div className={`grid gap-x-12 gap-y-16 px-6 py-16 md:px-10 ${gridCols(p)}`}>
       {shown.map((s) => (
         <SectionCard key={s.id} p={p} section={s} />
       ))}
@@ -83,38 +93,59 @@ export function Editorial({ p }: { p: Portfolio }) {
 
   return (
     <div style={groundStyle(p)}>
-
-      <div className="grid gap-12 px-6 pb-8 pt-10 md:grid-cols-[1fr_380px] md:px-10">
-        <div>
+      <div className="grid gap-14 px-6 pt-20 pb-16 md:grid-cols-[1fr_440px] md:px-10 md:pt-24">
+        <div className="flex flex-col items-start">
           {p.header.current && <Kicker>{p.header.current}</Kicker>}
-          <h1 className="m-0 mb-4 leading-[1.02]" style={headline("clamp(40px, 6vw, 64px)")}>
+          <h1
+            className="m-0 leading-[0.9]"
+            style={{
+              ...headline("clamp(52px, 8vw, 104px)"),
+              letterSpacing: "-0.045em",
+            }}
+          >
             {p.header.name}
           </h1>
-          <p className="m-0 mb-5 max-w-[44ch] text-lg">{p.header.description}</p>
-          <div className="flex flex-wrap gap-2">
+          <p
+            className="m-0 mt-9 max-w-[44ch] text-xl leading-[1.5]"
+            style={{ color: "var(--color-neutral-800)" }}
+          >
+            {p.header.description}
+          </p>
+          {/* Underlined words rather than filled chips: the tags are a
+              standfirst under the headline, not four buttons. */}
+          <div className="mt-10 flex flex-wrap gap-x-7 gap-y-3">
             {p.header.tags.map((t, i) => (
-              <span key={t} className={`tag ${i === 0 ? "tag-accent" : "tag-neutral"}`}>
+              <span
+                key={t}
+                className="pb-1 text-[15px]"
+                style={
+                  i === 0
+                    ? { fontWeight: 700, borderBottom: "3px solid var(--color-accent)" }
+                    : {
+                        fontWeight: 500,
+                        color: "var(--color-neutral-800)",
+                        borderBottom: "1px solid var(--color-divider)",
+                      }
+                }
+              >
                 {t}
               </span>
             ))}
           </div>
         </div>
         {/* 1d puts the portrait at 96px square on a phone. */}
-        <div
-          className="h-24 w-24 md:h-[260px] md:w-auto"
-        >
-          <Media
-            asset={p.header.portrait}
-            className="h-full w-full"
-            caption="portrait — 3:4, b&amp;w"
-          />
+        <div className="h-24 w-24 md:h-[540px] md:w-auto">
+          <Media asset={p.header.portrait} className="h-full w-full" caption="portrait — 4:5" />
         </div>
       </div>
 
       {nav === "tabs" && (
         <div
-          className="flex gap-7 overflow-x-auto px-6 md:px-10"
-          style={{ borderBottom: "2px solid var(--color-divider)" }}
+          className="flex gap-9 overflow-x-auto px-6 md:px-10"
+          style={{
+            borderTop: "2px solid var(--color-divider)",
+            borderBottom: "2px solid var(--color-divider)",
+          }}
         >
           <Tabs p={p} tab={tab} setTab={setTab} variant="underline" />
         </div>
@@ -122,12 +153,10 @@ export function Editorial({ p }: { p: Portfolio }) {
 
       {nav === "lens" && (
         <div
-          className="flex flex-wrap items-center gap-3 px-6 py-3 md:px-10"
+          className="flex flex-wrap items-center gap-3 px-6 py-4 md:px-10"
           style={{ borderBottom: "2px solid var(--color-divider)" }}
         >
-          <span className="text-[12px]" style={{ color: "var(--color-neutral-700)" }}>
-            Showing
-          </span>
+          <span className="mono-label">Showing</span>
           <span className="tag tag-accent">{tab}</span>
         </div>
       )}
@@ -136,20 +165,16 @@ export function Editorial({ p }: { p: Portfolio }) {
       <div
         className={`grid ${
           nav === "rail"
-            ? "lg:grid-cols-[220px_1fr]"
+            ? "lg:grid-cols-[240px_1fr]"
             : numbers.length > 0
-              ? "lg:grid-cols-[1fr_340px]"
+              ? "lg:grid-cols-[1fr_320px]"
               : ""
         }`}
-        style={{ borderBottom: "2px solid var(--color-divider)" }}
       >
         {nav === "rail" && (
           <div
-            className="p-4"
-            style={{
-              background: "var(--color-surface)",
-              borderRight: "2px solid var(--color-divider)",
-            }}
+            className="px-6 py-10 md:pl-10"
+            style={{ borderRight: "2px solid var(--color-divider)" }}
           >
             {railTabs.map((t, i) => {
               const on = t === tab;
@@ -159,18 +184,17 @@ export function Editorial({ p }: { p: Portfolio }) {
                   key={t}
                   type="button"
                   onClick={() => setTab(t)}
-                  className="flex w-full cursor-pointer items-center gap-3 py-2.5 text-left text-sm"
+                  className="flex min-h-[52px] w-full cursor-pointer items-center gap-3.5 py-3 text-left text-base"
                   style={{
                     borderBottom: "1px solid var(--color-divider)",
                     color: on ? "var(--color-accent)" : "inherit",
                     fontWeight: on ? 800 : 400,
+                    transition: "color 160ms var(--ease-out)",
                   }}
                 >
-                  <span className="font-heading text-[11px] font-extrabold opacity-55">
-                    {String(i + 1).padStart(2, "0")}
-                  </span>
+                  <span className="mono-label">{String(i + 1).padStart(2, "0")}</span>
                   <span>{t}</span>
-                  <span className="ml-auto text-[11px] opacity-55">{count}</span>
+                  <span className="mono-label ml-auto">{count}</span>
                 </button>
               );
             })}
@@ -182,15 +206,15 @@ export function Editorial({ p }: { p: Portfolio }) {
             {chapters.map((c) => (
               <div key={c.tab}>
                 <div
-                  className="px-6 py-3 md:px-10"
+                  className="px-6 py-4 md:px-10"
                   style={{
-                    background: "var(--color-surface)",
+                    borderTop: "2px solid var(--color-divider)",
                     borderBottom: "1px solid var(--color-divider)",
                   }}
                 >
                   <h6 className="m-0">{c.tab}</h6>
                 </div>
-                <div className={`grid ${gridCols(p)}`}>
+                <div className={`grid gap-x-12 gap-y-16 px-6 py-16 md:px-10 ${gridCols(p)}`}>
                   {c.sections.map((s) => (
                     <SectionCard key={s.id} p={p} section={s} />
                   ))}
@@ -203,20 +227,29 @@ export function Editorial({ p }: { p: Portfolio }) {
         )}
 
         {numbers.length > 0 && nav !== "rail" && (
-          <div className="p-6">
-            <h6 className="mb-3.5">By the numbers</h6>
+          <div
+            className="px-6 py-16 md:px-10 lg:pl-10"
+            style={{ borderLeft: "1px solid var(--color-divider)" }}
+          >
+            <h6 className="mb-6">By the numbers</h6>
             {numbers.map((n) => (
               <div
                 key={n.id}
-                className="py-3"
+                className="flex flex-col gap-1 py-5"
                 style={{ borderBottom: "1px solid var(--color-divider)" }}
               >
-                <div className="font-heading text-[30px] font-extrabold leading-none">
+                <div
+                  className="font-heading font-extrabold"
+                  style={{
+                    ...headline("42px"),
+                    lineHeight: 0.86,
+                    letterSpacing: "-0.035em",
+                    color: "var(--color-accent)",
+                  }}
+                >
                   {n.value}
                 </div>
-                <div className="text-xs" style={{ color: "var(--color-neutral-700)" }}>
-                  {n.label}
-                </div>
+                <div className="mono-label">{n.label}</div>
               </div>
             ))}
           </div>
@@ -227,28 +260,25 @@ export function Editorial({ p }: { p: Portfolio }) {
       {numbers.length > 0 && nav === "rail" && <StatRow p={p} />}
 
       {dates.length > 0 && (
-        <div className="px-6 py-8 md:px-10">
-          <h6 className="mb-4">Timeline</h6>
-          <div
-            className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6"
-            style={{ borderTop: "2px solid var(--color-divider)" }}
-          >
+        <div
+          className="px-6 py-16 md:px-10 md:py-20"
+          style={{ borderTop: "2px solid var(--color-divider)" }}
+        >
+          <h6 className="mb-8">Timeline</h6>
+          <div className="grid grid-cols-2 gap-x-10 gap-y-10 md:grid-cols-3 lg:grid-cols-4">
             {dates.map((e) => (
               <div
                 key={e.id}
-                className="px-3.5 pb-5 pt-4"
-                style={{
-                  background: "var(--color-bg)",
-                  borderRight: "1px solid var(--color-divider)",
-                }}
+                className="flex flex-col gap-2.5 pt-5"
+                style={{ borderTop: "2px solid var(--color-divider)" }}
               >
                 <div
-                  className="font-heading mb-1.5 text-base font-extrabold"
-                  style={{ color: "var(--color-accent)" }}
+                  className="font-heading text-3xl font-extrabold"
+                  style={{ letterSpacing: "-0.03em", color: "var(--color-accent)" }}
                 >
                   {e.year}
                 </div>
-                <div className="text-[13px] leading-snug">{e.text}</div>
+                <div className="text-base leading-[1.45]">{e.text}</div>
               </div>
             ))}
           </div>
@@ -256,32 +286,41 @@ export function Editorial({ p }: { p: Portfolio }) {
       )}
 
       <div
-        className="flex flex-col items-start gap-6 px-6 py-7 md:flex-row md:items-center md:px-10"
+        className="flex flex-col items-start gap-10 px-6 py-16 md:flex-row md:items-end md:px-10 md:py-20"
         style={{ background: "var(--color-accent)", color: "var(--color-bg)" }}
       >
-        <div className="font-heading max-w-[22ch] text-[26px] font-extrabold leading-[1.15]">
-          Working on something that needs a steady hand on the numbers?
-        </div>
-        {cta && showContact && (
-          <a
-            href={href(cta.url)}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="btn md:ml-auto"
-            style={{ background: "var(--color-bg)", color: "var(--color-ink)" }}
+        <div className="flex flex-col gap-5">
+          <span className="mono-label" style={{ color: "inherit", opacity: 0.75 }}>
+            Get in touch
+          </span>
+          <div
+            className="font-heading max-w-[20ch] font-extrabold"
+            style={{ ...headline("46px"), lineHeight: 1.04, letterSpacing: "-0.035em" }}
           >
-            <LinkIcon id={iconFor(cta)} />
-            {cta.label}
-          </a>
-        )}
-        <span
-          className={`btn ${cta && showContact ? "" : "md:ml-auto"}`}
-          style={{ borderColor: "var(--color-bg)", color: "var(--color-bg)" }}
-        >
-          {pageAddress(handle, p.slug)}
-        </span>
+            Working on something that needs a steady hand on the numbers?
+          </div>
+        </div>
+        <div className="flex flex-wrap items-center gap-3.5 md:ml-auto">
+          {cta && showContact && (
+            <a
+              href={href(cta.url)}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="btn min-h-[52px] px-6"
+              style={{ background: "var(--color-bg)", color: "var(--color-ink)" }}
+            >
+              <LinkIcon id={iconFor(cta)} size={18} />
+              {cta.label}
+            </a>
+          )}
+          <span
+            className="btn min-h-[52px] px-6"
+            style={{ borderColor: "var(--color-bg)", color: "var(--color-bg)" }}
+          >
+            {pageAddress(handle, p.slug)}
+          </span>
+        </div>
       </div>
     </div>
   );
 }
-

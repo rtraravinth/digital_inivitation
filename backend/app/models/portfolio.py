@@ -54,6 +54,7 @@ def default_layout() -> dict[str, Any]:
         "density": "standard",
         "scale": "default",
         "tracking": DEFAULT_TRACKING,
+        "photo": "colour",
     }
 
 

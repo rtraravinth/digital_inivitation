@@ -7,6 +7,7 @@ import {
   DEFAULT_TRACKING,
   DENSITIES,
   GROUNDS,
+  PHOTO_TREATMENTS,
   ROLE_NAVS,
   THEMES,
   TYPE_SCALES,
@@ -238,12 +239,28 @@ export function ColourControl({ p, onChange }: { p: Portfolio; onChange: Recipe 
       </p>
 
       <div className="border-divider border-t pt-3.5">
-        <div className="mb-2 flex items-center gap-2.5">
-          <span className="text-xs font-extrabold">Photography</span>
-          <span className="tag tag-neutral ml-auto">Black &amp; white</span>
+        <h6 className="mb-2.5">Photography</h6>
+        <div className="seg mb-2">
+          {PHOTO_TREATMENTS.map((t) => (
+            <label key={t.id} className="seg-opt">
+              <input
+                type="radio"
+                name={`photo-${group}`}
+                checked={p.layout.photo === t.id}
+                onChange={() =>
+                  onChange((prev) => ({
+                    ...prev,
+                    layout: { ...prev.layout, photo: t.id },
+                  }))
+                }
+              />
+              {t.name}
+            </label>
+          ))}
         </div>
         <p className="text-neutral-700 m-0 text-[11px]">
-          Every image on the page is printed in grayscale.
+          Every image on the published page, including the portrait. Your own
+          thumbnails in here and on the account page stay black and white.
         </p>
       </div>
     </>

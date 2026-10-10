@@ -22,6 +22,48 @@ import {
   previewPath,
 } from "@/lib/types";
 
+/**
+ * The page's own chrome glyphs — an outbound arrow, a chevron, a download
+ * mark. Deliberately NOT in `ICONS`: that record backs the editor's icon
+ * picker and `ICON_LIST`, and a visitor's chevron is not something an author
+ * should be offered for a link. They replace the `↗ › ↓` characters the
+ * themes used to print, which took whatever size and weight the surrounding
+ * face happened to give them and sat off the text baseline in half the
+ * fourteen headline faces.
+ */
+const UI_PATHS = {
+  out: "M7 17 17 7M8 7h9v9",
+  up: "M12 20V5m-6 6 6-6 6 6",
+  chevron: "m9 6 6 6-6 6",
+  download: "M12 3v12m-5-4 5 5 5-5M4 20h16",
+} as const;
+
+export function UiIcon({
+  id,
+  size = 17,
+}: {
+  id: keyof typeof UI_PATHS;
+  size?: number;
+}) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.75}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+      focusable="false"
+      className="flex-none"
+    >
+      <path d={UI_PATHS[id]} />
+    </svg>
+  );
+}
+
 export const HATCH =
   "repeating-linear-gradient(45deg,#d7d3d3 0 6px,#eae9e9 6px 12px)";
 
@@ -141,6 +183,8 @@ export function groundStyle(p: Portfolio): CSSProperties {
     fontFamily: "var(--font-body)",
     // Read by globals.css's heading rule and by headline() below.
     "--tracking": p.layout.tracking || DEFAULT_TRACKING,
+    // Read by `.published-photo`, which every theme's images go through.
+    "--photo-filter": p.layout.photo === "bw" ? "grayscale(1) contrast(1.08)" : "none",
     "--type-scale": String(scale.factor),
     background: "var(--color-bg)",
     color: "var(--color-ink)",
@@ -197,9 +241,6 @@ export function allDates(p: Portfolio) {
     .sort((a, b) => a.year.localeCompare(b.year));
 }
 
-/** A rule between cells on the accent field: the page's own paper, thinned. */
-const RULE_ON_ACCENT = "1px solid color-mix(in srgb, var(--color-bg) 25%, transparent)";
-
 /**
  * The numbers row.
  *
@@ -220,42 +261,52 @@ export function StatRow({
 }) {
   const nums = allNumbers(p);
   if (nums.length === 0) return null;
+  const shown = nums.slice(0, 8);
   const background = onAccent ? "var(--color-accent)" : "var(--color-bg)";
-  const rule = onAccent ? RULE_ON_ACCENT : "1px solid var(--color-divider)";
+  // A hairline between columns, and nothing around the outside. The row used
+  // to close every cell on all four sides, which turned five figures into a
+  // spreadsheet and left the last row of a partly-filled grid ruled into
+  // empty boxes.
+  const rule = onAccent
+    ? "1px solid color-mix(in srgb, var(--color-bg) 30%, transparent)"
+    : "1px solid var(--color-divider)";
   return (
-    // Cell borders rather than gap-bleed: a partly-filled last row would
-    // otherwise show the divider ground as empty grey blocks.
     <div
-      className="grid grid-cols-2 md:grid-cols-4"
+      className="grid grid-cols-2 px-6 md:grid-cols-4 md:px-10"
       style={{
         background,
         borderTop: onAccent ? "none" : "2px solid var(--color-divider)",
       }}
     >
-      {nums.slice(0, 8).map((n) => (
+      {shown.map((n, i) => (
         <div
           key={n.id}
-          className={onAccent ? "px-6 py-8" : "px-5 py-6"}
-          style={{ background, borderRight: rule, borderBottom: rule }}
+          className="flex flex-col gap-1.5 py-10"
+          style={{
+            background,
+            // No rule on the first cell of a row, so the row opens flush left
+            // against the page's own margin like every other block.
+            paddingLeft: i % 2 === 0 ? 0 : 20,
+            paddingRight: 20,
+            borderLeft: i % 2 === 0 ? "none" : rule,
+          }}
         >
           <div
-            className="font-heading font-extrabold leading-none"
+            className="font-heading font-extrabold"
             style={{
-              fontSize: big ? 40 : 32,
-              color: onAccent
-                ? "var(--color-bg)"
-                : big
-                  ? "var(--color-accent)"
-                  : "inherit",
+              ...headline(big ? "68px" : "56px"),
+              lineHeight: 0.86,
+              letterSpacing: "-0.04em",
+              color: onAccent ? "var(--color-bg)" : "var(--color-accent)",
             }}
           >
             {n.value}
           </div>
           <div
-            className="mt-1 text-xs"
+            className="mono-label"
             style={{
               color: onAccent
-                ? "color-mix(in srgb, var(--color-bg) 80%, transparent)"
+                ? "color-mix(in srgb, var(--color-bg) 78%, transparent)"
                 : "var(--color-neutral-700)",
             }}
           >
@@ -276,9 +327,9 @@ export function visibleSections(p: Portfolio): Section[] {
 
 /** Density is a padding scale; it changes how much fits on a screen. */
 const DENSITY_PAD: Record<Density, { card: string; page: string; row: string }> = {
-  airy: { card: "p-8", page: "px-8 py-10 md:px-12", row: "py-5" },
-  standard: { card: "p-6", page: "px-6 py-8 md:px-10", row: "py-3.5" },
-  dense: { card: "p-4", page: "px-4 py-5 md:px-6", row: "py-2" },
+  airy: { card: "pt-6", page: "px-6 py-16 md:px-16 md:py-24", row: "py-7" },
+  standard: { card: "pt-5", page: "px-6 py-12 md:px-14 md:py-18", row: "py-5" },
+  dense: { card: "pt-4", page: "px-5 py-8 md:px-10 md:py-12", row: "py-3" },
 };
 
 export function pad(p: Portfolio) {
@@ -351,13 +402,23 @@ export function LensGate({
 }) {
   const options = tabs(p);
   return (
-    <div className={`mx-auto max-w-[760px] ${padClass ?? pad(p).page}`}>
-      <h1 className="m-0 mb-3 leading-[1.05]" style={headline("40px")}>{p.header.name}</h1>
-      <p className="mb-8 max-w-[46ch] text-lg" style={{ color: "var(--color-neutral-800)" }}>
+    <div className={`mx-auto max-w-[860px] ${padClass ?? pad(p).page}`}>
+      <h1
+        className="m-0 mb-5 leading-[0.94]"
+        style={{ ...headline("clamp(40px, 7vw, 72px)"), letterSpacing: "-0.04em" }}
+      >
+        {p.header.name}
+      </h1>
+      <p
+        className="mb-14 max-w-[46ch] text-xl leading-[1.5]"
+        style={{ color: "var(--color-neutral-800)" }}
+      >
         {p.header.description}
       </p>
-      <h6 className="mb-3.5">What brings you here?</h6>
-      <div className="grid gap-0.5 sm:grid-cols-2" style={{ background: "var(--color-divider)" }}>
+      <h6 className="mb-5">What brings you here?</h6>
+      {/* Per-cell borders, not gap over a coloured ground: a partly-filled
+          last row would otherwise show the divider colour as empty blocks. */}
+      <div className="grid sm:grid-cols-2">
         {options.map((t) => {
           const count = visibleSections(p).filter((s) => s.tab === t).length;
           return (
@@ -365,11 +426,17 @@ export function LensGate({
               key={t}
               type="button"
               onClick={() => setTab(t)}
-              className="flex cursor-pointer flex-col items-start gap-1 p-5 text-left"
-              style={{ background: "var(--color-bg)" }}
+              className="group flex min-h-[104px] cursor-pointer flex-col items-start justify-center gap-1.5 py-6 pr-6 text-left"
+              style={{
+                background: "var(--color-bg)",
+                borderTop: "2px solid var(--color-divider)",
+                transition: "color 160ms var(--ease-out)",
+              }}
             >
-              <span className="font-heading text-lg font-extrabold">{t}</span>
-              <span className="text-[12px]" style={{ color: "var(--color-neutral-700)" }}>
+              <span className="font-heading text-2xl font-extrabold group-hover:text-[var(--color-accent)]">
+                {t}
+              </span>
+              <span className="mono-label" style={{ color: "var(--color-neutral-700)" }}>
                 {count} {count === 1 ? "entry" : "entries"}
               </span>
             </button>
@@ -393,9 +460,14 @@ export function Tabs({
    * "underline" rules a scrolling flex row; "block" is Poster's solid tab on
    * the accent field; "segment" is the same underline in a segmented control,
    * where the cells are grid tracks rather than flex items.
+   *
+   * All three clear 44px, which the underline row did not: it was a 14px
+   * label with 14px of padding, so the row a visitor navigates the whole page
+   * with was a 38px target on the theme most people open on a phone.
    */
   variant: "underline" | "block" | "segment";
 }) {
+  const counts = visibleSections(p);
   return (
     <>
       {tabs(p).map((t) => {
@@ -406,42 +478,62 @@ export function Tabs({
               key={t}
               type="button"
               onClick={() => setTab(t)}
-              className="font-heading flex-none cursor-pointer whitespace-nowrap px-4 py-2.5 text-[13px] font-extrabold"
+              className="font-heading flex h-14 flex-none cursor-pointer items-center whitespace-nowrap px-6 text-base font-extrabold"
               style={{
                 background: on ? "var(--color-bg)" : "transparent",
                 color: on ? "var(--color-ink)" : "inherit",
-                opacity: on ? 1 : 0.75,
+                opacity: on ? 1 : 0.72,
+                transition: "opacity 160ms var(--ease-out)",
               }}
             >
               {t}
             </button>
           );
         }
+        if (variant === "segment") {
+          return (
+            <button
+              key={t}
+              type="button"
+              onClick={() => setTab(t)}
+              // A grid item's automatic minimum size is its content size, so
+              // five tab labels would overrun their 1fr tracks, overlap and
+              // push the page wider than the viewport. `min-w-0` plus
+              // `overflow-hidden` drops that minimum to zero (CSS Grid §6.6)
+              // and lets the label clip with an ellipsis inside its own
+              // column. Owned here rather than patched on from the parent, so
+              // the caller only picks a variant.
+              className="font-heading flex h-[52px] min-w-0 cursor-pointer items-center justify-center overflow-hidden text-sm font-extrabold text-ellipsis whitespace-nowrap"
+              style={{
+                color: on ? "var(--color-accent)" : "var(--color-neutral-700)",
+                boxShadow: on ? "inset 0 -3px 0 var(--color-accent)" : "none",
+                transition: "color 160ms var(--ease-out)",
+              }}
+            >
+              {t}
+            </button>
+          );
+        }
+        // The count is the one number the row earns: it says how much sits
+        // behind a tab before the visitor spends a tap finding out.
+        const count = counts.filter((x) => x.tab === t).length;
         return (
           <button
             key={t}
             type="button"
             onClick={() => setTab(t)}
-            className={`font-heading cursor-pointer py-3.5 text-sm font-extrabold ${
-              variant === "segment"
-                ? // A grid item's automatic minimum size is its content size,
-                  // so five tab labels would overrun their 1fr tracks, overlap
-                  // and push the page wider than the viewport. `min-w-0` plus
-                  // `overflow-hidden` drops that minimum to zero (CSS Grid
-                  // §6.6) and lets the label clip with an ellipsis inside its
-                  // own column. Owned here rather than patched on from the
-                  // parent, so the caller only picks a variant.
-                  "min-w-0 overflow-hidden text-ellipsis whitespace-nowrap"
-                : // flex-none + nowrap: the row scrolls sideways inside its own
-                  // overflow container rather than breaking a tab name in half.
-                  "flex-none whitespace-nowrap"
-            }`}
+            // flex-none + nowrap: the row scrolls sideways inside its own
+            // overflow container rather than breaking a tab name in half.
+            className="font-heading flex h-[60px] flex-none cursor-pointer items-center gap-2 text-lg font-extrabold whitespace-nowrap"
             style={{
               color: on ? "var(--color-accent)" : "var(--color-neutral-700)",
-              boxShadow: on ? "inset 0 -3px 0 var(--color-accent)" : "none",
+              boxShadow: on ? "inset 0 -4px 0 var(--color-accent)" : "none",
+              letterSpacing: "-0.01em",
+              transition: "color 160ms var(--ease-out)",
             }}
           >
             {t}
+            <span className="text-xs font-bold opacity-65">{count}</span>
           </button>
         );
       })}
@@ -451,12 +543,7 @@ export function Tabs({
 
 export function Kicker({ children }: { children: React.ReactNode }) {
   return (
-    <div
-      className="mb-3.5 text-[11px] uppercase tracking-[0.1em]"
-      style={{ color: "var(--color-accent)" }}
-    >
-      {children}
-    </div>
+    <div className="card-kicker mb-6">{children}</div>
   );
 }
 
@@ -484,7 +571,7 @@ export function SectionLinks({ p, section }: { p: Portfolio; section: Section })
   const record = useRecordClick();
   if (section.links.length === 0) return null;
   return (
-    <div className="flex flex-wrap gap-x-4 gap-y-1 text-[13px]">
+    <div className="flex flex-wrap gap-x-6 gap-y-2 text-sm">
       {section.links.map((l) => (
         <a
           key={l.id}
@@ -492,11 +579,11 @@ export function SectionLinks({ p, section }: { p: Portfolio; section: Section })
           target="_blank"
           rel="noopener noreferrer"
           onClick={() => record(handle, p.slug, section.id)}
-          className="inline-flex items-center gap-1.5"
+          className="published-link font-heading inline-flex min-h-[28px] items-center gap-2 font-bold"
           style={{ color: "var(--color-accent)" }}
         >
-          <LinkIcon id={iconFor(l)} />
-          {l.label || l.url} ↗
+          <LinkIcon id={iconFor(l)} size={17} />
+          <span className="published-link-text">{l.label || l.url}</span>
         </a>
       ))}
     </div>
@@ -520,13 +607,13 @@ export function Media({
       <img
         src={assetSrc(asset)}
         alt={asset.name}
-        className={`grayscale-photo object-cover ${className}`}
+        className={`published-photo object-cover ${className}`}
       />
     );
   }
   return (
     <div
-      className={`grayscale-photo flex items-end p-2.5 ${className}`}
+      className={`flex items-end p-2.5 ${className}`}
       style={{ background: HATCH }}
     >
       {caption && <span className="text-[10px] text-neutral-700">{caption}</span>}
@@ -542,16 +629,16 @@ export function SectionAside({ p, section }: { p: Portfolio; section: Section })
     <>
       {section.quote?.text && (
         <blockquote
-          className="m-0 py-1 pl-3.5 text-[15px] italic"
+          className="m-0 py-0.5 pl-5 text-[17px] leading-[1.45] italic"
           style={{ borderLeft: "3px solid var(--color-accent)" }}
         >
           “{section.quote.text}”
           {section.quote.attribution && (
             <footer
-              className="mt-1 text-[12px] not-italic"
+              className="mono-label mt-2 not-italic"
               style={{ color: "var(--color-neutral-700)" }}
             >
-              — {section.quote.attribution}
+              {section.quote.attribution}
             </footer>
           )}
         </blockquote>
@@ -561,10 +648,11 @@ export function SectionAside({ p, section }: { p: Portfolio; section: Section })
           href={assetSrc(section.file)}
           download={section.file.name}
           onClick={() => record(handle, p.slug, section.id)}
-          className="btn btn-secondary self-start"
-          style={{ fontSize: 12, padding: "4px 10px" }}
+          className="btn btn-secondary min-h-[38px] self-start"
+          style={{ fontSize: 13 }}
         >
-          ↓ {section.file.name}
+          <UiIcon id="download" size={16} />
+          {section.file.name}
         </a>
       )}
     </>

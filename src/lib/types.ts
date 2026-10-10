@@ -281,6 +281,24 @@ export const DENSITIES: Array<{ id: Density; name: string }> = [
   { id: "dense", name: "Dense — more per screen" },
 ];
 
+/**
+ * How photographs are printed on the published page.
+ *
+ * "colour" is the default and was not always: every image used to run through
+ * `grayscale(1) contrast(1.08)` with no way out, because the Modernist system
+ * called for black-and-white photography. That reads as a print convention
+ * from a long way back on a page whose whole job is showing somebody's work,
+ * so the treatment became the author's to pick. Stored portfolios that never
+ * chose one get "colour" — this is a deliberate change of look for existing
+ * pages, not a backfill of what they had.
+ */
+export type PhotoTreatment = "colour" | "bw";
+
+export const PHOTO_TREATMENTS: Array<{ id: PhotoTreatment; name: string }> = [
+  { id: "colour", name: "Colour" },
+  { id: "bw", name: "Black & white" },
+];
+
 /** The headline scale multiplies each theme's own display size. */
 export type TypeScale = "compact" | "default" | "display";
 
@@ -299,6 +317,7 @@ export type Layout = {
   scale: TypeScale;
   /** Any CSS letter-spacing value; the published page reads it as a token. */
   tracking: string;
+  photo: PhotoTreatment;
 };
 
 export function defaultLayout(): Layout {
@@ -308,6 +327,7 @@ export function defaultLayout(): Layout {
     density: "standard",
     scale: "default",
     tracking: DEFAULT_TRACKING,
+    photo: "colour",
   };
 }
 
@@ -358,6 +378,7 @@ export function normalize(p: Portfolio): Portfolio {
       density: layout.density ?? "standard",
       scale: layout.scale ?? "default",
       tracking: layout.tracking ?? DEFAULT_TRACKING,
+      photo: layout.photo ?? "colour",
     },
     header: {
       ...emptyHeader(),

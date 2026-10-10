@@ -28,6 +28,7 @@ async def test_create_blank_portfolio_starts_with_one_empty_section(auth_client)
         "density": "standard",
         "scale": "default",
         "tracking": "-0.015em",
+        "photo": "colour",
     }
     assert len(body["sections"]) == 1
     assert body["sections"][0]["title"] == ""

@@ -40,6 +40,10 @@
   --radius-md: 0px;
   --radius-lg: 0px;
 
+  /* One easing for every transition in the product: a fast start that settles
+     rather than the symmetric ease-out the browser defaults to. */
+  --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
+
   --shadow-sm: 0 1px 2px color-mix(in srgb, #2d2b2b 14%, transparent);
   --shadow-md: 0 3px 10px color-mix(in srgb, #2d2b2b 16%, transparent);
   --shadow-lg: 0 12px 32px color-mix(in srgb, #2d2b2b 22%, transparent);
@@ -129,14 +133,30 @@
     color: color-mix(in srgb, var(--color-ink) 55%, transparent);
   }
 
-  /* The small uppercase Archivo labels that mark every structural slot. */
+  /* The small uppercase Archivo labels that mark every structural slot.
+     11px rather than 10px, and neutral-700 rather than -600: at 10px the old
+     label sat around 3.5:1 on the light ground, which is under AA for text
+     that small, and it read as a caption from a print manual rather than as
+     part of the page. */
   .mono-label {
     font-family: var(--font-heading);
     font-weight: 800;
-    font-size: 10px;
-    letter-spacing: 0.1em;
+    font-size: 11px;
+    letter-spacing: 0.14em;
     text-transform: uppercase;
-    color: var(--color-neutral-600);
+    color: var(--color-neutral-700);
+  }
+
+  /* The same label in the accent, over a card or a chapter. Used by the
+     themes and by the section detail page; it had call sites and no rule
+     until now, so it was rendering as plain 15px body text. */
+  .card-kicker {
+    font-family: var(--font-heading);
+    font-weight: 800;
+    font-size: 11px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--color-accent);
   }
 
   .hr {
@@ -146,8 +166,18 @@
     background: var(--color-divider);
   }
 
+  /* Owner-side chrome — the account page's portrait, the editor's thumbnails.
+     These stay black-and-white whatever the portfolio picks: they are
+     interface, not the published page. */
   .grayscale-photo {
     filter: grayscale(1) contrast(1.08);
+  }
+
+  /* A photograph on the published page. The filter is a variable rather than
+     a class swap because `groundStyle()` already writes the page's whole look
+     onto one wrapper, and every theme draws its images through `Media`. */
+  .published-photo {
+    filter: var(--photo-filter, none);
   }
 
   /* — buttons — */
@@ -445,14 +475,97 @@
     margin-top: 0.5rem;
   }
 
+  /* A link inside a published section. The rule sweeps in from the left on
+     hover rather than switching on, which is the one place the published page
+     spends motion on something small. `text-decoration` cannot be animated,
+     so the underline is a gradient background sized from 0. */
+  .published-link-text {
+    background-image: linear-gradient(currentColor, currentColor);
+    background-repeat: no-repeat;
+    background-position: 0 100%;
+    background-size: 0 2px;
+    transition: background-size 160ms var(--ease-out);
+  }
+  .published-link:hover .published-link-text,
+  .published-link:focus-visible .published-link-text {
+    background-size: 100% 2px;
+  }
+
+  /* Résumé's figures band, under the masthead.
+
+     Per-cell rules rather than `gap` over a coloured ground, for the reason
+     the whole system avoids gap rules: a partly-filled last row shows the
+     ground as empty blocks. The rule is dropped on whichever cell opens a
+     row so the first figure stays flush with the page's own margin — which
+     is why the reset is written once per breakpoint rather than once in
+     total. The cell count changes at `md`, so `2n + 1` stops being the
+     answer there and `4n + 1` becomes it. */
+  .resume-stats {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .resume-stats > * {
+    border-left: 1px solid var(--color-divider);
+    padding-left: 1.25rem;
+  }
+  .resume-stats > :nth-child(2n + 1) {
+    border-left: 0;
+    padding-left: 0;
+  }
+  /* `data-cols` is set from the number of figures, so five of them read as
+     3 + 2 rather than 4 + 1 orphan. The count has to reach CSS as an
+     attribute rather than a variable: `grid-template-columns` would take a
+     variable happily, but `:nth-child()` would not, and the two have to
+     agree or a cell in the middle of a row loses its rule. */
+  @media (width >= 48rem) {
+    .resume-stats {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+    /* Equal specificity to the `4n + 1` reset below, so source order decides
+       and every cell gets its rule back before the row-opener loses it. */
+    .resume-stats > :nth-child(n) {
+      border-left: 1px solid var(--color-divider);
+      padding-left: 1.25rem;
+    }
+    .resume-stats > :nth-child(4n + 1) {
+      border-left: 0;
+      padding-left: 0;
+    }
+    .resume-stats[data-cols="3"] {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+    .resume-stats[data-cols="3"] > :nth-child(n) {
+      border-left: 1px solid var(--color-divider);
+      padding-left: 1.25rem;
+    }
+    .resume-stats[data-cols="3"] > :nth-child(3n + 1) {
+      border-left: 0;
+      padding-left: 0;
+    }
+    .resume-stats[data-cols="2"] {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+    .resume-stats[data-cols="2"] > :nth-child(2n + 1) {
+      border-left: 0;
+      padding-left: 0;
+    }
+    .resume-stats[data-cols="1"] {
+      grid-template-columns: minmax(0, 1fr);
+    }
+    .resume-stats[data-cols="1"] > :nth-child(n) {
+      border-left: 0;
+      padding-left: 0;
+    }
+  }
+
   /* Site's reveal on scroll. The observer adds `.in`; the escapes for print,
      reduced motion and no JavaScript all restore the finished state. */
   .reveal {
     opacity: 0;
-    transform: translateY(12px);
+    transform: translateY(22px);
     transition:
-      opacity 400ms ease-out,
-      transform 400ms ease-out;
+      opacity 420ms var(--ease-out),
+      transform 420ms var(--ease-out);
   }
   .reveal.in {
     opacity: 1;
@@ -465,6 +578,9 @@
   .reveal.in {
     opacity: 1;
     transform: none;
+    transition: none;
+  }
+  .published-link-text {
     transition: none;
   }
 }

@@ -61,6 +61,10 @@ DENSITIES: Final[tuple[str, ...]] = ("airy", "standard", "dense")
 TypeScale = Literal["compact", "default", "display"]
 TYPE_SCALES: Final[tuple[str, ...]] = ("compact", "default", "display")
 
+#: How photographs print on the published page. Mirrors ``PhotoTreatment`` in
+#: src/lib/types.ts; "colour" is the default for a layout that never set one.
+PhotoTreatment = Literal["colour", "bw"]
+
 PlanId = Literal["free", "pro"]
 PLANS: Final[tuple[str, ...]] = ("free", "pro")
 

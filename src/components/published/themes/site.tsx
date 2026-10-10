@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useState } from "react";
-import type { Portfolio } from "@/lib/types";
+import type { Density, Portfolio } from "@/lib/types";
 import {
   HeaderLinks,
   Media,
@@ -9,13 +9,26 @@ import {
   SectionLinks,
   SectionTitleLink,
   StatRow,
+  UiIcon,
   allDates,
   allNumbers,
   chaptersOf,
   groundStyle,
   headline,
-  pad,
 } from "../shared";
+
+/**
+ * How much air a chapter entry gets. Site reads the Layout panel's density
+ * control the same as Editorial does, but not through `pad()`: that helper's
+ * `card` value is the padding under Editorial's top rule, and applying it
+ * here alongside a vertical rhythm put `pt-*` and `py-*` on the same element
+ * with the winner decided by stylesheet order rather than by intent.
+ */
+const CHAPTER_PAD: Record<Density, string> = {
+  airy: "py-16",
+  standard: "py-12",
+  dense: "py-8",
+};
 
 /**
  * Reveal on scroll, wired in a ref callback rather than an effect.
@@ -238,24 +251,30 @@ export function Site({ p }: { p: Portfolio }) {
   return (
     <div data-site-root="" style={groundStyle(p)}>
       <nav
-        className="sticky top-0 z-10 flex flex-wrap items-center justify-between gap-x-6 gap-y-2 px-6 py-3 md:px-10"
+        className="sticky top-0 z-10 flex flex-wrap items-center justify-between gap-x-8 gap-y-2 px-6 py-2 md:px-10"
         style={{
           background: "var(--color-bg)",
           borderBottom: "2px solid var(--color-divider)",
         }}
       >
-        <span className="font-heading text-[15px] font-extrabold">{p.header.name}</span>
-        <div className="flex flex-wrap gap-x-5 gap-y-1">
+        <span
+          className="font-heading text-lg font-extrabold"
+          style={{ letterSpacing: "-0.02em" }}
+        >
+          {p.header.name}
+        </span>
+        <div className="flex flex-wrap gap-x-8 gap-y-1">
           {chapters.map((c) => (
             <a
               key={c.id}
               href={`#${c.id}`}
               onClick={(e) => jump(e, c.id)}
               aria-current={c.id === current ? "true" : undefined}
-              className="font-heading py-1 text-[13px] font-extrabold"
+              className="font-heading flex min-h-[44px] items-center text-[15px] font-extrabold"
               style={{
-                color: c.id === current ? "var(--color-accent)" : "var(--color-neutral-700)",
-                boxShadow: c.id === current ? "inset 0 -2px 0 var(--color-accent)" : "none",
+                color: c.id === current ? "var(--color-accent)" : "var(--color-neutral-800)",
+                boxShadow: c.id === current ? "inset 0 -3px 0 var(--color-accent)" : "none",
+                transition: "color 160ms var(--ease-out)",
               }}
             >
               {c.tab}
@@ -264,30 +283,40 @@ export function Site({ p }: { p: Portfolio }) {
         </div>
       </nav>
 
-      <header className="grid gap-8 px-6 py-14 md:grid-cols-[1.4fr_1fr] md:px-10">
-        <div ref={revealRef} className="reveal">
+      {/* The portrait runs to the right edge of the window rather than
+          stopping at the page's margin: it is the one full-bleed element on
+          the theme, and it is what stops the hero reading as a two-column
+          form. `pr-0` only on the wide layout, where there is a second
+          column at all. */}
+      <header className="grid gap-12 px-6 py-16 md:grid-cols-[1.3fr_1fr] md:items-end md:py-24 md:pr-0 md:pl-10">
+        <div ref={revealRef} className="reveal flex flex-col items-start">
+          {p.header.current && (
+            <div className="card-kicker mb-6">{p.header.current}</div>
+          )}
           <h1
-            className="font-heading m-0 font-extrabold leading-[0.95]"
-            style={headline("64px")}
+            className="font-heading m-0 max-w-[13ch] font-extrabold"
+            style={{
+              ...headline("clamp(44px, 6.5vw, 84px)"),
+              lineHeight: 0.94,
+              letterSpacing: "-0.045em",
+            }}
           >
             {p.header.name}
           </h1>
-          {p.header.current && (
-            <p className="m-0 mt-4 text-[17px]" style={{ color: "var(--color-neutral-800)" }}>
-              {p.header.current}
-            </p>
-          )}
           {p.header.description && (
-            <p className="m-0 mt-4 max-w-[52ch] text-sm leading-relaxed opacity-80">
+            <p
+              className="m-0 mt-8 max-w-[46ch] text-xl leading-[1.52]"
+              style={{ color: "var(--color-neutral-800)" }}
+            >
               {p.header.description}
             </p>
           )}
-          <div className="mt-6">
+          <div className="mt-10">
             <HeaderLinks p={p} />
           </div>
         </div>
         {p.header.portrait && (
-          <div ref={revealRef} className="reveal h-[280px] w-full md:h-full">
+          <div ref={revealRef} className="reveal h-[300px] w-full md:h-[560px]">
             <Media asset={p.header.portrait} className="h-full w-full" />
           </div>
         )}
@@ -304,43 +333,55 @@ export function Site({ p }: { p: Portfolio }) {
           key={c.id}
           id={c.id}
           ref={spyRef}
-          className="scroll-mt-32 px-6 pt-14 md:px-10"
+          className="grid scroll-mt-32 gap-x-14 gap-y-8 px-6 pt-24 md:grid-cols-[232px_minmax(0,1fr)] md:px-10"
         >
-          <h2
-            className="font-heading m-0 pb-3 font-extrabold"
-            style={{ ...headline("30px"), borderBottom: "2px solid var(--color-divider)" }}
-          >
-            {c.tab}
-          </h2>
-          <div
-            className="grid md:grid-cols-2"
-            style={{ borderTop: "1px solid var(--color-divider)" }}
-          >
+          {/* The chapter number is set at display size in the ink at 10%:
+              it marks where you are in the page without competing with the
+              first heading under it, which is what a full-width rule and a
+              30px title were both trying to do at once. */}
+          <div className="flex flex-col gap-2.5 md:sticky md:top-24 md:self-start">
+            <span
+              className="font-heading font-extrabold"
+              style={{
+                ...headline("96px"),
+                lineHeight: 0.8,
+                letterSpacing: "-0.05em",
+                color: "color-mix(in srgb, var(--color-ink) 12%, transparent)",
+              }}
+            >
+              {String(chapters.indexOf(c) + 1).padStart(2, "0")}
+            </span>
+            <span className="card-kicker">{c.tab}</span>
+          </div>
+          <div className="grid">
             {c.sections.map((s, i) => (
               <article
                 key={s.id}
                 ref={revealRef}
-                className={`reveal flex flex-col gap-2.5 ${pad(p).card} ${i === 0 ? "md:col-span-2" : ""}`}
+                className={`reveal grid items-start gap-x-11 gap-y-5 first:pt-0 md:grid-cols-[minmax(0,1fr)_300px] ${CHAPTER_PAD[p.layout.density]}`}
                 style={{
                   transitionDelay: `${Math.min(i, 6) * 60}ms`,
-                  borderRight: "1px solid var(--color-divider)",
                   borderBottom: "1px solid var(--color-divider)",
                 }}
               >
-                {s.image && (
-                  <Media
-                    asset={s.image}
-                    className={`mb-1 w-full ${i === 0 ? "h-[260px]" : "h-[160px]"}`}
-                  />
-                )}
+                <div className="flex flex-col items-start gap-3.5">
                 <SectionTitleLink
                   p={p}
                   section={s}
-                  className="font-heading text-[21px] font-extrabold leading-tight hover:underline"
+                  className="font-heading text-[30px] leading-[1.02] font-extrabold tracking-[-0.035em] hover:underline md:text-[42px]"
                 />
-                <p className="m-0 flex-1 text-sm opacity-80">{s.description}</p>
+                <p
+                  className="m-0 max-w-[54ch] text-[17px] leading-[1.62]"
+                  style={{ color: "var(--color-neutral-800)" }}
+                >
+                  {s.description}
+                </p>
                 <SectionAside p={p} section={s} />
                 <SectionLinks p={p} section={s} />
+                </div>
+                {s.image && (
+                  <Media asset={s.image} className="h-[220px] w-full md:order-last" />
+                )}
               </article>
             ))}
           </div>
@@ -348,32 +389,26 @@ export function Site({ p }: { p: Portfolio }) {
       ))}
 
       {dates.length > 0 && (
-        <section className="px-6 pt-14 md:px-10">
-          <h2
-            className="font-heading m-0 pb-3 font-extrabold"
-            style={{ ...headline("30px"), borderBottom: "2px solid var(--color-divider)" }}
-          >
-            Timeline
-          </h2>
-          <ol
-            className="m-0 grid list-none p-0 md:grid-flow-col md:auto-cols-fr"
-            style={{ borderTop: "1px solid var(--color-divider)" }}
-          >
+        <section className="px-6 pt-24 md:px-10">
+          <h6 className="mb-8">Timeline</h6>
+          <ol className="m-0 grid list-none grid-cols-2 gap-x-10 gap-y-10 p-0 md:grid-cols-4">
             {dates.map((d, i) => (
               <li
                 key={d.id}
                 ref={revealRef}
-                className="reveal px-5 py-6"
+                className="reveal flex flex-col gap-2.5 pt-5"
                 style={{
                   transitionDelay: `${Math.min(i, 6) * 60}ms`,
-                  borderRight: "1px solid var(--color-divider)",
-                  borderBottom: "1px solid var(--color-divider)",
+                  borderTop: "2px solid var(--color-divider)",
                 }}
               >
-                <div className="mono-label" style={{ color: "var(--color-accent)" }}>
+                <div
+                  className="font-heading text-3xl font-extrabold"
+                  style={{ letterSpacing: "-0.03em", color: "var(--color-accent)" }}
+                >
                   {d.year}
                 </div>
-                <p className="m-0 mt-1.5 text-sm">{d.text}</p>
+                <p className="m-0 text-base leading-[1.45]">{d.text}</p>
               </li>
             ))}
           </ol>
@@ -381,7 +416,7 @@ export function Site({ p }: { p: Portfolio }) {
       )}
 
       <footer
-        className="mt-14 flex flex-wrap items-center justify-between gap-4 px-6 py-10 md:px-10"
+        className="mt-24 flex flex-wrap items-center justify-between gap-6 px-6 py-12 md:px-10"
         style={{ borderTop: "2px solid var(--color-divider)" }}
       >
         <HeaderLinks p={p} />
@@ -393,10 +428,11 @@ export function Site({ p }: { p: Portfolio }) {
             const reduced = doc.defaultView?.matchMedia("(prefers-reduced-motion: reduce)").matches;
             doc.scrollingElement?.scrollTo({ top: 0, behavior: reduced ? "auto" : "smooth" });
           }}
-          className="font-heading text-[13px] font-extrabold"
+          className="font-heading flex min-h-[44px] items-center gap-2 text-[15px] font-extrabold"
           style={{ color: "var(--color-accent)" }}
         >
-          Back to top ↑
+          <UiIcon id="up" size={17} />
+          Back to top
         </a>
       </footer>
     </div>

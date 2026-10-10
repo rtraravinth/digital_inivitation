@@ -8,6 +8,7 @@ import {
   LensGate,
   Media,
   Tabs,
+  UiIcon,
   groundStyle,
   headline,
   href,
@@ -35,36 +36,50 @@ export function Links({ p }: { p: Portfolio }) {
       <div style={groundStyle(p)}>
         {/* Links sizes itself for a thumb rather than from the density
             control, so the gate takes the column's own padding. */}
-        <LensGate p={p} setTab={setTab} padClass="px-[18px] py-8" />
+        <LensGate p={p} setTab={setTab} padClass="px-5 py-10" />
       </div>
     );
   }
 
   return (
     <div style={groundStyle(p)}>
-
       <div className="mx-auto w-full max-w-[30rem]">
         <div
-          className="px-[18px] pb-4 pt-6"
+          className="px-5 pt-10 pb-6"
           style={{ borderBottom: "2px solid var(--color-divider)" }}
         >
           <div className="flex flex-col items-center text-center">
-            <div className="h-[96px] w-[96px] flex-none">
+            <div className="h-28 w-28 flex-none">
               <Media asset={p.header.portrait} className="h-full w-full" />
             </div>
-            <h2 className="m-0 mt-3.5" style={headline("24px")}>
+            <h2
+              className="m-0 mt-5"
+              style={{ ...headline("32px"), lineHeight: 1.02, letterSpacing: "-0.035em" }}
+            >
               {p.header.name}
             </h2>
             <p
-              className="m-0 mt-1 text-[13px]"
+              className="m-0 mt-2.5 max-w-[34ch] text-[15px] leading-[1.5]"
               style={{ color: "var(--color-neutral-800)" }}
             >
               {p.header.description}
             </p>
           </div>
-          <div className="mt-3 flex flex-wrap gap-1.5">
+          <div className="mt-5 flex flex-wrap justify-center gap-x-5 gap-y-2">
             {p.header.tags.map((t, i) => (
-              <span key={t} className={`tag ${i === 0 ? "tag-accent" : "tag-neutral"}`}>
+              <span
+                key={t}
+                className="pb-1 text-[13px]"
+                style={
+                  i === 0
+                    ? { fontWeight: 700, borderBottom: "3px solid var(--color-accent)" }
+                    : {
+                        fontWeight: 500,
+                        color: "var(--color-neutral-800)",
+                        borderBottom: "1px solid var(--color-divider)",
+                      }
+                }
+              >
                 {t}
               </span>
             ))}
@@ -92,45 +107,44 @@ export function Links({ p }: { p: Portfolio }) {
           const rowIcon = first ? iconFor(first) : "link";
           const inner = (
             <>
+              {/* 44px, not 34px: this tile is the visual anchor of a row a
+                  thumb is aiming at, and it now matches the minimum every
+                  other control on the page clears. */}
               <span
-                className="font-heading flex h-[34px] w-[34px] flex-none items-center justify-center text-xs font-extrabold"
+                className="font-heading flex h-11 w-11 flex-none items-center justify-center text-[13px] font-extrabold"
+                // Both the glyph and its rule are drawn from the row's own
+                // colour, so a press — which repaints the row in the accent
+                // and its ink in the page's paper — carries the tile with it
+                // instead of leaving an accent glyph on an accent field.
                 style={{
-                  color: "var(--color-accent)",
-                  boxShadow: "inset 0 0 0 2px var(--color-divider)",
+                  color: "inherit",
+                  boxShadow:
+                    "inset 0 0 0 2px color-mix(in srgb, currentColor 35%, transparent)",
                 }}
               >
                 {rowIcon === "link" ? (
                   String(i + 1).padStart(2, "0")
                 ) : (
-                  <LinkIcon id={rowIcon} size={20} />
+                  <LinkIcon id={rowIcon} size={21} />
                 )}
               </span>
-              <span className="flex min-w-0 flex-col gap-0.5">
-                <span className="font-heading text-[15px] font-extrabold leading-tight">
+              <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                <span className="font-heading text-[17px] leading-tight font-extrabold tracking-[-0.015em]">
                   {s.title}
                 </span>
-                <span
-                  className="truncate text-xs"
-                  style={{ color: "var(--color-neutral-700)" }}
-                >
-                  {sub}
-                </span>
+                <span className="truncate text-[13px] opacity-75">{sub}</span>
               </span>
-              <span
-                className="font-heading ml-auto pl-2 text-sm font-extrabold"
-                style={{ color: "var(--color-neutral-700)" }}
-              >
-                {first ? "↗" : "›"}
-              </span>
+              <UiIcon id={first ? "out" : "chevron"} size={20} />
             </>
           );
           // 44px minimum hit target — these rows are built for a thumb.
           const rowClass =
-            "flex min-h-[56px] items-center gap-3 px-[18px] py-3 no-underline";
+            "flex min-h-[76px] items-center gap-3.5 px-5 py-3.5 no-underline";
           const rowStyle = {
-            borderBottom: "2px solid var(--color-divider)",
+            borderBottom: "1px solid var(--color-divider)",
             color: "var(--color-ink)",
-            transition: "background 150ms ease-out, color 150ms ease-out",
+            transition:
+              "background 160ms var(--ease-out), color 160ms var(--ease-out)",
           };
           // Direct style writes, not state — a re-render per touch would be
           // wasteful and isn't needed since nothing else depends on this.
@@ -180,37 +194,35 @@ export function Links({ p }: { p: Portfolio }) {
 
         {showContact && (
           <div
-            className="flex gap-2 px-[18px] py-4"
-            style={{ borderBottom: "2px solid var(--color-divider)" }}
+            className="flex gap-2.5 px-5 py-5"
+            style={{ borderTop: "1px solid var(--color-divider)" }}
           >
             {cta && (
               <a
                 href={href(cta.url)}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="btn btn-primary flex-1"
+                className="btn btn-primary min-h-[52px] flex-1 justify-center"
               >
-                <LinkIcon id={iconFor(cta)} />
+                <LinkIcon id={iconFor(cta)} size={18} />
                 {cta.label}
               </a>
             )}
             <button
               type="button"
-              className={`btn btn-secondary ${cta ? "" : "flex-1"}`}
+              className={`btn btn-secondary min-h-[52px] justify-center ${cta ? "" : "flex-1"}`}
               onClick={() => saveContact(p, handle)}
             >
+              <UiIcon id="download" size={18} />
               Save contact
             </button>
           </div>
         )}
 
-        <div className="flex items-center gap-2 px-[18px] py-3.5">
-          <span className="text-[11px]" style={{ color: "var(--color-neutral-700)" }}>
-            {pageAddress(handle, p.slug)}
-          </span>
+        <div className="flex justify-center px-5 pt-1 pb-10">
+          <span className="mono-label">{pageAddress(handle, p.slug)}</span>
         </div>
       </div>
     </div>
   );
 }
-

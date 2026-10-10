@@ -15,6 +15,7 @@ from app.models.enums import (
     FontId,
     Ground,
     PortfolioStatus,
+    PhotoTreatment,
     RoleNav,
     ThemeId,
     TypeScale,
@@ -50,6 +51,7 @@ class Layout(StrictCamelModel):
     density: Density = "standard"
     scale: TypeScale = "default"
     tracking: str = Field(default=DEFAULT_TRACKING, max_length=32)
+    photo: PhotoTreatment = "colour"
 
 
 class HeaderOut(CamelModel):

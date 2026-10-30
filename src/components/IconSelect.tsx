@@ -187,7 +187,7 @@ export function IconSelect({
                   className="col-span-4 flex cursor-pointer items-center gap-2 px-2 py-2 text-left text-xs"
                   style={{
                     borderBottom: "1px solid var(--color-divider)",
-                    color: overridden ? "inherit" : "var(--color-accent)",
+                    color: overridden ? "inherit" : "var(--color-foil)",
                   }}
                   onClick={() => pick("")}
                   onKeyDown={move}
@@ -210,7 +210,7 @@ export function IconSelect({
                     title={ICONS[id].name}
                     aria-label={ICONS[id].name}
                     className="flex cursor-pointer flex-col items-center gap-1 px-1 py-2 text-[10px]"
-                    style={{ color: on ? "var(--color-accent)" : "inherit" }}
+                    style={{ color: on ? "var(--color-foil)" : "inherit" }}
                     onClick={() => pick(id)}
                     onKeyDown={move}
                   >

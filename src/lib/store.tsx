@@ -394,7 +394,7 @@ async function importAll(json: string): Promise<number> {
   } catch {
     throw new Error("That file is not valid JSON.");
   }
-  if (!Array.isArray(parsed)) throw new Error("That file is not a FACET export.");
+  if (!Array.isArray(parsed)) throw new Error("That file is not a Facet export.");
 
   const result = await api.post<{ imported: number }>("/import", {
     mode: "replace",

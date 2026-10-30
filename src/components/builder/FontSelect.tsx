@@ -96,11 +96,11 @@ export function FontSelect({
         <FontSample
           cssVar={current.cssVar}
           eager
-          className="text-xl font-extrabold leading-none"
+          className="text-xl leading-none"
         >
           {specimen}
         </FontSample>
-        <span className="font-heading truncate text-sm font-extrabold">
+        <span className="font-heading truncate text-sm">
           {current.name}
         </span>
         <span className="text-neutral-700 ml-auto flex-none pl-2 text-[11px]">
@@ -128,7 +128,7 @@ export function FontSelect({
             style={{
               top: "calc(100% + 2px)",
               background: "var(--color-divider)",
-              border: "2px solid var(--color-divider)",
+              border: "1px solid var(--color-divider)",
               display: "flex",
               flexDirection: "column",
               gap: 1,
@@ -157,12 +157,12 @@ export function FontSelect({
                   <FontSample
                     cssVar={face.cssVar}
                     eager={on}
-                    className="w-[38px] flex-none text-xl font-extrabold leading-none"
+                    className="w-[38px] flex-none text-xl leading-none"
                   >
                     {specimen}
                   </FontSample>
                   <span className="flex min-w-0 flex-col gap-0.5">
-                    <span className="font-heading truncate text-sm font-extrabold">
+                    <span className="font-heading truncate text-sm">
                       {face.name}
                     </span>
                     <span className="text-neutral-700 truncate text-[11px]">
@@ -170,9 +170,9 @@ export function FontSelect({
                     </span>
                   </span>
                   <span
-                    className="ml-auto flex-none pl-2 font-extrabold"
+                    className="ml-auto flex-none pl-2"
                     style={{
-                      color: on ? "var(--color-accent)" : "transparent",
+                      color: on ? "var(--color-foil)" : "transparent",
                     }}
                   >
                     ✓

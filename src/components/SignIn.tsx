@@ -77,20 +77,32 @@ export function SignIn() {
   }
 
   return (
-    <main className="mx-auto w-full max-w-[420px] px-6 py-16">
-      <p className="mono-label">Facet</p>
-      <h1 className="mt-2 text-[32px] leading-[1.1] font-extrabold">
-        {challenge ? "One more step" : mode === "in" ? "Sign in" : "Create an account"}
+    /* The title page. The product's name is set at half-title scale with
+       nothing above it — the name carries the page, and a small label over a
+       heading is the one device this world does not use. */
+    <main className="mx-auto w-full max-w-[440px] px-6 py-16 md:py-24">
+      <h1
+        className="font-heading m-0 text-[64px] leading-[0.9] md:text-[76px]"
+        style={{ letterSpacing: "-0.03em" }}
+      >
+        Facet
       </h1>
-      <p className="text-muted mt-3 text-[14px]">
+      <p className="caption-credit mt-6 mb-0">
+        A portfolio is a catalogue · one page per room
+      </p>
+
+      <hr className="hr mt-10" />
+
+      <h2 className="font-heading m-0 text-[25px] leading-[1.12]">
+        {challenge ? "One more step" : mode === "in" ? "Sign in" : "Create an account"}
+      </h2>
+      <p className="text-muted mt-3 mb-7 text-[14px]">
         {challenge
           ? `Enter the six-digit code from your authenticator app for ${challenge.email}. A recovery code works too.`
           : mode === "in"
             ? "Your portfolios, on every device you sign in from."
             : "One page with a header and as many sections as you need."}
       </p>
-
-      <hr className="hr" />
 
       <form onSubmit={submit} className="flex flex-col gap-4" noValidate>
         {challenge ? (
@@ -121,7 +133,7 @@ export function SignIn() {
                   autoFocus
                 />
                 {fieldError("name") && (
-                  <p className="mt-1 text-[12px]" style={{ color: "var(--color-accent)" }}>
+                  <p className="mt-1 text-[12px]" style={{ color: "var(--color-alert)" }}>
                     {fieldError("name")}
                   </p>
                 )}
@@ -147,7 +159,7 @@ export function SignIn() {
                   />
                 </div>
                 {fieldError("handle") ? (
-                  <p className="mt-1 text-[12px]" style={{ color: "var(--color-accent)" }}>
+                  <p className="mt-1 text-[12px]" style={{ color: "var(--color-alert)" }}>
                     {fieldError("handle")}
                   </p>
                 ) : (
@@ -174,7 +186,7 @@ export function SignIn() {
                 required
               />
               {fieldError("email") && (
-                <p className="mt-1 text-[12px]" style={{ color: "var(--color-accent)" }}>
+                <p className="mt-1 text-[12px]" style={{ color: "var(--color-alert)" }}>
                   {fieldError("email")}
                 </p>
               )}
@@ -196,7 +208,7 @@ export function SignIn() {
                 </p>
               )}
               {fieldError("password") && (
-                <p className="mt-1 text-[12px]" style={{ color: "var(--color-accent)" }}>
+                <p className="mt-1 text-[12px]" style={{ color: "var(--color-alert)" }}>
                   {fieldError("password")}
                 </p>
               )}
@@ -217,7 +229,7 @@ export function SignIn() {
                     on the first keystroke of a field still being filled is
                     noise. */}
                 {mismatch && (
-                  <p className="mt-1 text-[12px]" style={{ color: "var(--color-accent)" }}>
+                  <p className="mt-1 text-[12px]" style={{ color: "var(--color-alert)" }}>
                     Those two do not match.
                   </p>
                 )}
@@ -231,9 +243,15 @@ export function SignIn() {
           !fieldError("password") &&
           !fieldError("name") &&
           !fieldError("handle") && (
+          /* The alert ink, not a coloured bar down the left: the bar is the
+             callout tell, and a failure that has to be read wants contrast,
+             which this ink has at 5.21:1 on board. */
           <p
-            className="border-l-2 py-2 pl-3 text-[13px]"
-            style={{ borderColor: "var(--color-accent)" }}
+            className="m-0 pt-3 text-[13px]"
+            style={{
+              color: "var(--color-alert)",
+              borderTop: "1px solid color-mix(in srgb, var(--color-alert) 45%, transparent)",
+            }}
             role="alert"
           >
             {messageFor(error)}

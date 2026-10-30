@@ -144,8 +144,8 @@ function Row({
     >
       {children}
       <span
-        className="ml-auto font-extrabold"
-        style={{ color: on ? "var(--color-accent)" : "transparent" }}
+        className="ml-auto"
+        style={{ color: on ? "var(--color-foil)" : "transparent" }}
       >
         ✓
       </span>
@@ -155,7 +155,7 @@ function Row({
 
 const stack = {
   background: "var(--color-divider)",
-  borderBlock: "2px solid var(--color-divider)",
+  borderBlock: "1px solid var(--color-divider)",
 };
 
 export function ThemeControl({ p, onChange }: { p: Portfolio; onChange: Recipe }) {
@@ -174,7 +174,7 @@ export function ThemeControl({ p, onChange }: { p: Portfolio; onChange: Recipe }
           >
             <ThemeThumb theme={t.id} accent={p.accent} />
             <span className="flex flex-col gap-0.5">
-              <span className="font-heading text-sm font-extrabold">{t.name}</span>
+              <span className="font-heading text-sm">{t.name}</span>
               <span className="text-neutral-700 text-[11px]">{t.desc}</span>
             </span>
           </Row>
@@ -195,7 +195,8 @@ export function ColourControl({ p, onChange }: { p: Portfolio; onChange: Recipe 
     <>
       <h6 className="mb-1.5">Accent</h6>
       <p className="text-neutral-700 mb-2.5 text-xs">
-        One accent runs the page — buttons, kickers and the closing banner.
+        One accent runs the page — the primary action, the open plate&rsquo;s mark,
+        and the colophon.
       </p>
       <div className="mb-5">
         <ColourPicker

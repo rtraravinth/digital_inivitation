@@ -26,11 +26,11 @@ export function ThemePanel({
 }) {
   return (
     <aside
-      className="border-divider bg-bg fixed right-0 top-0 z-40 flex h-full w-full flex-col overflow-y-auto border-l-2 sm:w-[336px]"
+      className="border-divider bg-bg fixed right-0 top-0 z-40 flex h-full w-full flex-col overflow-y-auto border-l sm:w-[336px]"
       aria-label="Theme"
     >
-      <div className="border-divider flex items-center border-b-2 px-4 py-3">
-        <span className="font-heading text-[15px] font-extrabold">Theme</span>
+      <div className="border-divider flex items-center border-b px-4 py-3">
+        <span className="font-heading text-[15px]">Theme</span>
         <button type="button" className="btn btn-ghost ml-auto" onClick={onClose}>
           Close
         </button>

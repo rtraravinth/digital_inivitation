@@ -17,11 +17,11 @@ async def test_create_blank_portfolio_starts_with_one_empty_section(auth_client)
     body = response.json()
     assert body["status"] == "empty"
     assert body["theme"] == "editorial"
-    assert body["accent"] == "#ec3013"
-    assert body["ground"] == "light"
+    assert body["accent"] == "#b5261e"
+    assert body["ground"] == "dark"
     assert body["groundHex"] == ""
-    assert body["font"] == "archivo"
-    assert body["bodyFont"] == "archivo"
+    assert body["font"] == "bodoni-moda"
+    assert body["bodyFont"] == "schibsted-grotesk"
     assert body["layout"] == {
         "roleNav": "tabs",
         "grid": 2,
@@ -190,7 +190,7 @@ async def test_patch_sets_a_custom_ground_colour(auth_client, portfolio):
     assert body["groundHex"] == "#2b3a67"
     # The preset is an override target, not a replacement: it stays put so
     # clearing the custom colour has somewhere to fall back to.
-    assert body["ground"] == "light"
+    assert body["ground"] == "dark"
 
 
 async def test_patch_clears_a_custom_ground_back_to_the_preset(auth_client, portfolio):
@@ -275,10 +275,10 @@ async def test_headline_and_body_faces_are_set_apart(auth_client, portfolio):
     assert again.json()["bodyFont"] == "inter"
 
 
-async def test_body_font_defaults_to_archivo(auth_client, portfolio):
+async def test_body_font_defaults_to_the_house_grotesk(auth_client, portfolio):
     """Existing portfolios predate the column, so the default has to hold."""
     response = await auth_client.get(f"/api/v1/portfolios/{portfolio['id']}")
-    assert response.json()["bodyFont"] == "archivo"
+    assert response.json()["bodyFont"] == "schibsted-grotesk"
 
 
 async def test_patch_rejects_an_unknown_body_font(auth_client, portfolio):

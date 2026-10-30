@@ -1,6 +1,7 @@
 "use client";
 
 import { IconSelect } from "@/components/IconSelect";
+import { Glyph } from "@/lib/glyphs";
 import { newId } from "@/lib/store";
 import type { LinkItem } from "@/lib/types";
 
@@ -42,7 +43,7 @@ export function LinkEditor({
             aria-label={`Remove link ${link.label || "untitled"}`}
             onClick={() => onChange(links.filter((l) => l.id !== link.id))}
           >
-            ✕
+            <Glyph id="close" size={15} />
           </button>
         </div>
       ))}
@@ -53,7 +54,8 @@ export function LinkEditor({
         style={{ fontSize: 12, padding: "4px 10px" }}
         onClick={() => onChange([...links, { id: newId(), label: "", url: "" }])}
       >
-        + Add link
+        <Glyph id="plus" size={15} />
+        Add link
       </button>
     </div>
   );

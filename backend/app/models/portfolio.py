@@ -32,6 +32,9 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.db.base import Base, TimestampMixin, UUIDPrimaryKeyMixin
 from app.models.enums import (
     DEFAULT_ACCENT,
+    DEFAULT_BODY_FONT,
+    DEFAULT_FONT,
+    DEFAULT_GROUND,
     DEFAULT_TAB,
     DEFAULT_TRACKING,
     FONTS,
@@ -86,19 +89,27 @@ class Portfolio(UUIDPrimaryKeyMixin, TimestampMixin, Base):
 
     theme: Mapped[str] = mapped_column(String(24), nullable=False, default="editorial")
     accent: Mapped[str] = mapped_column(String(32), nullable=False, default=DEFAULT_ACCENT)
-    ground: Mapped[str] = mapped_column(String(16), nullable=False, default="light")
+    ground: Mapped[str] = mapped_column(
+        String(16), nullable=False, default=DEFAULT_GROUND, server_default=DEFAULT_GROUND
+    )
     # A custom ground colour, which wins over the preset named in `ground`.
     # Empty means "use the preset" — an empty string rather than NULL so a
     # PATCH can clear it, since a null there already means "not sent".
     ground_hex: Mapped[str] = mapped_column(
         String(7), nullable=False, default="", server_default=""
     )
-    font: Mapped[str] = mapped_column(String(24), nullable=False, default="archivo")
+    font: Mapped[str] = mapped_column(
+        String(24), nullable=False, default=DEFAULT_FONT, server_default=DEFAULT_FONT
+    )
     # The body face. Separate from `font`, which is the headline: the panel is
-    # called "Type pairing" and a pairing needs both halves. Defaults to
-    # Archivo, the Modernist body face, so an untouched portfolio is unchanged.
+    # called "Type pairing" and a pairing needs both halves. The pair defaults
+    # to the catalogue's house faces, so a portfolio nobody styled still comes
+    # out set rather than falling back to one family doing both jobs.
     body_font: Mapped[str] = mapped_column(
-        String(24), nullable=False, default="archivo", server_default="archivo"
+        String(24),
+        nullable=False,
+        default=DEFAULT_BODY_FONT,
+        server_default=DEFAULT_BODY_FONT,
     )
     layout: Mapped[dict[str, Any]] = mapped_column(
         JSONB, nullable=False, default=default_layout

@@ -1,9 +1,11 @@
 "use client";
 
+import { motion, useReducedMotion } from "motion/react";
 import Link from "next/link";
-import { createContext, useContext, useState } from "react";
+import { createContext, useCallback, useContext, useState } from "react";
 import type { CSSProperties } from "react";
 import { recordClick } from "@/lib/analytics";
+import { Glyph, type GlyphId } from "@/lib/glyphs";
 import { LinkIcon, iconFor } from "@/lib/icons";
 import type { PublishedPrivacy } from "@/lib/published";
 import {
@@ -23,75 +25,69 @@ import {
 } from "@/lib/types";
 
 /**
- * The page's own chrome glyphs — an outbound arrow, a chevron, a download
- * mark. Deliberately NOT in `ICONS`: that record backs the editor's icon
- * picker and `ICON_LIST`, and a visitor's chevron is not something an author
- * should be offered for a link. They replace the `↗ › ↓` characters the
- * themes used to print, which took whatever size and weight the surrounding
- * face happened to give them and sat off the text baseline in half the
- * fourteen headline faces.
+ * The page's own chrome glyphs.
+ *
+ * The paths moved to `src/lib/glyphs.tsx` so the published page and the
+ * owner's chrome draw the same marks from one record rather than keeping two
+ * copies that drift. `UiIcon` stays as the name every theme already calls.
  */
-const UI_PATHS = {
-  out: "M7 17 17 7M8 7h9v9",
-  up: "M12 20V5m-6 6 6-6 6 6",
-  chevron: "m9 6 6 6-6 6",
-  download: "M12 3v12m-5-4 5 5 5-5M4 20h16",
-} as const;
-
-export function UiIcon({
-  id,
-  size = 17,
-}: {
-  id: keyof typeof UI_PATHS;
-  size?: number;
-}) {
-  return (
-    <svg
-      width={size}
-      height={size}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={1.75}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden
-      focusable="false"
-      className="flex-none"
-    >
-      <path d={UI_PATHS[id]} />
-    </svg>
-  );
+export function UiIcon({ id, size = 17 }: { id: GlyphId; size?: number }) {
+  return <Glyph id={id} size={size} />;
 }
 
+/**
+ * The empty plate — what a section with no image reproduces.
+ *
+ * Drawn from the page's own tokens rather than fixed greys, so it belongs to
+ * whatever ground the author picked. A catalogue prints a ruled blank where a
+ * plate was not available, which is what this is: diagonal hairlines, not a
+ * grey box and not an icon.
+ */
 export const HATCH =
-  "repeating-linear-gradient(45deg,#d7d3d3 0 6px,#eae9e9 6px 12px)";
+  "repeating-linear-gradient(45deg, color-mix(in srgb, var(--color-ink) 10%, transparent) 0 1px, transparent 1px 9px)";
 
-/** Ground swaps the page's ink and paper; the accent is chosen separately. */
+/**
+ * Ground swaps the page's board and ink; the accent is chosen separately.
+ *
+ * The three presets are the catalogue's three stocks. `--color-foil` rides
+ * with each of them because the apparatus's stamp colour cannot be one fixed
+ * gold: the house foil reads 9:1 on board and 1.7:1 on plate white, so a
+ * light ground needs its own darker instance of the same metal.
+ *
+ * The keys stay `light` / `dark` / `paper`. They are the wire format and
+ * stored values; only what they paint and what the Colour panel calls them
+ * has changed.
+ */
 const GROUNDS: Record<Ground, Record<string, string>> = {
+  // Plate — the catalogue printed on white stock, board navy as the ink.
   light: {
-    "--color-bg": "#f3f2f2",
-    "--color-surface": "#eae9e9",
-    "--color-ink": "#201e1d",
-    "--color-divider": "#201e1d66",
-    "--color-neutral-700": "#605d5d",
-    "--color-neutral-800": "#444141",
+    "--color-bg": "#ffffff",
+    "--color-surface": "#eceef2",
+    "--color-ink": "#16233b",
+    "--color-divider": "#16233b38",
+    "--color-neutral-700": "#5e6a7d",
+    "--color-neutral-800": "#2c3850",
+    "--color-foil": "#7a6118",
   },
+  // Board — the house ground, and what a new portfolio opens on.
   dark: {
-    "--color-bg": "#201e1d",
-    "--color-surface": "#2d2b2b",
-    "--color-ink": "#f3f2f2",
-    "--color-divider": "#f3f2f266",
-    "--color-neutral-700": "#bab6b6",
-    "--color-neutral-800": "#d7d3d3",
+    "--color-bg": "#16233b",
+    "--color-surface": "#0e1729",
+    "--color-ink": "#ffffff",
+    "--color-divider": "#ffffff38",
+    "--color-neutral-700": "#a2a7b1",
+    "--color-neutral-800": "#c3cad6",
+    "--color-foil": "#d9c37a",
   },
+  // Cloth — the binding. Deep enough to hold white at full strength.
   paper: {
-    "--color-bg": "#efe9dd",
-    "--color-surface": "#e5dece",
-    "--color-ink": "#201e1d",
-    "--color-divider": "#201e1d66",
-    "--color-neutral-700": "#6b6154",
-    "--color-neutral-800": "#4a4238",
+    "--color-bg": "#1f3a32",
+    "--color-surface": "#152a24",
+    "--color-ink": "#ffffff",
+    "--color-divider": "#ffffff38",
+    "--color-neutral-700": "#9fb3ab",
+    "--color-neutral-800": "#c4d3cd",
+    "--color-foil": "#dfc98a",
   },
 };
 
@@ -154,11 +150,50 @@ export function derivedGround(hex: string): Record<string, string> {
     "--color-bg": hex,
     "--color-surface": toHex(mix(bg, ink, 0.06)),
     "--color-ink": toHex(ink),
-    // The presets write divider as ink at 40%, which is the `…66` suffix.
-    "--color-divider": `${toHex(ink)}66`,
+    // The same hairline the three presets rule: ink at `0x38`, which is 22%.
+    // It has to match them exactly — a picked ground otherwise ruled every
+    // line on the page visibly heavier than the house grounds do, which is
+    // the one thing a derived palette must not do differently.
+    "--color-divider": `${toHex(ink)}38`,
     "--color-neutral-700": toHex(mix(ink, bg, 0.35)),
     "--color-neutral-800": toHex(mix(ink, bg, 0.2)),
+    // The same metal, taken to whichever instance of itself this ground can
+    // actually hold.
+    "--color-foil": readableOn(FOIL, bg, 4.5),
   };
+}
+
+/* ── a readable mark ──────────────────────────────────────────────────── */
+
+const FOIL: Rgb = [0xd9, 0xc3, 0x7a];
+
+/**
+ * The nearest instance of `colour` that reads on `bg` at `min`.
+ *
+ * The catalogue marks state in colour — the open plate, a link, a live stamp —
+ * and an author may pick any accent and any ground, so a hue the page wants to
+ * speak in is regularly a hue the page cannot read. Rather than refuse the
+ * colour or ship a 2:1 link, the mark keeps the hue and walks its lightness
+ * toward whichever end of the scale gains contrast until it clears the bar.
+ *
+ * Mixing toward pure white or pure black rather than toward the ink keeps the
+ * hue: mixing an orange into a navy ink turns it brown halfway there.
+ */
+export function readableOn(colour: Rgb | string, bg: Rgb | string, min: number): string {
+  const c = typeof colour === "string" ? parseHex(colour) : colour;
+  const ground = typeof bg === "string" ? parseHex(bg) : bg;
+  const lb = luminance(ground);
+  if (contrast(luminance(c), lb) >= min) return toHex(c);
+  // A dark ground is escaped upward, a light one downward. Decided by which
+  // direction has room, not by a luminance threshold on the ground.
+  const target: Rgb = lb < luminance(c) ? [255, 255, 255] : [0, 0, 0];
+  // 24 steps is finer than the eye resolves across this range and settles in
+  // well under a frame; the loop runs once per render of the wrapper.
+  for (let i = 1; i <= 24; i++) {
+    const step = mix(c, target, i / 24);
+    if (contrast(luminance(step), lb) >= min) return toHex(step);
+  }
+  return toHex(target);
 }
 
 /** A picked ground wins over the preset; an empty one leaves the preset alone. */
@@ -171,9 +206,35 @@ export function groundStyle(p: Portfolio): CSSProperties {
   const face = FONTS.find((x) => x.id === p.font) ?? FONTS[0];
   const body = FONTS.find((x) => x.id === p.bodyFont) ?? FONTS[0];
   const scale = TYPE_SCALES.find((s) => s.id === p.layout.scale) ?? TYPE_SCALES[1];
+  const ground = palette(p);
+  const bg = ground["--color-bg"];
   return {
-    ...palette(p),
+    ...ground,
     "--color-accent": p.accent,
+    /**
+     * The accent as a fill, and what reads on top of that fill.
+     *
+     * A cloth-red button carries white; a sunflower-yellow one carries the
+     * board. Picking the one that contrasts is a two-line answer and it is
+     * the difference between a legible button and a pale label on a pale
+     * fill, which is what a fixed `--color-bg` on `.btn-primary` produced
+     * for every light accent.
+     */
+    "--color-accent-ink":
+      contrast(luminance(parseHex(p.accent)), luminance(INK_DARK)) >=
+      contrast(luminance(parseHex(p.accent)), luminance(INK_LIGHT))
+        ? toHex(INK_DARK)
+        : toHex(INK_LIGHT),
+    /**
+     * The accent as a mark — link text, the open plate, a rule that has to be
+     * read rather than filled. Same hue, taken to an instance of itself this
+     * ground can hold at 4.5:1.
+     *
+     * Contrast on the published page used to be derived but not enforced, so
+     * a mid-grey ground under a mid-tone accent shipped links at around 2:1.
+     * The hue is still entirely the author's; only its lightness is ours.
+     */
+    "--color-mark": readableOn(p.accent, bg, 4.5),
     "--font-heading": `var(${face.cssVar}), system-ui, sans-serif`,
     // Both, because `--font-sans` is what Tailwind's `font-sans` utility
     // resolves to; leaving it on Archivo would split the page between two
@@ -188,6 +249,18 @@ export function groundStyle(p: Portfolio): CSSProperties {
     "--type-scale": String(scale.factor),
     background: "var(--color-bg)",
     color: "var(--color-ink)",
+    // The page's own ground has to reach the bottom of the window, and the
+    // bottom of the document. Without this a plate-white page showed the
+    // body's board navy as a strip under its own footer.
+    //
+    // Both properties, because the strip has two causes: a page shorter than
+    // the viewport needs the minimum, and `body` is a flex column whose
+    // child does not grow on the main axis unless told to. `flexGrow` is
+    // inert wherever the parent is not a flex container, which covers the
+    // builder's canvas and `/print`. The minimum is dropped on paper, where
+    // a stacked sheet must not be a viewport tall.
+    minHeight: "var(--ground-min-h, 100dvh)",
+    flexGrow: 1,
   } as CSSProperties;
 }
 
@@ -242,13 +315,12 @@ export function allDates(p: Portfolio) {
 }
 
 /**
- * The numbers row.
+ * The numbers row — the catalogue's table of measurements.
  *
  * `big` sets the figures at display size. `onAccent` paints the whole row on
- * the accent field, where — as on Editorial's band and Poster's hero — every
- * colour is drawn from `--color-bg` rather than a hardcoded white, so a dark
- * ground puts its own ink on the accent instead of diverging from every other
- * theme in the product.
+ * the accent field, where every colour is drawn from `--color-accent-ink`
+ * rather than a hardcoded white, so a pale accent gets dark figures on it
+ * instead of white ones nobody can read.
  */
 export function StatRow({
   p,
@@ -268,20 +340,20 @@ export function StatRow({
   // spreadsheet and left the last row of a partly-filled grid ruled into
   // empty boxes.
   const rule = onAccent
-    ? "1px solid color-mix(in srgb, var(--color-bg) 30%, transparent)"
+    ? "1px solid color-mix(in srgb, var(--color-accent-ink) 34%, transparent)"
     : "1px solid var(--color-divider)";
   return (
     <div
       className="grid grid-cols-2 px-6 md:grid-cols-4 md:px-10"
       style={{
         background,
-        borderTop: onAccent ? "none" : "2px solid var(--color-divider)",
+        borderTop: onAccent ? "none" : "1px solid var(--color-divider)",
       }}
     >
       {shown.map((n, i) => (
         <div
           key={n.id}
-          className="flex flex-col gap-1.5 py-10"
+          className="flex flex-col gap-2 py-10"
           style={{
             background,
             // No rule on the first cell of a row, so the row opens flush left
@@ -291,13 +363,17 @@ export function StatRow({
             borderLeft: i % 2 === 0 ? "none" : rule,
           }}
         >
+          {/* A measurement in a catalogue is set in the display face at its
+              lining figures, on the ink rather than in colour: the number is
+              the fact, and colour here would make eight of them compete with
+              the one mark the page actually spends on the open plate. */}
           <div
-            className="font-heading font-extrabold"
+            className="font-heading figure"
             style={{
-              ...headline(big ? "68px" : "56px"),
-              lineHeight: 0.86,
-              letterSpacing: "-0.04em",
-              color: onAccent ? "var(--color-bg)" : "var(--color-accent)",
+              ...headline(big ? "64px" : "52px"),
+              lineHeight: 0.9,
+              letterSpacing: "-0.02em",
+              color: onAccent ? "var(--color-accent-ink)" : "var(--color-ink)",
             }}
           >
             {n.value}
@@ -306,8 +382,8 @@ export function StatRow({
             className="mono-label"
             style={{
               color: onAccent
-                ? "color-mix(in srgb, var(--color-bg) 78%, transparent)"
-                : "var(--color-neutral-700)",
+                ? "color-mix(in srgb, var(--color-accent-ink) 78%, transparent)"
+                : undefined,
             }}
           >
             {n.label}
@@ -315,6 +391,230 @@ export function StatRow({
         </div>
       ))}
     </div>
+  );
+}
+
+/* ── the plate ────────────────────────────────────────────────────────────
+   The catalogue's one structural object: a reproduction mounted on board,
+   trimmed with a keyline, with its caption set outside it on the board.
+   ────────────────────────────────────────────────────────────────────── */
+
+/**
+ * Specular travel across a mounted plate.
+ *
+ * Writes `--tilt-x` / `--tilt-y` on the element so `.plate-sheen` can move its
+ * highlight, and rotates the plate a bounded six degrees. Pointer only, and
+ * only for a pointer that is actually fine: a touch drag on a plate is a
+ * scroll, and stealing it to tilt the thing would take the page's own gesture
+ * away. Reduced motion leaves the sheen flat and the plate square.
+ *
+ * Hand-rolled rather than handed to vanilla-tilt because the highlight and the
+ * rotation have to come off the same pointer event: the library owns the
+ * transform and exposes its angles only through its own glare element, which
+ * paints a white diagonal bar rather than this world's soft band.
+ */
+export function useTiltPlate() {
+  const reduced = useReducedMotion();
+
+  const onPointerMove = useCallback(
+    (e: React.PointerEvent<HTMLElement>) => {
+      if (reduced || e.pointerType !== "mouse") return;
+      const el = e.currentTarget;
+      const box = el.getBoundingClientRect();
+      const px = (e.clientX - box.left) / box.width;
+      const py = (e.clientY - box.top) / box.height;
+      el.style.setProperty("--tilt-x", `${(px * 100).toFixed(1)}%`);
+      el.style.setProperty("--tilt-y", `${(py * 100).toFixed(1)}%`);
+      // No easing while the pointer is on the plate. A transition here makes
+      // the surface chase the cursor nearly half a second behind it, which
+      // reads as syrup rather than as light moving across a sheet; specular
+      // travel has to be exactly as fast as the hand.
+      el.style.setProperty("transition", "none");
+      // Six degrees, and the sign reads as the plate leaning away from the
+      // pointer the way a sheet pinned at its centre would.
+      el.style.setProperty("transform", `perspective(900px) rotateX(${((0.5 - py) * 6).toFixed(2)}deg) rotateY(${((px - 0.5) * 6).toFixed(2)}deg)`);
+    },
+    [reduced],
+  );
+
+  // The return to rest is the one part that eases: the plate settles back
+  // flat rather than snapping, which is what the easing was for.
+  const onPointerLeave = useCallback((e: React.PointerEvent<HTMLElement>) => {
+    const el = e.currentTarget;
+    el.style.setProperty("transition", "transform 420ms var(--ease-out)");
+    el.style.removeProperty("transform");
+    el.style.removeProperty("--tilt-x");
+    el.style.removeProperty("--tilt-y");
+  }, []);
+
+  return { onPointerMove, onPointerLeave, reduced };
+}
+
+/**
+ * A mounted reproduction. `tilt` is for a plate large enough to be worth
+ * catching light — a thumbnail in a list is not.
+ */
+export function Plate({
+  children,
+  className = "",
+  tilt,
+  style,
+}: {
+  children: React.ReactNode;
+  className?: string;
+  tilt?: boolean;
+  style?: CSSProperties;
+}) {
+  const t = useTiltPlate();
+  return (
+    <div
+      className={`plate plate-keyline ${tilt ? "plate-sheen" : ""} ${className}`}
+      onPointerMove={tilt ? t.onPointerMove : undefined}
+      onPointerLeave={tilt ? t.onPointerLeave : undefined}
+      style={{
+        transition: "transform 420ms var(--ease-out)",
+        willChange: tilt ? "transform" : undefined,
+        ...style,
+      }}
+    >
+      {children}
+    </div>
+  );
+}
+
+/**
+ * The three fields under every plate: how it is filed, what it is, and who is
+ * credited for it.
+ *
+ * Every field is read off the section the author actually filled in — the tab
+ * it files under, the medium it carries, and the attribution on its quote.
+ * None of them is invented, and an absent one shows as an em dash rather than
+ * collapsing the line, so two plates' captions stay comparable down a column.
+ */
+export function captionCredit(section: Section): [string, string, string] {
+  const medium = section.image
+    ? "Reproduction"
+    : section.file
+      ? "Document"
+      : section.quote?.text
+        ? "Quotation"
+        : "Text";
+  return [section.tab.trim() || "—", medium, section.quote?.attribution?.trim() || "—"];
+}
+
+/** The caption block: plate number, title, credit line, then the description. */
+export function PlateCaption({
+  p,
+  section,
+  index,
+  titleOnPlate,
+  children,
+}: {
+  p: Portfolio;
+  section: Section;
+  /** 1-based plate number, as the plate list prints it. */
+  index: number;
+  /**
+   * The mount above already sets this work's title, because it had no
+   * reproduction to carry. The caption then prints the number and the credit
+   * and leaves the title alone — a catalogue does not set the same title
+   * twice, forty pixels apart.
+   */
+  titleOnPlate?: boolean;
+  children?: React.ReactNode;
+}) {
+  const [filed, medium, credit] = captionCredit(section);
+  return (
+    <figcaption className="caption flex flex-col gap-2">
+      <div className="flex items-baseline gap-3">
+        <span className="plate-no text-[13px]" style={{ color: "var(--color-mark)" }}>
+          {String(index).padStart(2, "0")}
+        </span>
+        {titleOnPlate ? (
+          <SectionTitleLink
+            p={p}
+            section={section}
+            className="caption-credit"
+          />
+        ) : (
+          <SectionTitleLink
+            p={p}
+            section={section}
+            className="font-heading text-[21px] leading-[1.15]"
+          />
+        )}
+      </div>
+      <div className="caption-credit">
+        {filed} · {medium} · {credit}
+      </div>
+      {section.description && (
+        <p className="m-0 text-[14px] leading-[1.55] text-muted">{section.description}</p>
+      )}
+      {children}
+    </figcaption>
+  );
+}
+
+/**
+ * The plate turn — the page's one authored moment.
+ *
+ * **Changing tab never swaps a page.** This container persists across every
+ * tab change and only animates its own box as the run inside it changes
+ * height; the turning happens on the plates themselves, in `PlateLeaf`, and
+ * a plate that appears in both rooms travels between them on its shared
+ * `layoutId` rather than leaving and arriving as two different objects.
+ *
+ * The first version keyed an `AnimatePresence` on the tab, which unmounted
+ * the whole stack and mounted a new one. It looked like a turn and was a
+ * swap — exactly what the contract's first sentence refuses.
+ */
+export function PlateTurn({
+  children,
+  className,
+}: {
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <motion.div
+      layout
+      className={className}
+      transition={{ duration: 0.52, ease: [0.33, 0, 0.1, 1] }}
+    >
+      {children}
+    </motion.div>
+  );
+}
+
+/**
+ * One plate turning in or out of the open room.
+ *
+ * Rendered inside an `AnimatePresence` so a plate that leaves turns away
+ * while the one arriving turns in. `layout` keeps its box animating to its
+ * new position rather than jumping there, and `mode="popLayout"` at the
+ * caller takes a leaving plate out of flow so the arrivals do not wait for
+ * the exit before they settle.
+ */
+export function PlateLeaf({
+  children,
+  className,
+}: {
+  children: React.ReactNode;
+  className?: string;
+}) {
+  const reduced = useReducedMotion();
+  return (
+    <motion.figure
+      layout
+      className={className}
+      initial={reduced ? { opacity: 0 } : { opacity: 0, rotateX: -7, y: 24, filter: "blur(7px)" }}
+      animate={reduced ? { opacity: 1 } : { opacity: 1, rotateX: 0, y: 0, filter: "blur(0px)" }}
+      exit={reduced ? { opacity: 0 } : { opacity: 0, rotateX: 5, y: -16, filter: "blur(7px)" }}
+      transition={reduced ? { duration: 0.12 } : { duration: 0.52, ease: [0.33, 0, 0.1, 1] }}
+      style={{ transformPerspective: 1400, transformOrigin: "50% 0%" }}
+    >
+      {children}
+    </motion.figure>
   );
 }
 
@@ -415,29 +715,37 @@ export function LensGate({
       >
         {p.header.description}
       </p>
-      <h6 className="mb-5">What brings you here?</h6>
+      <h6 className="mb-5 text-muted">The plate list</h6>
       {/* Per-cell borders, not gap over a coloured ground: a partly-filled
           last row would otherwise show the divider colour as empty blocks. */}
       <div className="grid sm:grid-cols-2">
-        {options.map((t) => {
+        {options.map((t, i) => {
           const count = visibleSections(p).filter((s) => s.tab === t).length;
           return (
             <button
               key={t}
               type="button"
               onClick={() => setTab(t)}
-              className="group flex min-h-[104px] cursor-pointer flex-col items-start justify-center gap-1.5 py-6 pr-6 text-left"
+              className="group flex min-h-[112px] cursor-pointer flex-col items-start justify-center gap-2 py-7 pr-6 text-left"
               style={{
                 background: "var(--color-bg)",
-                borderTop: "2px solid var(--color-divider)",
-                transition: "color 160ms var(--ease-out)",
+                borderTop: "1px solid var(--color-divider)",
+                transition: "color 180ms var(--ease-out)",
               }}
             >
-              <span className="font-heading text-2xl font-extrabold group-hover:text-[var(--color-accent)]">
-                {t}
+              <span className="flex items-baseline gap-3">
+                <span
+                  className="plate-no text-[13px]"
+                  style={{ color: "var(--color-mark)" }}
+                >
+                  {String(i + 1).padStart(2, "0")}
+                </span>
+                <span className="font-heading text-[28px] leading-none group-hover:text-[var(--color-mark)]">
+                  {t}
+                </span>
               </span>
-              <span className="mono-label" style={{ color: "var(--color-neutral-700)" }}>
-                {count} {count === 1 ? "entry" : "entries"}
+              <span className="caption-credit">
+                {count} {count === 1 ? "plate" : "plates"}
               </span>
             </button>
           );
@@ -470,22 +778,28 @@ export function Tabs({
   const counts = visibleSections(p);
   return (
     <>
-      {tabs(p).map((t) => {
+      {tabs(p).map((t, i) => {
         const on = t === tab;
+        // The plate list is numbered because the sequence is information: it
+        // is the order the sections are in, and it is how a visitor says
+        // which room they are reading.
+        const no = String(i + 1).padStart(2, "0");
         if (variant === "block") {
           return (
             <button
               key={t}
               type="button"
               onClick={() => setTab(t)}
-              className="font-heading flex h-14 flex-none cursor-pointer items-center whitespace-nowrap px-6 text-base font-extrabold"
+              className="font-heading flex h-14 flex-none cursor-pointer items-baseline gap-2.5 px-6 text-base whitespace-nowrap"
               style={{
-                background: on ? "var(--color-bg)" : "transparent",
-                color: on ? "var(--color-ink)" : "inherit",
-                opacity: on ? 1 : 0.72,
-                transition: "opacity 160ms var(--ease-out)",
+                background: on ? "var(--color-accent-ink)" : "transparent",
+                color: on ? "var(--color-accent)" : "var(--color-accent-ink)",
+                opacity: on ? 1 : 0.74,
+                transition:
+                  "opacity 180ms var(--ease-out), background-color 180ms var(--ease-out)",
               }}
             >
+              <span className="plate-no text-[12px] opacity-70">{no}</span>
               {t}
             </button>
           );
@@ -503,19 +817,22 @@ export function Tabs({
               // and lets the label clip with an ellipsis inside its own
               // column. Owned here rather than patched on from the parent, so
               // the caller only picks a variant.
-              className="font-heading flex h-[52px] min-w-0 cursor-pointer items-center justify-center overflow-hidden text-sm font-extrabold text-ellipsis whitespace-nowrap"
+              className="font-heading flex h-[52px] min-w-0 cursor-pointer items-center justify-center gap-2 overflow-hidden text-[15px] text-ellipsis whitespace-nowrap"
               style={{
-                color: on ? "var(--color-accent)" : "var(--color-neutral-700)",
-                boxShadow: on ? "inset 0 -3px 0 var(--color-accent)" : "none",
-                transition: "color 160ms var(--ease-out)",
+                color: on ? "var(--color-mark)" : undefined,
+                opacity: on ? 1 : 0.68,
+                boxShadow: on ? "inset 0 -1px 0 var(--color-mark)" : "none",
+                transition: "color 180ms var(--ease-out), opacity 180ms var(--ease-out)",
               }}
             >
+              <span className="plate-no text-[11px] opacity-70">{no}</span>
               {t}
             </button>
           );
         }
-        // The count is the one number the row earns: it says how much sits
-        // behind a tab before the visitor spends a tap finding out.
+        // The count is the one number the row earns beyond the plate number:
+        // it says how much sits behind a tab before the visitor spends a tap
+        // finding out.
         const count = counts.filter((x) => x.tab === t).length;
         return (
           <button
@@ -524,26 +841,24 @@ export function Tabs({
             onClick={() => setTab(t)}
             // flex-none + nowrap: the row scrolls sideways inside its own
             // overflow container rather than breaking a tab name in half.
-            className="font-heading flex h-[60px] flex-none cursor-pointer items-center gap-2 text-lg font-extrabold whitespace-nowrap"
+            className="font-heading flex h-[60px] flex-none cursor-pointer items-baseline gap-2.5 text-[19px] whitespace-nowrap"
             style={{
-              color: on ? "var(--color-accent)" : "var(--color-neutral-700)",
-              boxShadow: on ? "inset 0 -4px 0 var(--color-accent)" : "none",
+              color: on ? "var(--color-mark)" : undefined,
+              opacity: on ? 1 : 0.62,
+              boxShadow: on ? "inset 0 -1px 0 var(--color-mark)" : "none",
               letterSpacing: "-0.01em",
-              transition: "color 160ms var(--ease-out)",
+              transition: "color 180ms var(--ease-out), opacity 180ms var(--ease-out)",
             }}
           >
+            <span className="plate-no text-[12px] opacity-70">{no}</span>
             {t}
-            <span className="text-xs font-bold opacity-65">{count}</span>
+            <span className="caption-credit" style={{ color: "inherit", opacity: 0.7 }}>
+              {count}
+            </span>
           </button>
         );
       })}
     </>
-  );
-}
-
-export function Kicker({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="card-kicker mb-6">{children}</div>
   );
 }
 
@@ -579,8 +894,10 @@ export function SectionLinks({ p, section }: { p: Portfolio; section: Section })
           target="_blank"
           rel="noopener noreferrer"
           onClick={() => record(handle, p.slug, section.id)}
-          className="published-link font-heading inline-flex min-h-[28px] items-center gap-2 font-bold"
-          style={{ color: "var(--color-accent)" }}
+          // The mark, not the raw accent: cloth red on board measures 2.44:1,
+          // and an author's accent on their own ground can be worse.
+          className="published-link inline-flex min-h-[30px] items-center gap-2 text-[14px] font-medium"
+          style={{ color: "var(--color-mark)" }}
         >
           <LinkIcon id={iconFor(l)} size={17} />
           <span className="published-link-text">{l.label || l.url}</span>
@@ -590,38 +907,75 @@ export function SectionLinks({ p, section }: { p: Portfolio; section: Section })
   );
 }
 
-/** A stored image, or the hatched placeholder when there is none. */
+/**
+ * A reproduction, mounted. A stored image, or the ruled blank a catalogue
+ * prints where a plate was not available.
+ *
+ * `tilt` is for a plate big enough to be worth catching light; a thumbnail in
+ * a list passes it by. The mount is the same either way, so a page of sections
+ * where only some have images still reads as one run of plates.
+ */
 export function Media({
   asset,
   className,
   caption,
+  tilt,
+  layoutId,
+  children,
 }: {
   asset: Asset | null;
   className: string;
   caption?: string;
+  tilt?: boolean;
+  /**
+   * Shares this mount across a tab change and across the section-detail
+   * view, so the plate travels to its new box instead of being swapped out.
+   * Both ends must name the same id, and both must sit under one
+   * `LayoutGroup`.
+   */
+  layoutId?: string;
+  /** Set on the mount where no reproduction exists — the work's own title. */
+  children?: React.ReactNode;
 }) {
-  if (asset) {
-    // A data URI out of localStorage — nothing for next/image to optimise.
-    return (
-      // eslint-disable-next-line @next/next/no-img-element
-      <img
-        src={assetSrc(asset)}
-        alt={asset.name}
-        className={`published-photo object-cover ${className}`}
-      />
-    );
-  }
+  const t = useTiltPlate();
   return (
-    <div
-      className={`flex items-end p-2.5 ${className}`}
-      style={{ background: HATCH }}
+    <motion.div
+      layoutId={layoutId}
+      className={`plate plate-keyline ${tilt ? "plate-sheen" : ""} ${className}`}
+      onPointerMove={tilt ? t.onPointerMove : undefined}
+      onPointerLeave={tilt ? t.onPointerLeave : undefined}
+      transition={{ duration: 0.52, ease: [0.33, 0, 0.1, 1] }}
+      style={{ willChange: tilt ? "transform" : undefined }}
     >
-      {caption && <span className="text-[10px] text-neutral-700">{caption}</span>}
-    </div>
+      {asset ? (
+        // A data URI out of localStorage — nothing for next/image to optimise.
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={assetSrc(asset)}
+          alt={asset.name}
+          className="published-photo h-full w-full object-cover"
+        />
+      ) : children ? (
+        children
+      ) : (
+        <div
+          className="flex h-full w-full items-end p-3"
+          style={{ background: HATCH }}
+        >
+          {caption && <span className="caption-credit">{caption}</span>}
+        </div>
+      )}
+    </motion.div>
   );
 }
 
-/** The pull quote and the downloadable attachment, when a section has them. */
+/**
+ * The pull quote and the downloadable attachment, when a section has them.
+ *
+ * A quotation is set, not bordered: the 3px accent bar down the left edge is
+ * the callout tell, so a catalogue indents the quotation against a hairline
+ * and sets it in the display face instead.
+ */
 export function SectionAside({ p, section }: { p: Portfolio; section: Section }) {
   const handle = usePublishedHandle();
   const record = useRecordClick();
@@ -629,17 +983,12 @@ export function SectionAside({ p, section }: { p: Portfolio; section: Section })
     <>
       {section.quote?.text && (
         <blockquote
-          className="m-0 py-0.5 pl-5 text-[17px] leading-[1.45] italic"
-          style={{ borderLeft: "3px solid var(--color-accent)" }}
+          className="font-heading m-0 max-w-[40ch] py-1 pl-6 text-[20px] leading-[1.35]"
+          style={{ borderLeft: "1px solid var(--color-divider)" }}
         >
           “{section.quote.text}”
           {section.quote.attribution && (
-            <footer
-              className="mono-label mt-2 not-italic"
-              style={{ color: "var(--color-neutral-700)" }}
-            >
-              {section.quote.attribution}
-            </footer>
+            <footer className="caption-credit mt-3">{section.quote.attribution}</footer>
           )}
         </blockquote>
       )}
@@ -765,7 +1114,7 @@ export function HeaderLinks({
   const privacy = usePublishedPrivacy();
   if (!privacy.showContact) {
     return (
-      <p className="m-0 text-[12px]" style={{ color: "var(--color-neutral-700)" }}>
+      <p className="caption-credit m-0">
         Contact details are hidden. Ask {p.header.name.split(" ")[0] || "the owner"} for
         them directly.
       </p>
@@ -773,16 +1122,20 @@ export function HeaderLinks({
   }
   if (inline) {
     return (
-      <p className="m-0 flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px]">
+      <p className="m-0 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[13px]">
         {p.header.links.map((l, i) => (
-          <span key={l.id} className="flex items-center gap-2">
-            {i > 0 && <span aria-hidden="true" style={{ color: "var(--color-neutral-700)" }}>·</span>}
+          <span key={l.id} className="flex items-center gap-2.5">
+            {i > 0 && (
+              <span aria-hidden="true" className="text-muted">
+                ·
+              </span>
+            )}
             <a
               href={href(l.url)}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5"
-              style={{ color: "var(--color-accent)" }}
+              className="published-link inline-flex items-center gap-1.5"
+              style={{ color: "var(--color-mark)" }}
             >
               <LinkIcon id={iconFor(l)} />
               {l.label || l.url}

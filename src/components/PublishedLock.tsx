@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { Glyph } from "@/lib/glyphs";
 import { useAccount } from "@/lib/account";
 import { usePortfolios } from "@/lib/store";
 import { pageAddress, pagePath, previewPath, type Portfolio } from "@/lib/types";
@@ -21,7 +22,7 @@ export function PublishedLock({ portfolio }: { portfolio: Portfolio }) {
   return (
     <>
       <div className="nav bg-bg gap-3.5">
-        <Link href="/" className="font-heading text-[13px] font-extrabold">
+        <Link href="/" className="font-heading text-[13px]">
           ← Portfolios
         </Link>
         <span className="nav-brand mr-0 hidden text-[15px] sm:inline">{portfolio.name}</span>
@@ -42,7 +43,7 @@ export function PublishedLock({ portfolio }: { portfolio: Portfolio }) {
       {storageError && (
         <div
           role="alert"
-          className="px-4 py-2.5 text-[13px] font-extrabold"
+          className="px-4 py-2.5 text-[13px]"
           style={{ background: "var(--color-accent)", color: "var(--color-bg)" }}
         >
           {storageError}
@@ -75,7 +76,8 @@ export function PublishedLock({ portfolio }: { portfolio: Portfolio }) {
             target="_blank"
             rel="noopener noreferrer"
           >
-            Published page ↗
+            Published page
+            <Glyph id="out" size={15} />
           </Link>
           <button type="button" className="btn btn-primary" onClick={unpublish}>
             Unpublish to edit

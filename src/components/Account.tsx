@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { GROUPS, groupFlag, type GroupId } from "./account/panels";
+import { Glyph } from "@/lib/glyphs";
 import { useAccount } from "@/lib/account";
 import { signOut } from "@/lib/session";
 import { useAnalytics } from "@/lib/analytics";
@@ -31,7 +32,7 @@ export function Account() {
   return (
     <>
       <div className="nav bg-bg">
-        <span className="nav-brand">FACET</span>
+        <span className="nav-brand">Facet</span>
         <Link href="/">Portfolios</Link>
         <Link href="/stats">Stats</Link>
         <Link href="/account" aria-current="page">
@@ -42,7 +43,7 @@ export function Account() {
       {storageError && (
         <div
           role="alert"
-          className="px-4 py-2.5 text-[13px] font-extrabold"
+          className="px-4 py-2.5 text-[13px]"
           style={{ background: "var(--color-accent)", color: "var(--color-bg)" }}
         >
           {storageError}
@@ -51,7 +52,7 @@ export function Account() {
 
       {/* ══ desktop — rail beside one panel ═════════════════════════ */}
       <div className="hidden lg:block">
-        <div className="border-divider border-b-2 px-10 pb-6 pt-7">
+        <div className="border-divider border-b px-10 pb-6 pt-7">
           {/* The plan sits with the heading, not in the nav: an `ml-auto` tag
               there met .nav-brand's own `margin-right: auto` and the pair of
               them split the free space, centring the links — which no other
@@ -61,7 +62,7 @@ export function Account() {
             {/* Outlined rather than filled: the accent fill is what a primary
                 action looks like here, and this is a label, not a button. The
                 2px rule is the one the dividers use. */}
-            <span className="tag tag-outline font-heading border-2 text-[10px] font-extrabold uppercase tracking-[0.08em]">
+            <span className="tag tag-outline font-heading border text-[10px] uppercase tracking-[0.08em]">
               {planName} plan
             </span>
           </div>
@@ -73,7 +74,7 @@ export function Account() {
         </div>
 
         <div className="grid min-h-[660px] grid-cols-[250px_1fr]">
-          <div className="border-divider bg-surface border-r-2">
+          <div className="border-divider bg-surface border-r">
             {GROUPS.map((g) => {
               const on = g.id === groupId;
               const flag = groupFlag(g.id, account);
@@ -84,12 +85,12 @@ export function Account() {
                   onClick={() => setGroupId(g.id)}
                   className="border-divider flex w-full cursor-pointer items-center gap-2.5 border-b px-4 py-3.5 text-left"
                   style={{
-                    background: on ? "var(--color-accent)" : "transparent",
+                    background: on ? "var(--color-foil)" : "transparent",
                     color: on ? "var(--color-bg)" : "var(--color-ink)",
                   }}
                 >
                   <span className="flex flex-col gap-0.5">
-                    <span className="font-heading text-[13px] font-extrabold">
+                    <span className="font-heading text-[13px]">
                       {g.label}
                     </span>
                     <span
@@ -103,7 +104,7 @@ export function Account() {
                   </span>
                   {flag && (
                     <span
-                      className="font-heading ml-auto flex-none text-[10px] font-extrabold uppercase tracking-[0.06em]"
+                      className="font-heading ml-auto flex-none text-[10px] uppercase tracking-[0.06em]"
                       style={{
                         color: on ? "var(--color-bg)" : "var(--color-neutral-600)",
                       }}
@@ -139,7 +140,7 @@ export function Account() {
       <div className="lg:hidden">
         {mobile ? (
           <>
-            <div className="border-divider flex items-center gap-2.5 border-b-2 px-4 py-3">
+            <div className="border-divider flex items-center gap-2.5 border-b px-4 py-3">
               <button
                 type="button"
                 className="btn btn-secondary"
@@ -147,7 +148,7 @@ export function Account() {
               >
                 ← Account
               </button>
-              <span className="font-heading text-[15px] font-extrabold">
+              <span className="font-heading text-[15px]">
                 {mobile.label}
               </span>
             </div>
@@ -155,7 +156,7 @@ export function Account() {
           </>
         ) : (
           <>
-            <div className="border-divider border-b-2 px-4 pb-5 pt-6">
+            <div className="border-divider border-b px-4 pb-5 pt-6">
               <h1 className="mb-2 text-[30px]">Account</h1>
               <p className="text-neutral-700 m-0 text-[14px]">
                 Who you are, how people reach your pages, and what this build can and
@@ -163,7 +164,7 @@ export function Account() {
               </p>
             </div>
 
-            <div className="border-divider bg-surface flex items-center gap-3.5 border-b-2 px-4 py-4">
+            <div className="border-divider bg-surface flex items-center gap-3.5 border-b px-4 py-4">
               <span className="h-14 w-14 flex-none">
                 {account.profile.portrait ? (
                   // A data URI out of localStorage — nothing for next/image to do.
@@ -171,20 +172,20 @@ export function Account() {
                   <img
                     src={assetSrc(account.profile.portrait)}
                     alt={account.profile.portrait.name}
-                    className="grayscale-photo h-full w-full object-cover"
+                    className="h-full w-full object-cover"
                   />
                 ) : (
                   <span
-                    className="grayscale-photo block h-full w-full"
+                    className="block h-full w-full"
                     style={{
                       background:
-                        "repeating-linear-gradient(45deg,#d7d3d3 0 5px,#eae9e9 5px 10px)",
+                        "repeating-linear-gradient(45deg, color-mix(in srgb, var(--color-ink) 10%, transparent) 0 1px, transparent 1px 9px)",
                     }}
                   />
                 )}
               </span>
               <span className="flex min-w-0 flex-col gap-0.5">
-                <span className="font-heading truncate text-lg font-extrabold">
+                <span className="font-heading truncate text-lg">
                   {account.profile.name || "Your name"}
                 </span>
                 <span className="text-neutral-700 truncate text-xs">
@@ -203,22 +204,22 @@ export function Account() {
                   className="border-divider flex w-full cursor-pointer items-center gap-3 border-b px-4 py-3.5 text-left"
                 >
                   <span className="flex min-w-0 flex-col gap-0.5">
-                    <span className="font-heading text-sm font-extrabold">
+                    <span className="font-heading text-sm">
                       {g.label}
                     </span>
                     <span className="text-neutral-700 text-[11px]">{g.sub}</span>
                   </span>
                   {flag && (
-                    <span className="text-neutral-600 font-heading ml-auto flex-none text-[10px] font-extrabold uppercase tracking-[0.06em]">
+                    <span className="text-neutral-600 font-heading ml-auto flex-none text-[10px] uppercase tracking-[0.06em]">
                       {flag}
                     </span>
                   )}
                   <span
-                    className="font-heading flex-none text-[13px] font-extrabold"
-                    style={{ color: "var(--color-neutral-600)", marginLeft: flag ? 8 : "auto" }}
+                    className="flex-none text-muted"
+                    style={{ marginLeft: flag ? 8 : "auto" }}
                     aria-hidden
                   >
-                    ›
+                    <Glyph id="chevron" size={15} />
                   </span>
                 </button>
               );

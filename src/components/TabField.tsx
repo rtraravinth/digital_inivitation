@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { Glyph } from "@/lib/glyphs";
 import { TAB_MAX_LENGTH } from "@/lib/types";
 
 /**
@@ -73,7 +74,7 @@ export function TabField({
             setNaming(false);
           }}
         >
-          ✕
+          <Glyph id="close" size={15} />
         </button>
       </div>
     );

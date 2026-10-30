@@ -1,5 +1,6 @@
 "use client";
 
+import { LayoutGroup } from "motion/react";
 import { useSearchParams } from "next/navigation";
 import { useEffect } from "react";
 import { recordView } from "@/lib/analytics";
@@ -48,11 +49,21 @@ export function PublishedPage({
   return (
     <PrivacyProvider value={privacy}>
       <PublishedHandleProvider value={handle}>
-        {section ? (
-          <SectionDetail p={portfolio} section={section} />
-        ) : (
-          <PublishedBody p={portfolio} />
-        )}
+        {/*
+          One `LayoutGroup` across both views, which is what lets the caption
+          lift actually lift: the plate in the run and the plate on the detail
+          view share a `layoutId`, and because `?section=` only changes this
+          route's search params, the React tree survives the navigation and
+          the mount travels between the two rather than one disappearing while
+          another fades in somewhere else.
+        */}
+        <LayoutGroup>
+          {section ? (
+            <SectionDetail p={portfolio} section={section} />
+          ) : (
+            <PublishedBody p={portfolio} />
+          )}
+        </LayoutGroup>
       </PublishedHandleProvider>
     </PrivacyProvider>
   );

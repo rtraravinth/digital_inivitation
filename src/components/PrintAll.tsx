@@ -36,7 +36,7 @@ export function PrintAll() {
   return (
     <>
       <div className="no-print nav bg-bg gap-3">
-        <Link href="/account" className="font-heading text-[13px] font-extrabold">
+        <Link href="/account" className="font-heading text-[13px]">
           ← Account
         </Link>
         <span className="nav-brand mr-auto text-[15px]">

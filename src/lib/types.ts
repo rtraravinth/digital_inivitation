@@ -100,6 +100,8 @@ export type ThemeId = "resume" | "editorial" | "poster" | "links" | "site";
 
 export type Ground = "light" | "dark" | "paper";
 export type FontId =
+  | "bodoni-moda"
+  | "schibsted-grotesk"
   | "archivo"
   | "inter"
   | "dm-sans"
@@ -173,32 +175,54 @@ export const THEMES: Array<{
 ];
 
 /**
- * `hex` is the paper each preset paints, duplicated from the palette map in
- * `published/themes.tsx` so the picker can show a preset as a swatch and can
+ * The catalogue's three stocks: board, plate white, and binding cloth.
+ *
+ * `hex` is the ground each preset paints, duplicated from the palette map in
+ * `published/shared.tsx` so the picker can show a preset as a swatch and can
  * hand the custom field somewhere to start from. The map there stays the
- * authority on the other five variables a preset sets.
+ * authority on the other six variables a preset sets, foil included.
+ *
+ * The ids stay `light` / `dark` / `paper` — wire format and stored values —
+ * while Board leads the list because it is the house ground. Renaming the
+ * keys would be a migration for nothing a label change does not do, which is
+ * the same reason `roleNav` and `font` keep their names.
  */
 export const GROUNDS: Array<{ id: Ground; name: string; hex: string }> = [
-  { id: "light", name: "Light", hex: "#f3f2f2" },
-  { id: "dark", name: "Dark", hex: "#201e1d" },
-  { id: "paper", name: "Paper", hex: "#efe9dd" },
+  { id: "dark", name: "Board", hex: "#16233b" },
+  { id: "light", name: "Plate", hex: "#ffffff" },
+  { id: "paper", name: "Cloth", hex: "#1f3a32" },
 ];
 
 /**
- * Headline faces over an Archivo body. Archivo/Archivo is the Modernist
- * default and stays the default — the alternates are opt-in per portfolio,
- * and the body never changes.
+ * The faces an author can pick, headline and body.
+ *
+ * The two house faces lead the list: Bodoni Moda sets the catalogue's
+ * half-titles and plate numbers, Schibsted Grotesk its captions and
+ * controls, and a portfolio that never opens the Type panel gets that
+ * pairing. The twelve after them are opt-in alternates.
  *
  * Every face here is variable and reaches at least 700. That is the entry
- * requirement, not a coincidence: `globals.css` sets `font-weight: 800` on
+ * requirement, not a coincidence: `globals.css` sets `font-weight: 700` on
  * every heading, so a single-weight family would be faux-bolded by the
  * browser and come out smeared. It is why the obvious display picks —
  * Anton, Bebas Neue, Instrument Serif — are absent.
  *
  * Ordered by kind rather than alphabetically, so scanning the list moves
- * through sans, serif, slab, condensed, display, mono.
+ * through the house pairing, then sans, serif, slab, condensed, display, mono.
  */
 export const FONTS: Array<{ id: FontId; name: string; sample: string; cssVar: string }> = [
+  {
+    id: "bodoni-moda",
+    name: "Bodoni Moda",
+    sample: "Catalogue didone",
+    cssVar: "--font-bodoni-moda",
+  },
+  {
+    id: "schibsted-grotesk",
+    name: "Schibsted Grotesk",
+    sample: "Caption grotesk",
+    cssVar: "--font-schibsted-grotesk",
+  },
   { id: "archivo", name: "Archivo", sample: "One family throughout", cssVar: "--font-archivo" },
   { id: "inter", name: "Inter", sample: "Neutral sans", cssVar: "--font-inter" },
   { id: "dm-sans", name: "DM Sans", sample: "Geometric sans", cssVar: "--font-dm-sans" },
@@ -235,8 +259,16 @@ export const FONTS: Array<{ id: FontId; name: string; sample: string; cssVar: st
   },
 ];
 
-/** One accent runs the page — buttons, kickers and the closing banner. */
-export const SWATCHES = ["#ec3013", "#201e1d", "#1d4ed8", "#0f7b52", "#b45309"];
+/**
+ * One accent runs the page — the primary action's fill, the open plate's
+ * mark, the colophon field.
+ *
+ * Five binding colours, cloth red first because it is the house accent. A
+ * picked colour overrides any of them, and `--color-mark` in
+ * `published/shared.tsx` takes whatever is chosen to an instance of itself
+ * the author's ground can actually hold.
+ */
+export const SWATCHES = ["#b5261e", "#1f3a32", "#1d3f8a", "#8a6f1f", "#5b2545"];
 
 /**
  * Both pickers write straight into a style attribute on the published page,
@@ -368,10 +400,14 @@ export function normalize(p: Portfolio): Portfolio {
     // dropped; fall back rather than render nothing.
     theme: THEME_IDS.has(p.theme) ? p.theme : "editorial",
     accent: p.accent ?? SWATCHES[0],
-    ground: p.ground ?? "light",
+    // Board, not plate white. A portfolio stored without a ground is being
+    // backfilled, and the ground the house prints on is the honest answer to
+    // "this was never chosen" — the same call the photo treatment made when
+    // it stopped forcing black and white.
+    ground: p.ground ?? "dark",
     groundHex: isHexColour(p.groundHex) ? p.groundHex : "",
-    font: p.font ?? "archivo",
-    bodyFont: p.bodyFont ?? "archivo",
+    font: p.font ?? "bodoni-moda",
+    bodyFont: p.bodyFont ?? "schibsted-grotesk",
     layout: {
       roleNav: layout.roleNav ?? "tabs",
       grid: layout.grid ?? 2,

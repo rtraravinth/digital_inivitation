@@ -19,7 +19,7 @@ function StatsFrame({ children }: { children: React.ReactNode }) {
   return (
     <>
       <div className="nav bg-bg">
-        <span className="nav-brand">FACET</span>
+        <span className="nav-brand">Facet</span>
         <Link href="/">Portfolios</Link>
         <Link href="/stats" aria-current="page">
           Stats
@@ -85,7 +85,7 @@ export function Stats() {
 
   return (
     <StatsFrame>
-      <div className="border-divider flex flex-wrap items-center gap-4 border-b-2 px-6 py-3">
+      <div className="border-divider flex flex-wrap items-center gap-4 border-b px-6 py-3">
         <select
           className="input w-auto"
           aria-label="Portfolio"
@@ -103,7 +103,7 @@ export function Stats() {
 
       <div className="grid items-start gap-5 p-5 lg:grid-cols-[390px_1fr]">
         {/* ── where visitors come from ──────────────────────────── */}
-        <div className="border-divider bg-bg border-2">
+        <div className="border-divider bg-bg border">
           <div className="p-4">
             <h6 className="mb-2.5">Who&rsquo;s coming from where</h6>
             {sources.length === 0 ? (
@@ -121,7 +121,7 @@ export function Stats() {
                     className="bg-accent h-2"
                     style={{ width: `${Math.round((n / maxSource) * 120)}px` }}
                   />
-                  <span className="font-heading ml-auto text-xs font-extrabold">
+                  <span className="font-heading ml-auto text-xs">
                     {n.toLocaleString()}
                   </span>
                 </div>
@@ -131,13 +131,13 @@ export function Stats() {
         </div>
 
         {/* ── this month ────────────────────────────────────────── */}
-        <div className="border-divider bg-bg border-2">
-          <div className="border-divider border-b-2 px-5 py-4">
+        <div className="border-divider bg-bg border">
+          <div className="border-divider border-b px-5 py-4">
             <h2 className="m-0 text-[22px]">All time</h2>
           </div>
 
           <div
-            className="border-divider grid grid-cols-3 border-b-2"
+            className="border-divider grid grid-cols-3 border-b"
             style={{ background: "var(--color-bg)" }}
           >
             {[
@@ -151,8 +151,8 @@ export function Stats() {
                 style={{ borderRight: "1px solid var(--color-divider)" }}
               >
                 <div
-                  className="font-heading text-[30px] font-extrabold leading-none"
-                  style={t.accent ? { color: "var(--color-accent)" } : undefined}
+                  className="font-heading text-[30px] leading-none"
+                  style={t.accent ? { color: "var(--color-foil)" } : undefined}
                 >
                   {t.n}
                 </div>
@@ -191,7 +191,7 @@ export function Stats() {
                 <tbody>
                   {rows.map((r) => (
                     <tr key={r.id}>
-                      <td className="font-extrabold">{r.title}</td>
+                      <td className="font-heading text-[15px]">{r.title}</td>
                       <td>
                         <span className="tag tag-neutral">{r.tab}</span>
                       </td>
@@ -211,7 +211,7 @@ export function Stats() {
               className="flex flex-wrap items-center gap-4 px-5 py-[18px]"
               style={{ background: "var(--color-accent)", color: "var(--color-bg)" }}
             >
-              <div className="font-heading max-w-[34ch] text-lg font-extrabold leading-tight">
+              <div className="font-heading max-w-[34ch] text-lg leading-tight">
                 {top.hasLink
                   ? `“${top.title}” gets the most clicks — keep it near the top.`
                   : `“${top.title}” gets the most clicks and has no link.`}

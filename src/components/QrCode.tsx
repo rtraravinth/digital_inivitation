@@ -129,7 +129,7 @@ export function QrCode({
             aria-label="Download the code as a PNG"
             title="Download PNG"
             onClick={download}
-            className="hover:bg-accent hover:text-bg flex h-11 cursor-pointer items-center justify-center gap-2 text-[11px] font-extrabold uppercase tracking-[0.06em] transition-colors"
+            className="hover:bg-accent hover:text-bg flex h-11 cursor-pointer items-center justify-center gap-2 text-[11px] uppercase tracking-[0.06em] transition-colors"
             style={{ boxShadow: "inset 0 2px 0 var(--color-divider)" }}
           >
             <DownloadGlyph />

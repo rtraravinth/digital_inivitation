@@ -7,6 +7,7 @@ import { TabField } from "./TabField";
 import { TagEditor } from "./TagEditor";
 import { PortfolioExtras, PortraitField, SectionExtras } from "./SectionExtras";
 import { PublishedLock } from "./PublishedLock";
+import { Glyph } from "@/lib/glyphs";
 import { LinkIcon, iconFor } from "@/lib/icons";
 import { usePortfolios } from "@/lib/store";
 import {
@@ -193,9 +194,9 @@ function DocRow({
       ref={innerRef}
       className={[
         "border-divider grid grid-cols-[120px_1fr]",
-        last ? "" : "border-b-2",
+        last ? "" : "border-b",
         editing
-          ? "bg-surface shadow-[inset_3px_0_0_var(--color-accent)]"
+          ? "bg-surface shadow-[inset_1px_0_0_var(--color-foil)]"
           : interactive
             ? "hover:bg-neutral-100 cursor-pointer"
             : "",
@@ -306,7 +307,7 @@ export function Editor({ id }: { id: string }) {
     <>
       {/* ── top bar ─────────────────────────────────────────────────── */}
       <div className="nav bg-bg gap-3.5">
-        <Link href="/" className="font-heading text-[13px] font-extrabold">
+        <Link href="/" className="font-heading text-[13px]">
           ← Portfolios
         </Link>
         <span className="nav-brand mr-0 hidden text-[15px] sm:inline">{p.name}</span>
@@ -332,7 +333,7 @@ export function Editor({ id }: { id: string }) {
       {storageError && (
         <div
           role="alert"
-          className="px-4 py-2.5 text-[13px] font-extrabold"
+          className="px-4 py-2.5 text-[13px]"
           style={{ background: "var(--color-accent)", color: "var(--color-bg)" }}
         >
           {storageError}
@@ -341,13 +342,14 @@ export function Editor({ id }: { id: string }) {
 
       {/* ══ desktop — the document ═══════════════════════════════════ */}
       <div className="hidden lg:block">
-        <div className="border-divider bg-surface flex items-center gap-5 border-b-2 px-6 py-2.5">
+        <div className="border-divider bg-surface flex items-center gap-5 border-b px-6 py-2.5">
           <button
             type="button"
             className="btn btn-secondary"
             onClick={addAndEdit}
           >
-            + Add section
+            <Glyph id="plus" size={15} />
+            Add section
           </button>
           <button
             type="button"
@@ -366,8 +368,14 @@ export function Editor({ id }: { id: string }) {
           </span>
         </div>
 
-        <div className="bg-neutral-300 flex justify-center p-7">
-          <div className="border-divider bg-bg w-[860px] max-w-full border-2">
+        {/* The desk is the deeper board and the document is a sheet laid on
+            it: a hairline trim and the page's own lift, so the thing being
+            edited reads as an object rather than as the window's background. */}
+        <div className="bg-surface flex justify-center p-7 md:p-10">
+          <div
+            className="bg-bg w-[860px] max-w-full"
+            style={{ boxShadow: "0 0 0 1px var(--color-divider), var(--shadow-lg)" }}
+          >
             {/* header block */}
             {editingId === HEADER_KEY ? (
               <DocRow
@@ -397,14 +405,14 @@ export function Editor({ id }: { id: string }) {
                 onOpen={reordering ? undefined : () => setEditingId(HEADER_KEY)}
               >
                 <Field label="Name">
-                  <div className="font-heading text-[34px] font-extrabold leading-[1.05]">
+                  <div className="font-heading text-[34px] leading-[1.05]">
                     {p.header.name || (
                       <span className="text-neutral-400">Your name</span>
                     )}
                   </div>
                 </Field>
                 <Field label="Current">
-                  <div className="text-[15px] font-extrabold">
+                  <div className="text-[15px]">
                     {p.header.current || (
                       <span className="text-neutral-400 font-normal">
                         What you&rsquo;re doing right now
@@ -473,7 +481,7 @@ export function Editor({ id }: { id: string }) {
                             disabled={i === p.sections.length - 1}
                             onClick={() => moveSection(p.id, s.id, 1)}
                           >
-                            ↓
+                            <Glyph id="down" size={16} />
                           </button>
                         </div>
                       </div>
@@ -518,7 +526,7 @@ export function Editor({ id }: { id: string }) {
                     </>
                   ) : (
                     <>
-                      <div className="font-heading text-2xl font-extrabold leading-[1.1]">
+                      <div className="font-heading text-2xl leading-[1.1]">
                         {s.title || (
                           <span className="text-neutral-400">Section title</span>
                         )}
@@ -550,7 +558,8 @@ export function Editor({ id }: { id: string }) {
                   style={{ padding: 14 }}
                   onClick={addAndEdit}
                 >
-                  + Add section
+                  <Glyph id="plus" size={15} />
+                  Add section
                 </button>
               </div>
             </div>
@@ -562,16 +571,16 @@ export function Editor({ id }: { id: string }) {
       <div className="lg:hidden">
         {openSection ? (
           <>
-            <div className="border-divider flex items-center gap-2.5 border-b-2 px-4 py-3">
+            <div className="border-divider flex items-center gap-2.5 border-b px-4 py-3">
               <button
                 type="button"
-                className="font-heading text-xs font-extrabold"
+                className="font-heading text-xs"
                 onClick={() => setMobileOpen(null)}
                 aria-label="Back to sections"
               >
                 ←
               </button>
-              <span className="font-heading text-sm font-extrabold">
+              <span className="font-heading text-sm">
                 Section {sectionNumber(openSectionIndex)}
               </span>
               <button
@@ -603,16 +612,16 @@ export function Editor({ id }: { id: string }) {
           </>
         ) : mobileOpen === HEADER_KEY ? (
           <>
-            <div className="border-divider flex items-center gap-2.5 border-b-2 px-4 py-3">
+            <div className="border-divider flex items-center gap-2.5 border-b px-4 py-3">
               <button
                 type="button"
-                className="font-heading text-xs font-extrabold"
+                className="font-heading text-xs"
                 onClick={() => setMobileOpen(null)}
                 aria-label="Back to sections"
               >
                 ←
               </button>
-              <span className="font-heading text-sm font-extrabold">Header</span>
+              <span className="font-heading text-sm">Header</span>
               <button
                 type="button"
                 className="btn btn-primary ml-auto"
@@ -628,9 +637,9 @@ export function Editor({ id }: { id: string }) {
           </>
         ) : (
           <>
-            <div className="border-divider bg-surface border-b-2 px-4 py-3.5">
+            <div className="border-divider bg-surface border-b px-4 py-3.5">
               <div className="mono-label mb-1.5">Header</div>
-              <div className="font-heading text-xl font-extrabold">
+              <div className="font-heading text-xl">
                 {p.header.name || (
                   <span className="text-neutral-400">Your name</span>
                 )}
@@ -650,10 +659,11 @@ export function Editor({ id }: { id: string }) {
               )}
               <button
                 type="button"
-                className="font-heading mt-2.5 inline-block text-xs font-extrabold"
+                className="font-heading mt-2.5 inline-block text-xs"
                 onClick={() => setMobileOpen(HEADER_KEY)}
               >
-                Edit header →
+                Edit header
+                <Glyph id="arrow" size={15} />
               </button>
             </div>
 
@@ -673,11 +683,11 @@ export function Editor({ id }: { id: string }) {
                 key={s.id}
                 className="border-divider flex items-center gap-3 border-b px-4 py-3"
               >
-                <span className="font-heading text-neutral-400 text-[11px] font-extrabold">
+                <span className="font-heading text-neutral-400 text-[11px]">
                   {sectionNumber(i)}
                 </span>
                 <span className="flex min-w-0 flex-col gap-0.5">
-                  <span className="font-heading truncate text-sm font-extrabold leading-tight">
+                  <span className="font-heading truncate text-sm leading-tight">
                     {s.title || (
                       <span className="text-neutral-400">Untitled section</span>
                     )}
@@ -705,17 +715,17 @@ export function Editor({ id }: { id: string }) {
                       disabled={i === p.sections.length - 1}
                       onClick={() => moveSection(p.id, s.id, 1)}
                     >
-                      ↓
+                      <Glyph id="down" size={16} />
                     </button>
                   </span>
                 ) : (
                   <button
                     type="button"
-                    className="font-heading text-neutral-600 ml-auto text-[13px] font-extrabold"
+                    className="font-heading text-neutral-600 ml-auto text-[13px]"
                     aria-label={`Edit ${s.title || "untitled section"}`}
                     onClick={() => setMobileOpen(s.id)}
                   >
-                    ›
+                    <Glyph id="chevron" size={16} />
                   </button>
                 )}
               </div>
@@ -727,7 +737,8 @@ export function Editor({ id }: { id: string }) {
                 className="btn btn-primary btn-block"
                 onClick={async () => setMobileOpen(await addSectionAsync(p.id))}
               >
-                + Add section
+                <Glyph id="plus" size={15} />
+                Add section
               </button>
             </div>
           </>

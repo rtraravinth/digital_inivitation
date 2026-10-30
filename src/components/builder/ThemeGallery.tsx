@@ -44,14 +44,14 @@ export function ThemeGallery({ id }: { id: string }) {
   return (
     <>
       <div className="nav bg-bg">
-        <span className="nav-brand">FACET</span>
+        <span className="nav-brand">Facet</span>
         <span className="text-neutral-700 text-xs">Choose a theme</span>
         <Link href={`/builder/${p.id}`} className="btn btn-ghost ml-auto">
           Skip for now
         </Link>
       </div>
 
-      <div className="border-divider border-b-2 px-6 pb-6 pt-8 sm:px-10">
+      <div className="border-divider border-b px-6 pb-6 pt-8 sm:px-10">
         <h1 className="mb-3 text-[34px] sm:text-[46px]">Pick a starting theme</h1>
         <p className="mb-5 max-w-[60ch] text-[17px]">
           Every theme carries the same content. You can swap themes at any time
@@ -87,12 +87,12 @@ export function ThemeGallery({ id }: { id: string }) {
             <div key={t.id} className="bg-bg p-5">
               <ThemeThumb theme={t.id} accent={p.accent} size="lg" />
               <div className="mb-1 mt-3.5 flex items-baseline gap-2">
-                <span className="font-heading text-lg font-extrabold">{t.name}</span>
+                <span className="font-heading text-lg">{t.name}</span>
                 {(on || t.badge) && (
                   <span
-                    className="font-heading text-[10px] font-extrabold uppercase tracking-[0.06em]"
+                    className="font-heading text-[10px] uppercase tracking-[0.06em]"
                     style={{
-                      color: on ? "var(--color-accent)" : "var(--color-neutral-600)",
+                      color: on ? "var(--color-foil)" : "var(--color-neutral-600)",
                     }}
                   >
                     {on ? "Selected" : t.badge}
@@ -124,7 +124,7 @@ export function ThemeGallery({ id }: { id: string }) {
         })}
       </div>
 
-      <div className="border-divider flex flex-wrap items-center gap-4 border-t-2 px-6 py-6 sm:px-10">
+      <div className="border-divider flex flex-wrap items-center gap-4 border-t px-6 py-6 sm:px-10">
         <span className="text-neutral-700 text-[13px]">
           Selected: <strong>{selected?.name ?? "—"}</strong>
         </span>

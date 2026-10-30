@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { UploadButton } from "./UploadButton";
+import { Glyph } from "@/lib/glyphs";
 import { formatBytes, readFileAsset, readImageAsset } from "@/lib/assets";
 import { newId } from "@/lib/store";
 import { assetSrc, type Asset, type PortfolioHeader, type Section } from "@/lib/types";
@@ -26,7 +27,7 @@ function AssetChip({
         <img
           src={assetSrc(asset)}
           alt={asset.name}
-          className="grayscale-photo h-16 w-16 flex-none object-cover"
+          className="h-16 w-16 flex-none object-cover"
         />
       ) : (
         <span className="bg-surface border-divider mono-label flex h-16 w-16 flex-none items-center justify-center border">
@@ -34,7 +35,7 @@ function AssetChip({
         </span>
       )}
       <div className="min-w-0 flex-1">
-        <div className="truncate text-[13px] font-extrabold">{asset.name}</div>
+        <div className="truncate text-[13px]">{asset.name}</div>
         <div className="text-neutral-700 text-[11px]">{formatBytes(asset.size)}</div>
       </div>
       <button
@@ -43,7 +44,7 @@ function AssetChip({
         aria-label="Remove"
         onClick={onRemove}
       >
-        ✕
+        <Glyph id="close" size={15} />
       </button>
     </div>
   );
@@ -98,7 +99,7 @@ function NumberRows({ header, onChange }: { header: PortfolioHeader; onChange: H
                 }))
               }
             >
-              ✕
+              <Glyph id="close" size={15} />
             </button>
           </div>
         ))}
@@ -153,7 +154,7 @@ function DateRows({ header, onChange }: { header: PortfolioHeader; onChange: Hea
                 onChange((h) => ({ ...h, dates: h.dates.filter((x) => x.id !== d.id) }))
               }
             >
-              ✕
+              <Glyph id="close" size={15} />
             </button>
           </div>
         ))}
@@ -262,7 +263,7 @@ export function SectionExtras({
 
       {error && (
         <p
-          className="mb-3 text-[12px] font-extrabold"
+          className="mb-3 text-[12px]"
           style={{ color: "var(--color-accent-700)" }}
           role="alert"
         >
@@ -330,7 +331,7 @@ export function SectionExtras({
                 aria-label="Remove quote"
                 onClick={() => onChange((s) => ({ ...s, quote: null }))}
               >
-                ✕
+                <Glyph id="close" size={15} />
               </button>
             </div>
           </div>
@@ -362,7 +363,7 @@ export function PortraitField({
       </div>
       {error && (
         <p
-          className="mb-2 text-[12px] font-extrabold"
+          className="mb-2 text-[12px]"
           style={{ color: "var(--color-accent-700)" }}
           role="alert"
         >

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { Glyph } from "@/lib/glyphs";
 
 export function TagEditor({
   tags,
@@ -36,7 +37,7 @@ export function TagEditor({
             aria-label={`Remove tag ${tag}`}
             className="cursor-pointer opacity-60 hover:opacity-100"
           >
-            ✕
+            <Glyph id="close" size={15} />
           </button>
         </span>
       ))}
@@ -68,7 +69,8 @@ export function TagEditor({
           style={{ fontSize: 12, padding: "4px 10px" }}
           onClick={() => setAdding(true)}
         >
-          + Add tag
+          <Glyph id="plus" size={15} />
+          Add tag
         </button>
       )}
     </div>

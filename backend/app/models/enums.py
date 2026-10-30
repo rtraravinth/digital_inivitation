@@ -17,6 +17,8 @@ Ground = Literal["light", "dark", "paper"]
 GROUNDS: Final[tuple[str, ...]] = ("light", "dark", "paper")
 
 FontId = Literal[
+    "bodoni-moda",
+    "schibsted-grotesk",
     "archivo",
     "inter",
     "dm-sans",
@@ -33,6 +35,8 @@ FontId = Literal[
     "jetbrains-mono",
 ]
 FONTS: Final[tuple[str, ...]] = (
+    "bodoni-moda",
+    "schibsted-grotesk",
     "archivo",
     "inter",
     "dm-sans",
@@ -79,8 +83,17 @@ NOTIFICATION_KEYS: Final[tuple[str, ...]] = (
 PrivacyKey = Literal["indexable", "showContact", "countVisits", "badge"]
 PRIVACY_KEYS: Final[tuple[str, ...]] = ("indexable", "showContact", "countVisits", "badge")
 
-#: The one accent that ships as the default, from SWATCHES[0].
-DEFAULT_ACCENT: Final[str] = "#ec3013"
+#: The one accent that ships as the default, from SWATCHES[0] — book cloth.
+DEFAULT_ACCENT: Final[str] = "#b5261e"
+
+#: The house type pairing: the catalogue's didone over its caption grotesk.
+#: Mirrors the first two entries of FONTS in src/lib/types.ts.
+DEFAULT_FONT: Final[str] = "bodoni-moda"
+DEFAULT_BODY_FONT: Final[str] = "schibsted-grotesk"
+
+#: The stock a new portfolio prints on. "dark" is board; the key is the wire
+#: format and did not change when the colour it names did.
+DEFAULT_GROUND: Final[str] = "dark"
 DEFAULT_TRACKING: Final[str] = "-0.015em"
 
 #: What a section files under when the page has no tabs yet. Every section

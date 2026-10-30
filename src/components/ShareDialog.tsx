@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { QrCode } from "./QrCode";
+import { Glyph } from "@/lib/glyphs";
 import { useAccount } from "@/lib/account";
 import { pageAddress, type Portfolio } from "@/lib/types";
 
@@ -66,7 +67,7 @@ export function ShareDialog({
         aria-label="Share your page"
       >
         {/* ── title ─────────────────────────────────────────────── */}
-        <div className="border-divider flex items-center gap-3 border-b-2 px-4 py-3.5">
+        <div className="border-divider flex items-center gap-3 border-b px-4 py-3.5">
           <div className="dialog-title">Share your page</div>
           <button
             type="button"
@@ -81,8 +82,8 @@ export function ShareDialog({
         </div>
 
         {/* ── which page ────────────────────────────────────────── */}
-        <div className="border-divider flex items-center gap-3 border-b-2 px-4 py-3">
-          <label htmlFor="share-page" className="font-heading text-xs font-extrabold">
+        <div className="border-divider flex items-center gap-3 border-b px-4 py-3">
+          <label htmlFor="share-page" className="font-heading text-xs">
             Page
           </label>
           <select
@@ -100,14 +101,14 @@ export function ShareDialog({
         </div>
 
         {/* ── the address ───────────────────────────────────────── */}
-        <div className="border-divider border-b-2 px-4 py-4">
+        <div className="border-divider border-b px-4 py-4">
           {/* One box holds the address and the act of taking it, so the two
               read as one control rather than a label beside a button. */}
           <div
             className="flex items-stretch"
             style={{ boxShadow: "inset 0 0 0 2px var(--color-divider)" }}
           >
-            <span className="font-heading min-w-0 flex-1 self-center break-all px-3 py-2.5 text-[15px] font-extrabold leading-snug">
+            <span className="font-heading min-w-0 flex-1 self-center break-all px-3 py-2.5 text-[15px] leading-snug">
               {address}
             </span>
             <button
@@ -151,7 +152,8 @@ export function ShareDialog({
               rel="noopener noreferrer"
               className="btn btn-secondary btn-block no-underline"
             >
-              WhatsApp ↗
+              WhatsApp
+              <Glyph id="out" size={15} />
             </a>
             <a
               href={`https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(url)}`}
@@ -159,7 +161,8 @@ export function ShareDialog({
               rel="noopener noreferrer"
               className="btn btn-secondary btn-block no-underline"
             >
-              LinkedIn ↗
+              LinkedIn
+              <Glyph id="out" size={15} />
             </a>
             <button
               type="button"
@@ -180,7 +183,7 @@ export function ShareDialog({
           {/* One line, always present, so nothing below it moves when a copy
               lands. */}
           <p
-            className="m-0 mt-3 min-h-[15px] text-[11px] font-extrabold"
+            className="m-0 mt-3 min-h-[15px] text-[11px]"
             role="status"
             style={{ color: "var(--color-accent-700)" }}
           >

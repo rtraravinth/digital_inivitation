@@ -14,7 +14,7 @@ export async function generateMetadata({
   const { handle, slug } = await params;
   const published = await fetchPublished(handle, slug);
 
-  if (!published) return { title: "No page here · FACET" };
+  if (!published) return { title: "No page here · Facet" };
 
   const { portfolio, privacy } = published;
   return {

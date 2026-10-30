@@ -64,11 +64,11 @@ export function ServerNotice({ what }: { what: string }) {
       role="note"
       style={{
         background: "var(--color-surface)",
-        boxShadow: "inset 3px 0 0 var(--color-accent)",
+        boxShadow: "inset 1px 0 0 var(--color-foil)",
         color: "var(--color-neutral-800)",
       }}
     >
-      <strong>Stored, enforced nowhere.</strong> {what} FACET has a server, but not
+      <strong>Stored, enforced nowhere.</strong> {what} Facet has a server, but not
       that one — so what you set here is saved to your account and does not do
       anything yet.
     </p>
@@ -78,7 +78,7 @@ export function ServerNotice({ what }: { what: string }) {
 export function Pill({ on, children }: { on: boolean; children: React.ReactNode }) {
   return (
     <span
-      className="font-heading ml-auto flex-none px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-[0.06em]"
+      className="font-heading ml-auto flex-none px-2.5 py-1 text-[10px] uppercase tracking-[0.06em]"
       style={
         on
           ? { background: "var(--color-accent)", color: "var(--color-bg)" }
@@ -105,7 +105,7 @@ function SettingRow({
   return (
     <div className="border-divider flex flex-wrap items-center gap-4 border-b py-3.5">
       <span className="flex max-w-[52ch] flex-col gap-0.5">
-        <span className="font-heading text-sm font-extrabold">{title}</span>
+        <span className="font-heading text-sm">{title}</span>
         <span className="text-neutral-700 text-xs">{desc}</span>
       </span>
       {/* Pushed right explicitly. Without this the controls sit wherever the
@@ -179,14 +179,14 @@ export function ProfilePanel({ account }: PanelProps) {
               <img
                 src={assetSrc(p.portrait)}
                 alt={p.portrait.name}
-                className="grayscale-photo h-full w-full object-cover"
+                className="h-full w-full object-cover"
               />
             ) : (
               <div
-                className="grayscale-photo h-full w-full"
+                className="h-full w-full"
                 style={{
                   background:
-                    "repeating-linear-gradient(45deg,#d7d3d3 0 6px,#eae9e9 6px 12px)",
+                    "repeating-linear-gradient(45deg, color-mix(in srgb, var(--color-ink) 10%, transparent) 0 1px, transparent 1px 9px)",
                 }}
               />
             )}
@@ -210,7 +210,7 @@ export function ProfilePanel({ account }: PanelProps) {
           </div>
           {error && (
             <p
-              className="mt-2 text-[12px] font-extrabold"
+              className="mt-2 text-[12px]"
               role="alert"
               style={{ color: "var(--color-accent-700)" }}
             >
@@ -299,7 +299,7 @@ export function ProfilePanel({ account }: PanelProps) {
               <span className="text-neutral-700 text-[12px]">Unsaved changes</span>
             )}
             {saved && !dirty && (
-              <span className="text-[12px] font-extrabold" role="status">
+              <span className="text-[12px]" role="status">
                 Saved to this browser.
               </span>
             )}
@@ -386,12 +386,12 @@ export function SecurityPanel({ account }: PanelProps) {
       </p>
 
       {error && (
-        <p className="border-accent mb-4 border-l-2 py-2 pl-3 text-[13px]" role="alert">
+        <p className="border-accent mb-4 border-l py-2 pl-3 text-[13px]" role="alert">
           {error}
         </p>
       )}
       {note && (
-        <p className="mb-4 text-[13px] font-extrabold" role="status">
+        <p className="mb-4 text-[13px]" role="status">
           {note}
         </p>
       )}
@@ -429,7 +429,7 @@ export function SecurityPanel({ account }: PanelProps) {
       </SettingRow>
 
       {changingPassword && (
-        <div className="border-divider mb-4 grid gap-3 border-2 p-4 sm:grid-cols-2">
+        <div className="border-divider mb-4 grid gap-3 border p-4 sm:grid-cols-2">
           <div className="field">
             <label htmlFor="ac-current">Current password</label>
             {/* Starts empty and stays the user's to type. Nothing here knows
@@ -468,7 +468,7 @@ export function SecurityPanel({ account }: PanelProps) {
             {/* Only once they have typed enough to mean it — an alarm on the
                 first keystroke of a field they are still filling is noise. */}
             {mismatch && (
-              <p className="mt-1 text-[12px]" style={{ color: "var(--color-accent)" }}>
+              <p className="mt-1 text-[12px]" style={{ color: "var(--color-alert)" }}>
                 Those two do not match.
               </p>
             )}
@@ -518,7 +518,7 @@ export function SecurityPanel({ account }: PanelProps) {
       </SettingRow>
 
       {setup && (
-        <div className="border-divider mb-4 border-2 p-4">
+        <div className="border-divider mb-4 border p-4">
           {setup.otpauthUri ? (
             <div className="flex flex-col gap-4 sm:flex-row">
               {/* The same hand-rolled encoder the print code on /stats uses.
@@ -605,9 +605,9 @@ export function SecurityPanel({ account }: PanelProps) {
       </SettingRow>
 
       {codes && (
-        <div className="border-divider mt-4 border-2 p-4">
+        <div className="border-divider mt-4 border p-4">
           <div className="mb-2 flex items-center">
-            <span className="font-heading text-[13px] font-extrabold">
+            <span className="font-heading text-[13px]">
               Your recovery codes
             </span>
             <button
@@ -656,7 +656,7 @@ export function SecurityPanel({ account }: PanelProps) {
               <tbody>
                 {sessions.map((session) => (
                   <tr key={session.id}>
-                    <td className="font-extrabold">{session.device}</td>
+                    <td className="font-heading text-[15px]">{session.device}</td>
                     <td>{session.place}</td>
                     <td>{new Date(session.when).toLocaleString()}</td>
                     <td>
@@ -800,7 +800,7 @@ export function AddressesPanel({ account, portfolios, analytics }: PanelProps) {
           <tbody>
             {portfolios.map((p) => (
               <tr key={p.id}>
-                <td className="font-extrabold">{p.name}</td>
+                <td className="font-heading text-[15px]">{p.name}</td>
                 <td className="font-mono text-xs">{pageAddress(handle, p.slug)}</td>
                 <td>
                   <span
@@ -829,8 +829,8 @@ export function AddressesPanel({ account, portfolios, analytics }: PanelProps) {
         <p className="text-neutral-700 m-0 py-6 text-[13px]">No portfolios yet.</p>
       )}
 
-      <div className="border-divider mt-6 border-2 p-5">
-        <div className="font-heading mb-1 text-[15px] font-extrabold">
+      <div className="border-divider mt-6 border p-5">
+        <div className="font-heading mb-1 text-[15px]">
           Use your own domain
         </div>
         <ServerNotice what={NEEDS_SERVER.domain} />
@@ -859,7 +859,7 @@ export function PlanPanel({ account }: PanelProps) {
       <h6 className="mb-1.5">Plan &amp; billing</h6>
       <ServerNotice what={NEEDS_SERVER.billing} />
 
-      <div className="border-divider mb-6 grid border-2 sm:grid-cols-2">
+      <div className="border-divider mb-6 grid border sm:grid-cols-2">
         {PLANS.map((plan) => {
           const current = account.plan === plan.id;
           return (
@@ -868,21 +868,21 @@ export function PlanPanel({ account }: PanelProps) {
               className="bg-bg flex flex-col gap-3 p-5"
               style={{
                 borderRight: "1px solid var(--color-divider)",
-                boxShadow: current ? "none" : "inset 3px 0 0 var(--color-accent)",
+                boxShadow: current ? "none" : "inset 1px 0 0 var(--color-foil)",
               }}
             >
               <div className="flex items-baseline gap-2">
-                <span className="font-heading text-xl font-extrabold">{plan.name}</span>
+                <span className="font-heading text-xl">{plan.name}</span>
                 {current && (
                   <span
-                    className="font-heading text-[10px] font-extrabold uppercase tracking-[0.06em]"
-                    style={{ color: "var(--color-accent)" }}
+                    className="font-heading text-[10px] uppercase tracking-[0.06em]"
+                    style={{ color: "var(--color-foil)" }}
                   >
                     Current
                   </span>
                 )}
               </div>
-              <div className="font-heading text-[30px] font-extrabold leading-none">
+              <div className="font-heading text-[30px] leading-none">
                 {plan.price}
               </div>
               <div className="text-neutral-800 flex flex-col gap-1.5 text-[13px]">
@@ -981,13 +981,13 @@ export function PrivacyPanel({ account, portfolios }: PanelProps) {
       />
 
       {message && (
-        <p className="mt-3 text-[13px] font-extrabold" role="status">
+        <p className="mt-3 text-[13px]" role="status">
           {message}
         </p>
       )}
       {error && (
         <p
-          className="mt-3 text-[13px] font-extrabold"
+          className="mt-3 text-[13px]"
           style={{ color: "var(--color-accent-700)" }}
           role="alert"
         >
@@ -997,10 +997,10 @@ export function PrivacyPanel({ account, portfolios }: PanelProps) {
 
       <div
         className="mt-7 p-5"
-        style={{ boxShadow: "inset 0 0 0 2px var(--color-accent)" }}
+        style={{ boxShadow: "inset 0 0 0 1px var(--color-foil)" }}
       >
         <div
-          className="font-heading mb-1 text-[15px] font-extrabold"
+          className="font-heading mb-1 text-[15px]"
           style={{ color: "var(--color-accent-700)" }}
         >
           Delete everything

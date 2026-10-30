@@ -217,11 +217,11 @@
         "hidden": false
       }
     ],
-    "accent": "#ec3013",
-    "ground": "light",
+    "accent": "#b5261e",
+    "ground": "dark",
     "groundHex": "",
-    "font": "archivo",
-    "bodyFont": "archivo",
+    "font": "bodoni-moda",
+    "bodyFont": "schibsted-grotesk",
     "layout": {
       "roleNav": "tabs",
       "grid": 2,
@@ -314,11 +314,11 @@
       }
     ],
     "theme": "editorial",
-    "accent": "#ec3013",
-    "ground": "light",
+    "accent": "#b5261e",
+    "ground": "dark",
     "groundHex": "",
-    "font": "archivo",
-    "bodyFont": "archivo",
+    "font": "bodoni-moda",
+    "bodyFont": "schibsted-grotesk",
     "layout": {
       "roleNav": "tabs",
       "grid": 2,
@@ -418,11 +418,11 @@
       }
     ],
     "theme": "editorial",
-    "accent": "#ec3013",
-    "ground": "light",
+    "accent": "#b5261e",
+    "ground": "dark",
     "groundHex": "",
-    "font": "archivo",
-    "bodyFont": "archivo",
+    "font": "bodoni-moda",
+    "bodyFont": "schibsted-grotesk",
     "layout": {
       "roleNav": "tabs",
       "grid": 2,
@@ -497,11 +497,11 @@
         "hidden": false
       }
     ],
-    "accent": "#ec3013",
-    "ground": "light",
+    "accent": "#b5261e",
+    "ground": "dark",
     "groundHex": "",
-    "font": "archivo",
-    "bodyFont": "archivo",
+    "font": "bodoni-moda",
+    "bodyFont": "schibsted-grotesk",
     "layout": {
       "roleNav": "tabs",
       "grid": 2,
@@ -611,11 +611,11 @@
         "hidden": false
       }
     ],
-    "accent": "#ec3013",
-    "ground": "light",
+    "accent": "#b5261e",
+    "ground": "dark",
     "groundHex": "",
-    "font": "archivo",
-    "bodyFont": "archivo",
+    "font": "bodoni-moda",
+    "bodyFont": "schibsted-grotesk",
     "layout": {
       "roleNav": "tabs",
       "grid": 2,

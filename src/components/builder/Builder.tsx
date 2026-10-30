@@ -19,6 +19,7 @@ import {
 import { PublishedLock } from "../PublishedLock";
 import { ColourPicker } from "@/components/builder/ColourPicker";
 import { FontSelect } from "@/components/builder/FontSelect";
+import { Glyph } from "@/lib/glyphs";
 import { usePortfolios } from "@/lib/store";
 import {
   GROUNDS,
@@ -98,7 +99,7 @@ function Canvas({
     <div ref={outerRef} className="w-full">
       <div className="mb-3 flex items-center gap-3">
         <span
-          className="font-heading text-[11px] font-extrabold"
+          className="font-heading text-[11px]"
           style={{ color: "var(--color-neutral-700)" }}
         >
           {width} × auto
@@ -113,7 +114,7 @@ function Canvas({
       </div>
 
       <div
-        className="border-divider mx-auto overflow-hidden border-2"
+        className="border-divider mx-auto overflow-hidden border"
         style={{
           width: scale > 0 ? width * scale : "100%",
           height,
@@ -264,7 +265,7 @@ function SectionRail({ p }: { p: Portfolio }) {
 
   return (
     <>
-      <div className="border-divider border-b-2 p-4">
+      <div className="border-divider border-b p-4">
         <h6 className="m-0">Page sections</h6>
       </div>
 
@@ -276,7 +277,7 @@ function SectionRail({ p }: { p: Portfolio }) {
             className="border-divider border-b"
             style={{
               background: on ? "var(--color-bg)" : "transparent",
-              boxShadow: on ? "inset 3px 0 0 var(--color-accent)" : "none",
+              boxShadow: on ? "inset 1px 0 0 var(--color-foil)" : "none",
               opacity: s.hidden ? 0.45 : 1,
             }}
           >
@@ -285,10 +286,10 @@ function SectionRail({ p }: { p: Portfolio }) {
               onClick={() => setSelected(on ? null : s.id)}
               className="flex w-full cursor-pointer items-center gap-2.5 px-4 py-2.5 text-left"
             >
-              <span className="font-heading text-neutral-500 w-4 flex-none text-[10px] font-extrabold">
+              <span className="font-heading text-neutral-500 w-4 flex-none text-[10px]">
                 {String(i + 1).padStart(2, "0")}
               </span>
-              <span className="truncate text-[13px] font-extrabold">
+              <span className="truncate text-[13px]">
                 {s.title || "Untitled section"}
               </span>
               <span className="text-neutral-600 ml-auto flex-none text-[11px]">
@@ -314,7 +315,7 @@ function SectionRail({ p }: { p: Portfolio }) {
                   disabled={i === p.sections.length - 1}
                   onClick={() => moveSection(p.id, s.id, 1)}
                 >
-                  ↓
+                  <Glyph id="down" size={16} />
                 </button>
                 <button
                   type="button"
@@ -327,7 +328,8 @@ function SectionRail({ p }: { p: Portfolio }) {
                   href={`/editor/${p.id}`}
                   className="btn btn-ghost text-xs"
                 >
-                  Edit text →
+                  Edit text
+                  <Glyph id="arrow" size={14} />
                 </Link>
               </div>
             )}
@@ -341,11 +343,12 @@ function SectionRail({ p }: { p: Portfolio }) {
           className="btn btn-secondary btn-block"
           onClick={() => addSection(p.id)}
         >
-          + Add section
+          <Glyph id="plus" size={15} />
+          Add section
         </button>
       </div>
 
-      <div className="border-divider border-t-2 p-3.5">
+      <div className="border-divider border-t p-3.5">
         <h6 className="mb-2.5">Tabs on this page</h6>
         <div className="flex flex-wrap gap-1.5">
           {pageTabs.map((t, i) => (
@@ -416,7 +419,7 @@ export function Builder({ id }: { id: string }) {
     <>
       {/* ── top bar ─────────────────────────────────────────────────── */}
       <div className="nav bg-bg gap-3.5">
-        <Link href="/" className="font-heading text-[13px] font-extrabold">
+        <Link href="/" className="font-heading text-[13px]">
           ← Portfolios
         </Link>
         <span className="nav-brand mr-0 hidden text-[15px] sm:inline">{p.name}</span>
@@ -464,7 +467,7 @@ export function Builder({ id }: { id: string }) {
       {storageError && (
         <div
           role="alert"
-          className="px-4 py-2.5 text-[13px] font-extrabold"
+          className="px-4 py-2.5 text-[13px]"
           style={{ background: "var(--color-accent)", color: "var(--color-bg)" }}
         >
           {storageError}
@@ -473,7 +476,7 @@ export function Builder({ id }: { id: string }) {
 
       {/* ══ desktop — rail, canvas, inspector ═══════════════════════ */}
       <div className="hidden lg:grid lg:grid-cols-[248px_1fr_336px]">
-        <div className="border-divider bg-surface border-r-2">
+        <div className="border-divider bg-surface border-r">
           <SectionRail p={p} />
         </div>
 
@@ -481,8 +484,8 @@ export function Builder({ id }: { id: string }) {
           <Canvas p={p} handle={handle} device={device} height={760} />
         </div>
 
-        <div className="border-divider bg-bg border-l-2">
-          <div className="border-divider flex border-b-2">
+        <div className="border-divider bg-bg border-l">
+          <div className="border-divider flex border-b">
             {inspectorTabs.map((t) => {
               const on = tab === t.id;
               return (
@@ -490,9 +493,9 @@ export function Builder({ id }: { id: string }) {
                   key={t.id}
                   type="button"
                   onClick={() => setTab(t.id)}
-                  className="font-heading flex-1 cursor-pointer px-1.5 py-3 text-[13px] font-extrabold"
+                  className="font-heading flex-1 cursor-pointer px-1.5 py-3 text-[13px]"
                   style={{
-                    background: on ? "var(--color-accent)" : "transparent",
+                    background: on ? "var(--color-foil)" : "transparent",
                     color: on ? "var(--color-bg)" : "var(--color-ink)",
                   }}
                 >
@@ -527,8 +530,8 @@ export function Builder({ id }: { id: string }) {
           <Canvas p={p} handle={handle} device="mobile" height={420} panX={false} />
         </div>
 
-        <div className="border-divider border-t-2">
-          <div className="border-divider flex border-b-2">
+        <div className="border-divider border-t">
+          <div className="border-divider flex border-b">
             {sheetTabs.map((t) => {
               const on = sheet === t.id;
               return (
@@ -536,9 +539,9 @@ export function Builder({ id }: { id: string }) {
                   key={t.id}
                   type="button"
                   onClick={() => setSheet(t.id)}
-                  className="font-heading flex-1 cursor-pointer px-1.5 py-3 text-xs font-extrabold"
+                  className="font-heading flex-1 cursor-pointer px-1.5 py-3 text-xs"
                   style={{
-                    background: on ? "var(--color-accent)" : "transparent",
+                    background: on ? "var(--color-foil)" : "transparent",
                     color: on ? "var(--color-bg)" : "var(--color-ink)",
                   }}
                 >
@@ -562,12 +565,12 @@ export function Builder({ id }: { id: string }) {
                       background:
                         p.theme === t.id ? "var(--color-surface)" : "var(--color-bg)",
                       border: `2px solid ${
-                        p.theme === t.id ? "var(--color-accent)" : "var(--color-divider)"
+                        p.theme === t.id ? "var(--color-foil)" : "var(--color-divider)"
                       }`,
                     }}
                   >
                     <ThemeThumb theme={t.id} accent={p.accent} />
-                    <span className="font-heading text-[11px] font-extrabold">
+                    <span className="font-heading text-[11px]">
                       {t.name}
                     </span>
                   </button>

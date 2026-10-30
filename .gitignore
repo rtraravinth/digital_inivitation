@@ -45,3 +45,6 @@ next-env.d.ts
 
 # browser artifacts from Playwright MCP checks
 /.playwright-mcp/
+
+# design-tool working directory: local config, review screenshots, surface notes
+/.impeccable/

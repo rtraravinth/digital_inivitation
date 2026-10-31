@@ -1,258 +1,286 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useId, useRef, useState } from "react";
-import { createPortal } from "react-dom";
+import { useState } from "react";
+import { Canvas, DEVICES, type Device } from "./Canvas";
 import {
   ColourControl,
   LayoutControl,
+  MotionControl,
+  ProfessionControl,
   ThemeControl,
-  ThemeThumb,
   TypeControl,
 } from "./controls";
-import {
-  PreviewProvider,
-  PublishedBody,
-  PublishedHandleProvider,
-  tabs,
-} from "../published/themes";
+import { tabs } from "../published/themes";
 import { PublishedLock } from "../PublishedLock";
-import { ColourPicker } from "@/components/builder/ColourPicker";
-import { FontSelect } from "@/components/builder/FontSelect";
 import { Glyph } from "@/lib/glyphs";
 import { usePortfolios } from "@/lib/store";
-import {
-  GROUNDS,
-  THEMES,
-  pageAddress,
-  previewPath,
-  type Portfolio,
-} from "@/lib/types";
+import { THEMES, pageAddress, previewPath, type Portfolio } from "@/lib/types";
 import { useAccount } from "@/lib/account";
 
-type Device = "desktop" | "mobile";
-type InspectorTab = "theme" | "colour" | "type" | "layout";
-type SheetTab = "style" | "sections" | "content";
+/* ── the builder ──────────────────────────────────────────────────────────
+   Artboards 2a (desktop) and 2c (phone), rebuilt around the motion themes.
 
-const DEVICE_WIDTH: Record<Device, number> = { desktop: 1440, mobile: 390 };
+   Desktop is a workspace the height of the window: the section rail on the
+   left and the inspector on the right scroll on their own, and the canvas
+   between them always shows the whole device, so an edit and its effect are
+   never a scroll apart. On a phone the canvas sits over a control sheet.
 
-/** The canvas iframe starts empty; everything else is copied in or portaled. */
-const FRAME_DOC =
-  "<!doctype html><html><head><style>html,body{margin:0;height:100%}</style></head><body></body></html>";
+   The inspector leads with "Look" — profession and theme — because that one
+   choice moves the page further than every other control together.
+   ──────────────────────────────────────────────────────────────────────── */
 
-/* ── the live canvas ──────────────────────────────────────────────────── */
+type InspectorTab = "look" | "colour" | "type" | "motion";
+type SheetTab = "look" | "style" | "motion" | "sections" | "content";
 
-/**
- * The real published page, in an iframe sized to the device, scaled to fit
- * whatever room the column has.
- *
- * The iframe is what makes "Mobile" mean anything. A theme's `md:` and `lg:`
- * utilities are media queries, and a media query answers about the *window* —
- * so a 390px box inside a 1440px window still got the desktop layout, crammed
- * and overflowing sideways. An iframe has a window of its own, 390px wide, so
- * the breakpoints resolve the way they do on a phone.
- *
- * The scale is a CSS transform, which does not change layout size, so the
- * iframe is given the unscaled size it needs and the outer box shows a
- * shrunken window onto it.
- */
-function Canvas({
-  p,
-  handle,
-  device,
-  height,
-  panX = true,
-}: {
-  handle: string;
-  p: Portfolio;
-  device: Device;
-  height: number;
-  /**
-   * Whether a horizontal swipe inside the preview may scroll it.
-   *
-   * Off on a phone. The canvas fills the middle of that screen and the page
-   * inside it has its own sideways tab row, so a swipe meant to scroll the
-   * builder dragged that row instead — which reads as the builder scrolling
-   * sideways. `touch-action: pan-y` refuses the horizontal gesture and leaves
-   * the vertical one to the builder; taps still land, because touch-action
-   * does not affect them.
-   */
-  panX?: boolean;
-}) {
-  const outerRef = useRef<HTMLDivElement>(null);
-  const [available, setAvailable] = useState(0);
+const INSPECTOR: Array<{ id: InspectorTab; label: string }> = [
+  { id: "look", label: "Look" },
+  { id: "colour", label: "Colour" },
+  { id: "type", label: "Type" },
+  { id: "motion", label: "Motion" },
+];
 
-  useEffect(() => {
-    const node = outerRef.current;
-    if (!node) return;
-    const observer = new ResizeObserver(([entry]) => {
-      setAvailable(entry.contentRect.width);
-    });
-    observer.observe(node);
-    return () => observer.disconnect();
-  }, []);
+const SHEET: Array<{ id: SheetTab; label: string }> = [
+  { id: "look", label: "Look" },
+  { id: "style", label: "Style" },
+  { id: "motion", label: "Motion" },
+  { id: "sections", label: "Sections" },
+  { id: "content", label: "Content" },
+];
 
-  const width = DEVICE_WIDTH[device];
-  const scale = available > 0 ? Math.min(1, available / width) : 0;
+export function Builder({ id }: { id: string }) {
+  const handle = useAccount().account.profile.handle;
+  const { ready, storageError, getPortfolio, updatePortfolio } = usePortfolios();
+  const [device, setDevice] = useState<Device>("desktop");
+  const [tab, setTab] = useState<InspectorTab>("look");
+  const [sheet, setSheet] = useState<SheetTab>("look");
+  const [replay, setReplay] = useState(0);
+
+  const portfolio = getPortfolio(id);
+
+  if (!portfolio) {
+    return (
+      <div className="p-10">
+        <h2>{ready ? "That portfolio doesn't exist." : "Loading…"}</h2>
+        {ready && <Link href="/">← Back to portfolios</Link>}
+      </div>
+    );
+  }
+
+  // A live page is frozen — the API refuses every write to it — so this
+  // screen steps aside for Preview and Unpublish rather than rendering
+  // controls that can only fail.
+  if (portfolio.status === "live") {
+    return <PublishedLock portfolio={portfolio} />;
+  }
+
+  const p: Portfolio = portfolio;
+  const onChange = (recipe: (prev: Portfolio) => Portfolio) => updatePortfolio(p.id, recipe);
+  const theme = THEMES.find((t) => t.id === p.theme);
 
   return (
-    <div ref={outerRef} className="w-full">
-      <div className="mb-3 flex items-center gap-3">
-        <span
-          className="font-heading text-[11px]"
-          style={{ color: "var(--color-neutral-700)" }}
-        >
-          {width} × auto
+    <div className="flex min-h-dvh flex-col lg:h-dvh">
+      {/* ── top bar ─────────────────────────────────────────────────── */}
+      <div className="nav bg-bg flex-none gap-3">
+        <Link href="/" className="btn btn-ghost" aria-label="Back to portfolios">
+          <Glyph id="back" size={16} />
+          <span className="hidden sm:inline">Portfolios</span>
+        </Link>
+        <span className="flex min-w-0 flex-col leading-tight">
+          <span className="nav-brand mr-0 truncate text-[15px]">{p.name}</span>
+          <span className="text-neutral-700 hidden truncate text-[11px] md:inline">
+            {pageAddress(handle, p.slug)}
+          </span>
         </span>
-        <span
-          className="ml-auto text-[11px]"
-          style={{ color: "var(--color-neutral-700)" }}
+        <span className="status status-draft mr-auto hidden sm:inline-flex">Draft — saved</span>
+
+        <Link href={`/editor/${p.id}`} className="btn btn-secondary hidden md:inline-flex">
+          Edit text
+        </Link>
+        <Link
+          href={previewPath(p.id)}
+          className="btn btn-secondary"
+          // A new tab, because the point of a preview is seeing the page
+          // with nothing of the app around it — exactly what a visitor gets.
+          target="_blank"
+          rel="noopener noreferrer"
         >
-          {scale > 0 && `${Math.round(scale * 100)}% · `}Live preview — edits apply
-          instantly
-        </span>
+          Preview
+        </Link>
+        <button
+          type="button"
+          className="btn btn-primary"
+          onClick={() => onChange((prev) => ({ ...prev, status: "live" }))}
+        >
+          Publish
+        </button>
       </div>
 
-      <div
-        className="border-divider mx-auto overflow-hidden border"
-        style={{
-          width: scale > 0 ? width * scale : "100%",
-          height,
-          boxShadow: "var(--shadow-lg)",
-        }}
-      >
-        {scale > 0 && (
-          <CanvasFrame
-            width={width}
-            height={height / scale}
-            scale={scale}
-            panX={panX}
+      {storageError && (
+        <div
+          role="alert"
+          className="flex-none px-4 py-2.5 text-[13px]"
+          style={{ background: "var(--color-accent)", color: "var(--color-accent-ink)" }}
+        >
+          {storageError}
+        </div>
+      )}
+
+      {/* ══ desktop — rail, canvas, inspector ═══════════════════════ */}
+      <div className="hidden min-h-0 flex-1 lg:grid lg:grid-cols-[264px_minmax(0,1fr)_368px]">
+        <aside className="border-divider bg-surface min-h-0 overflow-y-auto border-r">
+          <SectionRail p={p} />
+        </aside>
+
+        <main className="flex min-h-0 flex-col" style={{ background: "var(--color-surface)" }}>
+          <div className="border-divider flex flex-none items-center gap-3 border-b px-5 py-2.5">
+            <div className="seg" role="radiogroup" aria-label="Device">
+              {DEVICES.map((d) => (
+                <label key={d.id} className="seg-opt">
+                  <input
+                    type="radio"
+                    name="builder-device"
+                    checked={device === d.id}
+                    onChange={() => setDevice(d.id)}
+                  />
+                  {d.name}
+                </label>
+              ))}
+            </div>
+            <button
+              type="button"
+              className="btn btn-ghost"
+              style={{ marginTop: 0 }}
+              onClick={() => setReplay((n) => n + 1)}
+              title="Run the page's entrance again"
+            >
+              Replay motion
+            </button>
+            <span className="text-neutral-700 ml-auto truncate text-[11px]">
+              {theme?.name} · {p.layout.motion === "full" ? "full motion" : p.layout.motion === "subtle" ? "subtle motion" : "still"} · edits apply instantly
+            </span>
+          </div>
+          <div className="min-h-0 flex-1 p-6">
+            <Canvas p={p} handle={handle} device={device} replay={replay} />
+          </div>
+        </main>
+
+        <aside className="border-divider bg-bg flex min-h-0 flex-col border-l">
+          <div className="border-divider flex flex-none border-b" role="tablist" aria-label="Inspector">
+            {INSPECTOR.map((t) => {
+              const on = tab === t.id;
+              return (
+                <button
+                  key={t.id}
+                  type="button"
+                  role="tab"
+                  aria-selected={on}
+                  onClick={() => setTab(t.id)}
+                  className="font-heading flex-1 cursor-pointer px-1.5 py-3 text-[13px]"
+                  style={{
+                    boxShadow: on ? "inset 0 -2px 0 var(--color-foil)" : "none",
+                    color: on ? "var(--color-ink)" : "var(--color-neutral-800)",
+                  }}
+                >
+                  {t.label}
+                </button>
+              );
+            })}
+          </div>
+
+          <div className="min-h-0 flex-1 overflow-y-auto p-[18px]">
+            {tab === "look" && (
+              <>
+                <ProfessionControl p={p} onChange={onChange} />
+                <ThemeControl p={p} onChange={onChange} />
+                <Link href={`/themes/${p.id}`} className="btn btn-secondary btn-block">
+                  Open the theme gallery
+                </Link>
+              </>
+            )}
+            {tab === "colour" && <ColourControl p={p} onChange={onChange} />}
+            {tab === "type" && <TypeControl p={p} onChange={onChange} />}
+            {tab === "motion" && (
+              <>
+                <MotionControl p={p} onChange={onChange} />
+                <div className="border-divider border-t pt-5">
+                  <LayoutControl p={p} onChange={onChange} />
+                </div>
+              </>
+            )}
+          </div>
+        </aside>
+      </div>
+
+      {/* ══ phone — canvas over a control sheet ═════════════════════ */}
+      <div className="lg:hidden">
+        <div className="flex items-center gap-2 px-3.5 pt-3">
+          <span className="text-neutral-700 text-[11px]">
+            {theme?.name} · live preview
+          </span>
+          <button
+            type="button"
+            className="btn btn-ghost ml-auto text-xs"
+            style={{ marginTop: 0 }}
+            onClick={() => setReplay((n) => n + 1)}
           >
-            {/* A preview, and it has to say so: otherwise a click in here is
-                recorded as a real visitor's, and a section title links to
-                /p/<handle>/<slug>, which does not resolve until the page is
-                published. */}
-            <PreviewProvider value>
-              <PublishedHandleProvider value={handle}>
-                <PublishedBody p={p} />
-              </PublishedHandleProvider>
-            </PreviewProvider>
-          </CanvasFrame>
-        )}
+            Replay motion
+          </button>
+        </div>
+        <div className="h-[460px] p-3.5" style={{ background: "var(--color-surface)" }}>
+          <Canvas p={p} handle={handle} device="mobile" replay={replay} panX={false} chrome={false} />
+        </div>
+
+        <div className="border-divider border-t">
+          <div className="border-divider fx-rail flex overflow-x-auto border-b" role="tablist" aria-label="Controls">
+            {SHEET.map((t) => {
+              const on = sheet === t.id;
+              return (
+                <button
+                  key={t.id}
+                  type="button"
+                  role="tab"
+                  aria-selected={on}
+                  onClick={() => setSheet(t.id)}
+                  className="font-heading min-h-[48px] flex-1 cursor-pointer px-3 text-xs whitespace-nowrap"
+                  style={{
+                    boxShadow: on ? "inset 0 -2px 0 var(--color-foil)" : "none",
+                    color: on ? "var(--color-ink)" : "var(--color-neutral-800)",
+                  }}
+                >
+                  {t.label}
+                </button>
+              );
+            })}
+          </div>
+
+          {sheet === "look" && (
+            <div className="p-3.5">
+              <ProfessionControl p={p} onChange={onChange} />
+              <ThemeControl p={p} onChange={onChange} />
+            </div>
+          )}
+          {sheet === "style" && (
+            <div className="p-3.5">
+              <ColourControl p={p} onChange={onChange} />
+              <div className="border-divider border-t pt-5">
+                <TypeControl p={p} onChange={onChange} />
+              </div>
+            </div>
+          )}
+          {sheet === "motion" && (
+            <div className="p-3.5">
+              <MotionControl p={p} onChange={onChange} />
+              <div className="border-divider border-t pt-5">
+                <LayoutControl p={p} onChange={onChange} />
+              </div>
+            </div>
+          )}
+          {sheet === "sections" && <SectionRail p={p} />}
+          {sheet === "content" && <ContentSheet p={p} onChange={onChange} />}
+        </div>
       </div>
     </div>
-  );
-}
-
-/** One stylesheet of this document, in the form the iframe can re-render. */
-type Sheet = { key: string; href?: string; css?: string };
-
-/**
- * Every stylesheet in this document's head, kept current.
- *
- * The canvas iframe is a separate document and inherits none of the page's
- * CSS, so it has to render its own copy. In dev the bundler adds and swaps
- * these as you edit, which is what the observer is watching for.
- */
-function useHeadSheets(): Sheet[] {
-  const [sheets, setSheets] = useState<Sheet[]>([]);
-
-  useEffect(() => {
-    const read = () =>
-      setSheets(
-        [...document.querySelectorAll<HTMLElement>('style, link[rel="stylesheet"]')].map(
-          (node, index) => {
-            const href = node.getAttribute("href");
-            return href
-              ? { key: `l${href}`, href }
-              : { key: `s${index}`, css: node.textContent ?? "" };
-          },
-        ),
-      );
-
-    read();
-    const observer = new MutationObserver(read);
-    observer.observe(document.head, { childList: true, subtree: true });
-    return () => observer.disconnect();
-  }, []);
-
-  return sheets;
-}
-
-/**
- * An iframe carrying the app's stylesheets, rendering `children` through a
- * portal so they stay part of this React tree — same state, same context,
- * same live edits.
- *
- * Everything inside is rendered, never appended: the React Compiler will not
- * allow a document held in state to be mutated, and portalling the
- * stylesheets keeps them in step with the parent for free.
- */
-function CanvasFrame({
-  width,
-  height,
-  scale,
-  panX,
-  children,
-}: {
-  width: number;
-  height: number;
-  scale: number;
-  panX: boolean;
-  children: React.ReactNode;
-}) {
-  // Set from the load event, not from a ref at mount: `srcDoc` replaces the
-  // document *after* React attaches the element, so anything written before
-  // that goes with the document it was written to.
-  const [doc, setDoc] = useState<Document | null>(null);
-  // The font variables are declared on <html> as classes, not in a
-  // stylesheet. They are custom properties, so a wrapper inherits them. Read
-  // once, lazily: on the server there is no document, and by the time this
-  // is used the portal has mounted, so there is nothing to mismatch.
-  const [rootClass] = useState(() =>
-    typeof document === "undefined" ? "" : document.documentElement.className,
-  );
-  const sheets = useHeadSheets();
-
-  return (
-    <>
-      <iframe
-        title="Live preview"
-        onLoad={(event) => setDoc(event.currentTarget.contentDocument)}
-        srcDoc={FRAME_DOC}
-        style={{
-          width,
-          height,
-          border: 0,
-          display: "block",
-          transform: `scale(${scale})`,
-          transformOrigin: "top left",
-        }}
-      />
-      {doc &&
-        createPortal(
-          sheets.map((sheet) =>
-            sheet.href ? (
-              <link key={sheet.key} rel="stylesheet" href={sheet.href} />
-            ) : (
-              <style key={sheet.key} dangerouslySetInnerHTML={{ __html: sheet.css ?? "" }} />
-            ),
-          ),
-          doc.head,
-        )}
-      {doc &&
-        createPortal(
-          // touch-action lives inside the iframe because that is the document
-          // the gesture starts in — the parent's own value cannot reach it.
-          <div
-            className={rootClass}
-            style={{ minHeight: "100%", touchAction: panX ? undefined : "pan-y" }}
-          >
-            {children}
-          </div>,
-          doc.body,
-        )}
-    </>
   );
 }
 
@@ -265,8 +293,11 @@ function SectionRail({ p }: { p: Portfolio }) {
 
   return (
     <>
-      <div className="border-divider border-b p-4">
-        <h6 className="m-0">Page sections</h6>
+      <div className="border-divider flex items-baseline border-b p-4">
+        <h6 className="m-0">Sections</h6>
+        <span className="text-neutral-700 ml-auto text-[11px]">
+          {p.sections.length} · {pageTabs.length} {pageTabs.length === 1 ? "tab" : "tabs"}
+        </span>
       </div>
 
       {p.sections.map((s, i) => {
@@ -277,23 +308,25 @@ function SectionRail({ p }: { p: Portfolio }) {
             className="border-divider border-b"
             style={{
               background: on ? "var(--color-bg)" : "transparent",
-              boxShadow: on ? "inset 1px 0 0 var(--color-foil)" : "none",
-              opacity: s.hidden ? 0.45 : 1,
+              boxShadow: on ? "inset 2px 0 0 var(--color-foil)" : "none",
             }}
           >
             <button
               type="button"
+              aria-expanded={on}
               onClick={() => setSelected(on ? null : s.id)}
-              className="flex w-full cursor-pointer items-center gap-2.5 px-4 py-2.5 text-left"
+              className="flex min-h-[48px] w-full cursor-pointer items-center gap-2.5 px-4 py-2.5 text-left"
+              style={{ opacity: s.hidden ? 0.5 : 1 }}
             >
-              <span className="font-heading text-neutral-500 w-4 flex-none text-[10px]">
+              <span className="font-heading text-neutral-500 w-5 flex-none text-[10px]">
                 {String(i + 1).padStart(2, "0")}
               </span>
-              <span className="truncate text-[13px]">
-                {s.title || "Untitled section"}
+              <span className="flex min-w-0 flex-col">
+                <span className="truncate text-[13px]">{s.title || "Untitled section"}</span>
+                <span className="text-neutral-700 truncate text-[10.5px]">{s.tab}</span>
               </span>
               <span className="text-neutral-600 ml-auto flex-none text-[11px]">
-                {s.hidden ? "Hidden" : on ? "Selected" : ""}
+                {s.hidden ? "Hidden" : ""}
               </span>
             </button>
 
@@ -306,7 +339,7 @@ function SectionRail({ p }: { p: Portfolio }) {
                   disabled={i === 0}
                   onClick={() => moveSection(p.id, s.id, -1)}
                 >
-                  ↑
+                  <Glyph id="up" size={16} />
                 </button>
                 <button
                   type="button"
@@ -324,10 +357,7 @@ function SectionRail({ p }: { p: Portfolio }) {
                 >
                   {s.hidden ? "Show" : "Hide"}
                 </button>
-                <Link
-                  href={`/editor/${p.id}`}
-                  className="btn btn-ghost text-xs"
-                >
+                <Link href={`/editor/${p.id}`} className="btn btn-ghost text-xs">
                   Edit text
                   <Glyph id="arrow" size={14} />
                 </Link>
@@ -367,336 +397,50 @@ function SectionRail({ p }: { p: Portfolio }) {
   );
 }
 
-/* ── the builder ──────────────────────────────────────────────────────── */
+/* ── the phone's content sheet ────────────────────────────────────────── */
 
-export function Builder({ id }: { id: string }) {
-  const handle = useAccount().account.profile.handle;
-  const { ready, storageError, getPortfolio, updatePortfolio } = usePortfolios();
-  const [device, setDevice] = useState<Device>("desktop");
-  const [tab, setTab] = useState<InspectorTab>("theme");
-  const [sheet, setSheet] = useState<SheetTab>("style");
-  // The mobile sheet's own radio group. A radio `name` is document-scoped and
-  // the desktop inspector is mounted at the same time, so a shared name would
-  // put both panels' inputs in one group and let the hidden one hold the only
-  // checked member.
-  const sheetGroup = useId();
-
-  const portfolio = getPortfolio(id);
-
-  if (!portfolio) {
-    return (
-      <div className="p-10">
-        <h2>{ready ? "That portfolio doesn't exist." : "Loading…"}</h2>
-        {ready && <Link href="/">← Back to portfolios</Link>}
-      </div>
-    );
-  }
-
-  // A live page is frozen — the API refuses every write to it — so this
-  // screen steps aside for Preview and Unpublish rather than rendering
-  // controls that can only fail.
-  if (portfolio.status === "live") {
-    return <PublishedLock portfolio={portfolio} />;
-  }
-
-  const p: Portfolio = portfolio;
-  const onChange = (recipe: (prev: Portfolio) => Portfolio) =>
-    updatePortfolio(p.id, recipe);
-  const inspectorTabs: Array<{ id: InspectorTab; label: string }> = [
-    { id: "theme", label: "Theme" },
-    { id: "colour", label: "Colour" },
-    { id: "type", label: "Type" },
-    { id: "layout", label: "Layout" },
-  ];
-
-  const sheetTabs: Array<{ id: SheetTab; label: string }> = [
-    { id: "style", label: "Style" },
-    { id: "sections", label: "Sections" },
-    { id: "content", label: "Content" },
-  ];
+function ContentSheet({
+  p,
+  onChange,
+}: {
+  p: Portfolio;
+  onChange: (recipe: (prev: Portfolio) => Portfolio) => void;
+}) {
+  const field = (key: "name" | "current" | "description", value: string) =>
+    onChange((prev) => ({ ...prev, header: { ...prev.header, [key]: value } }));
 
   return (
-    <>
-      {/* ── top bar ─────────────────────────────────────────────────── */}
-      <div className="nav bg-bg gap-3.5">
-        <Link href="/" className="font-heading text-[13px]">
-          ← Portfolios
-        </Link>
-        <span className="nav-brand mr-0 hidden text-[15px] sm:inline">{p.name}</span>
-        <span className="text-neutral-700 hidden text-[13px] md:inline">
-          {pageAddress(handle, p.slug)}
-        </span>
-        <span className="status status-draft mr-auto">Not published — saved</span>
-
-        <div className="seg hidden lg:inline-flex">
-          {(["desktop", "mobile"] as Device[]).map((d) => (
-            <label key={d} className="seg-opt capitalize">
-              <input
-                type="radio"
-                name="device"
-                checked={device === d}
-                onChange={() => setDevice(d)}
-              />
-              {d}
-            </label>
-          ))}
-        </div>
-
-        <Link href={`/editor/${p.id}`} className="btn btn-secondary">
-          Document
-        </Link>
-        <Link
-          href={previewPath(p.id)}
-          className="btn btn-secondary"
-          // A new tab, because the point of a preview is seeing the page
-          // with nothing of the app around it — exactly what a visitor gets.
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Preview
-        </Link>
-        <button
-          type="button"
-          className="btn btn-primary"
-          onClick={() => onChange((prev) => ({ ...prev, status: "live" }))}
-        >
-          Publish
-        </button>
+    <div className="flex flex-col gap-3.5 p-3.5">
+      <div className="field">
+        <label htmlFor="b-name">Name</label>
+        <input
+          id="b-name"
+          className="input"
+          value={p.header.name}
+          onChange={(e) => field("name", e.target.value)}
+        />
       </div>
-
-      {storageError && (
-        <div
-          role="alert"
-          className="px-4 py-2.5 text-[13px]"
-          style={{ background: "var(--color-accent)", color: "var(--color-bg)" }}
-        >
-          {storageError}
-        </div>
-      )}
-
-      {/* ══ desktop — rail, canvas, inspector ═══════════════════════ */}
-      <div className="hidden lg:grid lg:grid-cols-[248px_1fr_336px]">
-        <div className="border-divider bg-surface border-r">
-          <SectionRail p={p} />
-        </div>
-
-        <div className="bg-neutral-300 p-8">
-          <Canvas p={p} handle={handle} device={device} height={760} />
-        </div>
-
-        <div className="border-divider bg-bg border-l">
-          <div className="border-divider flex border-b">
-            {inspectorTabs.map((t) => {
-              const on = tab === t.id;
-              return (
-                <button
-                  key={t.id}
-                  type="button"
-                  onClick={() => setTab(t.id)}
-                  className="font-heading flex-1 cursor-pointer px-1.5 py-3 text-[13px]"
-                  style={{
-                    background: on ? "var(--color-foil)" : "transparent",
-                    color: on ? "var(--color-bg)" : "var(--color-ink)",
-                  }}
-                >
-                  {t.label}
-                </button>
-              );
-            })}
-          </div>
-
-          <div className="p-[18px]">
-            {tab === "theme" && (
-              <>
-                <ThemeControl p={p} onChange={onChange} />
-                <Link
-                  href={`/themes/${p.id}`}
-                  className="btn btn-secondary btn-block mt-4"
-                >
-                  Browse all {THEMES.length} themes
-                </Link>
-              </>
-            )}
-            {tab === "colour" && <ColourControl p={p} onChange={onChange} />}
-            {tab === "type" && <TypeControl p={p} onChange={onChange} />}
-            {tab === "layout" && <LayoutControl p={p} onChange={onChange} />}
-          </div>
-        </div>
+      <div className="field">
+        <label htmlFor="b-current">Current</label>
+        <input
+          id="b-current"
+          className="input"
+          value={p.header.current}
+          onChange={(e) => field("current", e.target.value)}
+        />
       </div>
-
-      {/* ══ mobile — canvas over a control sheet ════════════════════ */}
-      <div className="lg:hidden">
-        <div className="bg-neutral-300 p-3.5">
-          <Canvas p={p} handle={handle} device="mobile" height={420} panX={false} />
-        </div>
-
-        <div className="border-divider border-t">
-          <div className="border-divider flex border-b">
-            {sheetTabs.map((t) => {
-              const on = sheet === t.id;
-              return (
-                <button
-                  key={t.id}
-                  type="button"
-                  onClick={() => setSheet(t.id)}
-                  className="font-heading flex-1 cursor-pointer px-1.5 py-3 text-xs"
-                  style={{
-                    background: on ? "var(--color-foil)" : "transparent",
-                    color: on ? "var(--color-bg)" : "var(--color-ink)",
-                  }}
-                >
-                  {t.label}
-                </button>
-              );
-            })}
-          </div>
-
-          {sheet === "style" && (
-            <div className="p-3.5">
-              <h6 className="mb-2.5">Theme</h6>
-              <div className="mb-4 flex gap-2.5 overflow-x-auto pb-1">
-                {THEMES.map((t) => (
-                  <button
-                    key={t.id}
-                    type="button"
-                    onClick={() => onChange((prev) => ({ ...prev, theme: t.id }))}
-                    className="flex flex-none cursor-pointer flex-col items-start gap-1.5 p-2"
-                    style={{
-                      background:
-                        p.theme === t.id ? "var(--color-surface)" : "var(--color-bg)",
-                      border: `2px solid ${
-                        p.theme === t.id ? "var(--color-foil)" : "var(--color-divider)"
-                      }`,
-                    }}
-                  >
-                    <ThemeThumb theme={t.id} accent={p.accent} />
-                    <span className="font-heading text-[11px]">
-                      {t.name}
-                    </span>
-                  </button>
-                ))}
-              </div>
-
-              <h6 className="mb-2.5">Accent</h6>
-              <div className="mb-4">
-                <ColourPicker
-                  id="accent-hex-mobile"
-                  name="Accent"
-                  value={p.accent}
-                  onPick={(hex) => onChange((prev) => ({ ...prev, accent: hex }))}
-                />
-              </div>
-
-              <h6 className="mb-2.5">Ground</h6>
-              <div className="seg mb-3">
-                {GROUNDS.map((g) => (
-                  <label key={g.id} className="seg-opt">
-                    <input
-                      type="radio"
-                      name={`ground-${sheetGroup}`}
-                      checked={p.groundHex === "" && p.ground === g.id}
-                      onChange={() =>
-                        onChange((prev) => ({ ...prev, ground: g.id, groundHex: "" }))
-                      }
-                    />
-                    {g.name}
-                  </label>
-                ))}
-              </div>
-              <div className="mb-4">
-                <ColourPicker
-                  id="ground-hex-mobile"
-                  name="Ground"
-                  value={
-                    p.groundHex ||
-                    (GROUNDS.find((g) => g.id === p.ground) ?? GROUNDS[0]).hex
-                  }
-                  onPick={(hex) => onChange((prev) => ({ ...prev, groundHex: hex }))}
-                />
-              </div>
-
-              <h6 className="mb-2.5">Type</h6>
-              <div className="field mb-3">
-                <label htmlFor="headline-face-mobile">Headline</label>
-                <FontSelect
-                  id="headline-face-mobile"
-                  label="Headline face"
-                  value={p.font}
-                  specimen={p.header.name || "Your name"}
-                  onPick={(id) => onChange((prev) => ({ ...prev, font: id }))}
-                />
-              </div>
-              <div className="field mb-4">
-                <label htmlFor="body-face-mobile">Body</label>
-                <FontSelect
-                  id="body-face-mobile"
-                  label="Body face"
-                  value={p.bodyFont}
-                  onPick={(id) => onChange((prev) => ({ ...prev, bodyFont: id }))}
-                />
-              </div>
-
-              <LayoutControl p={p} onChange={onChange} />
-            </div>
-          )}
-
-          {sheet === "sections" && (
-            <div className="border-divider border-t">
-              <SectionRail p={p} />
-            </div>
-          )}
-
-          {sheet === "content" && (
-            <div className="flex flex-col gap-3.5 p-3.5">
-              <div className="field">
-                <label htmlFor="b-name">Name</label>
-                <input
-                  id="b-name"
-                  className="input"
-                  value={p.header.name}
-                  onChange={(e) =>
-                    onChange((prev) => ({
-                      ...prev,
-                      header: { ...prev.header, name: e.target.value },
-                    }))
-                  }
-                />
-              </div>
-              <div className="field">
-                <label htmlFor="b-current">Current</label>
-                <input
-                  id="b-current"
-                  className="input"
-                  value={p.header.current}
-                  onChange={(e) =>
-                    onChange((prev) => ({
-                      ...prev,
-                      header: { ...prev.header, current: e.target.value },
-                    }))
-                  }
-                />
-              </div>
-              <div className="field">
-                <label htmlFor="b-desc">Description</label>
-                <textarea
-                  id="b-desc"
-                  className="input"
-                  value={p.header.description}
-                  onChange={(e) =>
-                    onChange((prev) => ({
-                      ...prev,
-                      header: { ...prev.header, description: e.target.value },
-                    }))
-                  }
-                />
-              </div>
-              <Link href={`/editor/${p.id}`} className="btn btn-primary btn-block">
-                Open the full document editor
-              </Link>
-            </div>
-          )}
-        </div>
+      <div className="field">
+        <label htmlFor="b-desc">Description</label>
+        <textarea
+          id="b-desc"
+          className="input"
+          value={p.header.description}
+          onChange={(e) => field("description", e.target.value)}
+        />
       </div>
-    </>
+      <Link href={`/editor/${p.id}`} className="btn btn-primary btn-block">
+        Open the full document editor
+      </Link>
+    </div>
   );
 }

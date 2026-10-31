@@ -45,7 +45,7 @@ async def test_a_published_page_is_readable_without_a_token(client, published):
     assert response.status_code == 200
 
     body = response.json()
-    assert body["theme"] == "editorial"
+    assert body["theme"] == "aurora"
     assert body["slug"] == published["slug"]
     assert "sections" in body
 

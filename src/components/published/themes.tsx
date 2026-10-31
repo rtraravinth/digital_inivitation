@@ -1,27 +1,27 @@
 "use client";
 
 import type { Portfolio } from "@/lib/types";
-import { Editorial } from "./themes/editorial";
-import { Links } from "./themes/links";
-import { Poster } from "./themes/poster";
-import { Resume } from "./themes/resume";
-import { Site } from "./themes/site";
+import { Arcade } from "./themes/arcade";
+import { Aurora } from "./themes/aurora";
+import { Journey } from "./themes/journey";
+import { Meridian } from "./themes/meridian";
+import { Stage } from "./themes/stage";
 
 export * from "./shared";
 export { SectionDetail } from "./section-detail";
-export { Editorial, Links, Poster, Resume, Site };
+export { Arcade, Aurora, Journey, Meridian, Stage };
 
 export function PublishedBody({ p }: { p: Portfolio }) {
   switch (p.theme) {
-    case "resume":
-      return <Resume p={p} />;
-    case "poster":
-      return <Poster p={p} />;
-    case "links":
-      return <Links p={p} />;
-    case "site":
-      return <Site p={p} />;
+    case "meridian":
+      return <Meridian p={p} />;
+    case "stage":
+      return <Stage p={p} />;
+    case "arcade":
+      return <Arcade p={p} />;
+    case "journey":
+      return <Journey p={p} />;
     default:
-      return <Editorial p={p} />;
+      return <Aurora p={p} />;
   }
 }

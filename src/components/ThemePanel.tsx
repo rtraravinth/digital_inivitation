@@ -4,10 +4,12 @@ import Link from "next/link";
 import {
   ColourControl,
   LayoutControl,
+  MotionControl,
+  ProfessionControl,
   ThemeControl,
   TypeControl,
 } from "./builder/controls";
-import { THEMES, type Portfolio } from "@/lib/types";
+import type { Portfolio } from "@/lib/types";
 
 /**
  * The document editor's own theme drawer. The three-pane builder at
@@ -37,11 +39,12 @@ export function ThemePanel({
       </div>
 
       <div className="p-[18px]">
+        <ProfessionControl p={portfolio} onChange={onChange} />
         <ThemeControl p={portfolio} onChange={onChange} />
 
         <div className="mt-3">
           <Link href={`/themes/${portfolio.id}`} className="btn btn-secondary btn-block">
-            Browse all {THEMES.length} themes
+            Open the theme gallery
           </Link>
           <Link href={`/builder/${portfolio.id}`} className="btn btn-secondary btn-block">
             Open the visual builder
@@ -54,6 +57,10 @@ export function ThemePanel({
 
         <div className="mt-6">
           <TypeControl p={portfolio} onChange={onChange} />
+        </div>
+
+        <div className="border-divider mt-6 border-t pt-4">
+          <MotionControl p={portfolio} onChange={onChange} />
         </div>
 
         <div className="border-divider mt-6 border-t pt-4">

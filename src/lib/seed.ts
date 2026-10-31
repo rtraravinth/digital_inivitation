@@ -37,11 +37,10 @@ const RAW: SeedPortfolio[] = [
     summary:
       "Everything: both businesses, the advisory practice, the letter and the clinic.",
     meta: "6 sections · updated 2 days ago",
-    // The fullest page carries Site: a sticky nav, a numbers band and a
-    // timeline all want content behind them, and a seeded set where nothing
-    // is on the flagship theme leaves the gallery's "New" badge opening on
-    // an empty page.
-    theme: "site",
+    // The fullest page carries Aurora, the default: its glass nav, numbers
+    // and timeline all want content behind them, and the flagship theme
+    // should open on the richest page the seed has.
+    theme: "aurora",
     header: {
       name: "Rohan Mehta",
       current:
@@ -203,6 +202,9 @@ const RAW: SeedPortfolio[] = [
     slug: "advisory",
     status: "live",
     summary: "The practice, the fee, the clinic. Nothing about the businesses.",
+    // Journey: the free clinic and the households advised are the story this
+    // page tells, which is what the stacking chapters are for.
+    theme: "journey",
     meta: "3 sections · updated 12 days ago",
     header: {
       name: "Rohan Mehta",
@@ -263,7 +265,7 @@ const RAW: SeedPortfolio[] = [
     status: "live",
     summary: "For editors and podcast bookers. The letter and nothing else.",
     meta: "2 sections · updated 1 month ago",
-    theme: "poster",
+    theme: "stage",
     header: {
       name: "Rohan Mehta",
       current: "Writer of The Slow Compounding letter",
@@ -306,15 +308,15 @@ const RAW: SeedPortfolio[] = [
     status: "draft",
     summary: "Governance work only — for trusts and boards doing diligence.",
     meta: "2 sections · updated 1 month ago",
-    theme: "resume",
+    theme: "meridian",
     header: {
       name: "Rohan Mehta",
       current: "Trustee, Sanjeevani Schools Trust · Chair, finance committee",
       description:
         "I sit on one board and chair its finance committee. I take governance work seriously and I take very little of it.",
       tags: ["Trustee", "Governance"],
-      // Résumé draws a numbers row and a timeline. Without these the theme
-      // that shows both had the least to show of any seed.
+      // Meridian draws a numbers row and a timeline. Without these the
+      // credentials page would have the least to show of any seed.
       numbers: [
         { id: "bn1", value: "3", label: "Schools" },
         { id: "bn2", value: "1,400", label: "Pupils" },

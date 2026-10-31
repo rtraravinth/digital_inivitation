@@ -7,9 +7,11 @@ import {
   Fraunces,
   Inter,
   JetBrains_Mono,
+  Lexend,
   Lora,
   Manrope,
   Oswald,
+  Outfit,
   Playfair_Display,
   Roboto_Slab,
   Schibsted_Grotesk,
@@ -84,6 +86,8 @@ const bitter = Bitter({ variable: "--font-bitter", subsets: ["latin"], preload: 
 const oswald = Oswald({ variable: "--font-oswald", subsets: ["latin"], preload: false });
 const syne = Syne({ variable: "--font-syne", subsets: ["latin"], preload: false });
 const jetbrainsMono = JetBrains_Mono({ variable: "--font-jetbrains-mono", subsets: ["latin"], preload: false });
+const lexend = Lexend({ variable: "--font-lexend", subsets: ["latin"], preload: false });
+const outfit = Outfit({ variable: "--font-outfit", subsets: ["latin"], preload: false });
 
 const fontVariables = [
   bodoni,
@@ -102,6 +106,8 @@ const fontVariables = [
   oswald,
   syne,
   jetbrainsMono,
+  lexend,
+  outfit,
 ]
   .map((face) => face.variable)
   .join(" ");
@@ -117,7 +123,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     <html lang="en" className={`${fontVariables} h-full antialiased`}>
       <body className="min-h-full flex flex-col">
         {/*
-          Site's reveal-on-scroll starts every block at `opacity: 0` and a
+          The themes' reveal-on-scroll starts every block at `opacity: 0` and a
           client-side observer adds `.in`. `/p/[...slug]` is a server
           component on purpose and every other theme degrades to
           static-but-readable, so without this a visitor with JavaScript off
@@ -128,7 +134,9 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
           one whatever the specificity.
         */}
         <noscript>
-          <style>{".reveal, .reveal.in { opacity: 1; transform: none; }"}</style>
+          <style>
+            {".reveal, .reveal.in, .fx-reveal, .fx-words .fx-w { opacity: 1; transform: none; filter: none; }"}
+          </style>
         </noscript>
         {children}
       </body>

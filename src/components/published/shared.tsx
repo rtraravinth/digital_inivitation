@@ -636,10 +636,17 @@ export function pad(p: Portfolio) {
   return DENSITY_PAD[p.layout.density];
 }
 
+/**
+ * Always a template, never none. A grid without one gets an implicit `auto`
+ * column, and an auto column grows to its widest unbreakable content — a
+ * nowrap label, a row of buttons in a scroller — past the viewport, where
+ * the theme root's `overflow-x: clip` silently crops it. `grid-cols-1` is
+ * `minmax(0, 1fr)`, which holds the column to the container.
+ */
 const GRID_COLS: Record<GridCols, string> = {
-  1: "",
-  2: "sm:grid-cols-2",
-  3: "sm:grid-cols-2 lg:grid-cols-3",
+  1: "grid-cols-1",
+  2: "grid-cols-1 sm:grid-cols-2",
+  3: "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3",
 };
 
 export function gridCols(p: Portfolio) {

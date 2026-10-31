@@ -95,8 +95,15 @@ export type PortfolioHeader = {
 
 export type PortfolioStatus = "live" | "draft" | "empty";
 
-/** The published-page structures. Content stays put; the frame changes. */
-export type ThemeId = "resume" | "editorial" | "poster" | "links" | "site";
+/**
+ * The published-page structures. Content stays put; the frame changes.
+ *
+ * Five motion themes, each built around one piece of depth rather than a
+ * page of effects: Aurora's floating glass, Meridian's layered portrait,
+ * Stage's showreel rails, Arcade's perspective grid, Journey's stacking
+ * cards. Mirrors THEMES in backend/app/models/enums.py.
+ */
+export type ThemeId = "aurora" | "meridian" | "stage" | "arcade" | "journey";
 
 export type Ground = "light" | "dark" | "paper";
 export type FontId =
@@ -115,64 +122,215 @@ export type FontId =
   | "bitter"
   | "oswald"
   | "syne"
-  | "jetbrains-mono";
+  | "jetbrains-mono"
+  | "lexend"
+  | "outfit";
 
-/** The gallery filters by who a theme suits, not by what it looks like. */
-export type ThemeAudience = "founders" | "advisers" | "office" | "writers" | "multi";
-
-export const THEME_AUDIENCES: Array<{ id: ThemeAudience; name: string }> = [
-  { id: "founders", name: "Founders" },
-  { id: "advisers", name: "Advisers" },
-  { id: "office", name: "Public office" },
-  { id: "writers", name: "Writers" },
-  { id: "multi", name: "Multi-role" },
-];
+/**
+ * Who the page is for. The gallery and the builder start here, because "what
+ * do you do?" is a question everyone can answer and "which layout?" is not.
+ * It is not stored: picking one applies a look, and the look is what's saved.
+ */
+export type ProfessionId =
+  | "doctor"
+  | "advocate"
+  | "business"
+  | "entrepreneur"
+  | "developer"
+  | "gamer"
+  | "musician"
+  | "dancer"
+  | "student"
+  | "social";
 
 export const THEMES: Array<{
   id: ThemeId;
   name: string;
+  /** One line for a list row. */
   desc: string;
+  /** Two sentences for the gallery card. */
   long: string;
-  badge?: string;
-  audiences: ThemeAudience[];
+  /** The theme's one piece of depth, said plainly. */
+  depth: string;
+  professions: ProfessionId[];
 }> = [
   {
-    id: "resume",
-    name: "Résumé",
-    desc: "One column, rules, made to print",
-    long: "A plain document with every tab as a heading. The one to attach to an application.",
-    audiences: ["advisers", "office", "multi"],
+    id: "aurora",
+    name: "Aurora",
+    desc: "Glass cards floating over light",
+    long: "A dark page lit from behind, with your work on glass cards that tilt toward the pointer. Reads as a product launch.",
+    depth: "Cards lean in 3D under the pointer; tags orbit the portrait at three depths.",
+    professions: ["developer", "entrepreneur", "business"],
   },
   {
-    id: "editorial",
-    name: "Editorial",
-    desc: "Tabs across a modular grid",
-    long: "A tabbed grid with the portrait on the right. The default, and the safest.",
-    audiences: ["multi", "founders"],
+    id: "meridian",
+    name: "Meridian",
+    desc: "Calm, credentialed, made to be trusted",
+    long: "A light, quiet page that leads with credentials and lets testimonials speak. For the people a visitor has to trust first.",
+    depth: "The portrait sits on layered plates that separate as you scroll.",
+    professions: ["doctor", "advocate", "business"],
   },
   {
-    id: "poster",
-    name: "Poster",
-    desc: "A colour field, then the record",
-    long: "A colour field and display type over the work, listed. A résumé for people who present.",
-    audiences: ["founders", "writers"],
+    id: "stage",
+    name: "Stage",
+    desc: "A billboard, then showreel rails",
+    long: "Your portrait fills the screen, then every tab becomes a rail of posters to swipe through. For people who perform.",
+    depth: "The billboard recedes as you scroll; posters turn toward the pointer.",
+    professions: ["musician", "dancer"],
   },
   {
-    id: "site",
-    name: "Site",
-    desc: "A real website: sticky nav, hero, work grid",
-    long: "A full personal website — a sticky nav that follows you down the page, a hero, and the work in a grid.",
-    badge: "New",
-    audiences: ["multi", "founders"],
+    id: "arcade",
+    name: "Arcade",
+    desc: "Neon, a moving grid, level select",
+    long: "A synthwave horizon, a glitching name and a level-select menu for your tabs. Built for players and the people who make games.",
+    depth: "A perspective grid runs to the horizon; cards flip in as you change level.",
+    professions: ["gamer", "developer"],
   },
   {
-    id: "links",
-    name: "Links",
-    desc: "A stack of tappable rows, thumb-sized",
-    long: "One shareable page of rows, sized for a thumb. The link you put in a bio.",
-    audiences: ["founders", "writers"],
+    id: "journey",
+    name: "Journey",
+    desc: "A warm story in stacking chapters",
+    long: "A friendly page told as a story: each piece of work is a card that stacks on the last as you scroll. For impact, study and growth.",
+    depth: "Tags ring the portrait in a slow 3D orbit; cards stack and settle back as you read.",
+    professions: ["student", "social"],
   },
 ];
+
+/**
+ * Each profession's starting look: a theme and the colour and type that suit
+ * it. Applying one writes these fields onto the portfolio — after that they
+ * are the author's like any other choice, and the profession is forgotten.
+ *
+ * The grounds are picked colours rather than presets: the three presets are
+ * the catalogue's stocks, and none of them is the near-black a showreel
+ * wants or the cream a story page does.
+ */
+export const PROFESSIONS: Array<{
+  id: ProfessionId;
+  name: string;
+  /** What the page has to do for this person, in a line. */
+  goal: string;
+  theme: ThemeId;
+  accent: string;
+  groundHex: string;
+  font: FontId;
+  bodyFont: FontId;
+}> = [
+  {
+    id: "doctor",
+    name: "Doctor",
+    goal: "Qualifications, specialties and where to book",
+    theme: "meridian",
+    accent: "#0e7490",
+    groundHex: "#f3f7f9",
+    font: "lexend",
+    bodyFont: "inter",
+  },
+  {
+    id: "advocate",
+    name: "Advocate",
+    goal: "Practice areas, notable matters, chambers",
+    theme: "meridian",
+    accent: "#7a1f2b",
+    groundHex: "#f6f2ea",
+    font: "playfair-display",
+    bodyFont: "source-serif-4",
+  },
+  {
+    id: "business",
+    name: "Business",
+    goal: "Track record, numbers and the board seats",
+    theme: "aurora",
+    accent: "#3b82f6",
+    groundHex: "#0b1324",
+    font: "manrope",
+    bodyFont: "inter",
+  },
+  {
+    id: "entrepreneur",
+    name: "Entrepreneur",
+    goal: "Ventures, traction, and what's next",
+    theme: "aurora",
+    accent: "#8b5cf6",
+    groundHex: "#0a0a14",
+    font: "space-grotesk",
+    bodyFont: "dm-sans",
+  },
+  {
+    id: "developer",
+    name: "Developer",
+    goal: "Shipped projects, stack, open source",
+    theme: "aurora",
+    accent: "#22c55e",
+    groundHex: "#0b0f14",
+    font: "jetbrains-mono",
+    bodyFont: "inter",
+  },
+  {
+    id: "gamer",
+    name: "Gamer",
+    goal: "Ranks, streams, teams and highlights",
+    theme: "arcade",
+    accent: "#ff2bd6",
+    groundHex: "#07060f",
+    font: "oswald",
+    bodyFont: "space-grotesk",
+  },
+  {
+    id: "musician",
+    name: "Musician",
+    goal: "Releases, shows and where to listen",
+    theme: "stage",
+    accent: "#f43f5e",
+    groundHex: "#09090b",
+    font: "syne",
+    bodyFont: "inter",
+  },
+  {
+    id: "dancer",
+    name: "Dancer",
+    goal: "Performances, reels and companies",
+    theme: "stage",
+    accent: "#f59e0b",
+    groundHex: "#0c0a12",
+    font: "playfair-display",
+    bodyFont: "manrope",
+  },
+  {
+    id: "student",
+    name: "Student",
+    goal: "Projects, skills and what you're learning",
+    theme: "journey",
+    accent: "#6366f1",
+    groundHex: "#f7f7fb",
+    font: "outfit",
+    bodyFont: "dm-sans",
+  },
+  {
+    id: "social",
+    name: "Social work",
+    goal: "Causes, impact and the people behind it",
+    theme: "journey",
+    accent: "#e76f51",
+    groundHex: "#fbf6ef",
+    font: "fraunces",
+    bodyFont: "outfit",
+  },
+];
+
+/** The fields a profession's look writes, applied to a portfolio. */
+export function applyProfession(p: Portfolio, id: ProfessionId): Portfolio {
+  const look = PROFESSIONS.find((x) => x.id === id);
+  if (!look) return p;
+  return {
+    ...p,
+    theme: look.theme,
+    accent: look.accent,
+    groundHex: look.groundHex,
+    font: look.font,
+    bodyFont: look.bodyFont,
+  };
+}
 
 /**
  * The catalogue's three stocks: board, plate white, and binding cloth.
@@ -257,6 +415,8 @@ export const FONTS: Array<{ id: FontId; name: string; sample: string; cssVar: st
     sample: "Monospace headline",
     cssVar: "--font-jetbrains-mono",
   },
+  { id: "lexend", name: "Lexend", sample: "Clear, open sans", cssVar: "--font-lexend" },
+  { id: "outfit", name: "Outfit", sample: "Friendly geometric", cssVar: "--font-outfit" },
 ];
 
 /**
@@ -331,6 +491,20 @@ export const PHOTO_TREATMENTS: Array<{ id: PhotoTreatment; name: string }> = [
   { id: "bw", name: "Black & white" },
 ];
 
+/**
+ * How much the published page moves. "full" is every theme's depth and
+ * motion; "subtle" keeps the reveals and drops the pointer tilt, parallax and
+ * ambient loops; "off" is a still page. A visitor's own reduced-motion
+ * setting caps it at "off" whatever the author picked — see `useMotionLevel`.
+ */
+export type MotionLevel = "full" | "subtle" | "off";
+
+export const MOTION_LEVELS: Array<{ id: MotionLevel; name: string; desc: string }> = [
+  { id: "full", name: "Full", desc: "Depth, tilt, parallax and ambient motion." },
+  { id: "subtle", name: "Subtle", desc: "Content eases in. Nothing follows the pointer." },
+  { id: "off", name: "Still", desc: "No motion at all. Everything is simply there." },
+];
+
 /** The headline scale multiplies each theme's own display size. */
 export type TypeScale = "compact" | "default" | "display";
 
@@ -350,6 +524,7 @@ export type Layout = {
   /** Any CSS letter-spacing value; the published page reads it as a token. */
   tracking: string;
   photo: PhotoTreatment;
+  motion: MotionLevel;
 };
 
 export function defaultLayout(): Layout {
@@ -360,6 +535,7 @@ export function defaultLayout(): Layout {
     scale: "default",
     tracking: DEFAULT_TRACKING,
     photo: "colour",
+    motion: "full",
   };
 }
 
@@ -391,14 +567,32 @@ export type Portfolio = {
 
 const THEME_IDS = new Set<string>(THEMES.map((t) => t.id));
 
+/** The theme a new or unrecognised portfolio renders in. */
+export const DEFAULT_THEME: ThemeId = "aurora";
+
+/**
+ * The catalogue themes and the motion theme that took each one's place.
+ * Mirrors LEGACY_THEMES in backend/app/models/enums.py and the migration
+ * that retired them; kept here for data that reaches the page without
+ * passing through that migration.
+ */
+const LEGACY_THEMES: Record<string, ThemeId> = {
+  editorial: "aurora",
+  site: "aurora",
+  resume: "meridian",
+  poster: "stage",
+  links: "journey",
+};
+
 /** Fills in fields added after a portfolio was first stored. */
 export function normalize(p: Portfolio): Portfolio {
   const layout = { ...defaultLayout(), ...(p.layout ?? {}) };
+  const theme = LEGACY_THEMES[p.theme] ?? p.theme;
   return {
     ...p,
     // An unknown theme means data from a build that had one we've since
     // dropped; fall back rather than render nothing.
-    theme: THEME_IDS.has(p.theme) ? p.theme : "editorial",
+    theme: THEME_IDS.has(theme) ? theme : DEFAULT_THEME,
     accent: p.accent ?? SWATCHES[0],
     // Board, not plate white. A portfolio stored without a ground is being
     // backfilled, and the ground the house prints on is the honest answer to
@@ -415,6 +609,7 @@ export function normalize(p: Portfolio): Portfolio {
       scale: layout.scale ?? "default",
       tracking: layout.tracking ?? DEFAULT_TRACKING,
       photo: layout.photo ?? "colour",
+      motion: layout.motion ?? "full",
     },
     header: {
       ...emptyHeader(),

@@ -16,7 +16,7 @@ async def test_create_blank_portfolio_starts_with_one_empty_section(auth_client)
 
     body = response.json()
     assert body["status"] == "empty"
-    assert body["theme"] == "editorial"
+    assert body["theme"] == "aurora"
     assert body["accent"] == "#b5261e"
     assert body["ground"] == "dark"
     assert body["groundHex"] == ""
@@ -29,6 +29,7 @@ async def test_create_blank_portfolio_starts_with_one_empty_section(auth_client)
         "scale": "default",
         "tracking": "-0.015em",
         "photo": "colour",
+        "motion": "full",
     }
     assert len(body["sections"]) == 1
     assert body["sections"][0]["title"] == ""
@@ -156,7 +157,7 @@ async def test_patch_updates_theme_accent_and_layout(auth_client, portfolio):
     response = await auth_client.patch(
         f"/api/v1/portfolios/{portfolio['id']}",
         json={
-            "theme": "editorial",
+            "theme": "stage",
             "accent": "#1d4ed8",
             "ground": "paper",
             "font": "fraunces",
@@ -166,18 +167,20 @@ async def test_patch_updates_theme_accent_and_layout(auth_client, portfolio):
                 "density": "dense",
                 "scale": "display",
                 "tracking": "-0.02em",
+                "motion": "subtle",
             },
         },
     )
     assert response.status_code == 200
 
     body = response.json()
-    assert body["theme"] == "editorial"
+    assert body["theme"] == "stage"
     assert body["accent"] == "#1d4ed8"
     assert body["ground"] == "paper"
     assert body["font"] == "fraunces"
     assert body["layout"]["grid"] == 3
     assert body["layout"]["roleNav"] == "lens"
+    assert body["layout"]["motion"] == "subtle"
 
 
 async def test_patch_sets_a_custom_ground_colour(auth_client, portfolio):
@@ -236,9 +239,9 @@ async def test_patch_accepts_every_theme(auth_client, portfolio, theme):
     assert response.json()["theme"] == theme
 
 
-@pytest.mark.parametrize("theme", ["resume", "site"])
+@pytest.mark.parametrize("theme", ["arcade", "journey"])
 async def test_patch_accepts_new_themes(auth_client, portfolio, theme):
-    """The check constraint widens ahead of the UI offering these themes."""
+    """The motion-theme set: these two have no catalogue predecessor."""
     response = await auth_client.patch(
         f"/api/v1/portfolios/{portfolio['id']}", json={"theme": theme}
     )
@@ -246,9 +249,12 @@ async def test_patch_accepts_new_themes(auth_client, portfolio, theme):
     assert response.json()["theme"] == theme
 
 
-@pytest.mark.parametrize("theme", ["index", "ledger", "dossier", "broadsheet"])
+@pytest.mark.parametrize(
+    "theme",
+    ["index", "ledger", "dossier", "broadsheet", "resume", "editorial", "poster", "links", "site"],
+)
 async def test_patch_rejects_removed_themes(auth_client, portfolio, theme):
-    """The five-theme set narrows the constraint; the old four are gone."""
+    """Both retired sets are refused: the catalogue four and the catalogue five."""
     response = await auth_client.patch(
         f"/api/v1/portfolios/{portfolio['id']}", json={"theme": theme}
     )

@@ -28,7 +28,7 @@ because the connection never arrives. Pass flags through when you need them:
 ```
 npm run build
 npm run lint
-cd backend && .venv/bin/python -m pytest    # 271 tests (.venv/Scripts on Windows)
+cd backend && .venv/bin/python -m pytest    # 281 tests (.venv/Scripts on Windows)
 ```
 
 `NEXT_PUBLIC_API_URL` points the frontend at the API; see
@@ -97,18 +97,29 @@ your browser keeps hitting the stale server on 3000. Kill it (`taskkill //F
   not maintained twice; re-run it whenever this changes.
 - `src/components/Editor.tsx` — artboards 4b (desktop document) and 4d (mobile),
   sharing one state tree.
-- `src/components/builder/` — `Builder.tsx` is artboards 2a (three-pane:
-  section rail, live canvas, tabbed inspector) and 2c (mobile control sheet);
-  `ThemeGallery.tsx` is 2b; `controls.tsx` holds the Theme / Colour / Type /
-  Layout controls **shared** with the editor's drawer so the two cannot drift.
+- `src/components/builder/` — `Builder.tsx` is artboards 2a (a window-height
+  workspace: section rail, live canvas with a device toolbar and "Replay
+  motion", inspector tabbed Look / Colour / Type / Motion) and 2c (canvas over
+  a five-tab control sheet). `Canvas.tsx` is the live canvas, shared with
+  `ThemeGallery.tsx` (2b), which is try-before-you-apply: picking a profession
+  or theme changes a local draft only the preview sees, and nothing is written
+  until "Use this look". `controls.tsx` holds the Profession / Theme / Colour /
+  Type / Motion / Layout controls **shared** with the editor's drawer so the
+  two cannot drift.
 - `src/components/PrintAll.tsx` — `/print` stacks every published page with a
   page break between so the browser's own **Save as PDF** can export them.
   That is what "Download all pages as PDF" on `/account` opens; generating a
   PDF in-process would mean a library, and the themes already print correctly.
 - `src/components/account/panels.tsx` + `Account.tsx` — artboards 5a and 5b.
-- `src/components/published/themes.tsx` — the published page in five themes:
-  Résumé, Editorial (1a), Poster (1c), Links (3a), Site. Also `SectionDetail`,
-  artboard 1d, reached at `?section=<id>`.
+- `src/components/published/themes.tsx` — the published page in five motion
+  themes: Aurora (the default), Meridian, Stage, Arcade, Journey, one file
+  each under `themes/`. Also `SectionDetail`, artboard 1d, reached at
+  `?section=<id>`. The catalogue themes (Résumé, Editorial, Poster, Links,
+  Site) are retired; migration `b6e2f0d4a913` remapped stored rows, and
+  `LEGACY_THEMES` on both sides maps old ids arriving any other way.
+- `src/components/published/fx.tsx` — the motion layer every theme is built
+  on: `ThemeRoot`, `Reveal`, `Words`, `Tilt`, `useScrollProgress`, `CountUp`,
+  `Marquee`. Read its header before adding motion — see "Motion" below.
 - `src/app/globals.css` — the Modernist design system: tokens in `@theme`,
   component classes in `@layer components`.
 
@@ -159,21 +170,57 @@ format, a stored value and in tests, so it is still `roleNav`; every label it
 shows says "tab". Renaming the key would be a migration for no user-visible
 gain.
 
-**`p.layout.roleNav` only applies to Editorial and Links.** Poster, Résumé
-and Site carry their own navigation — Poster its numbered list, Résumé every
-tab as a heading, Site its sticky nav. The rail and lens options still on
-offer live on Editorial, since that is where Index rail and Dossier went.
-The Layout panel says so on screen rather than offering a control that
-silently does nothing — and it says the same about its other two controls,
-which are just as theme-specific: "Content grid" is read by Editorial alone
-(`gridCols`), and "Rules & density" by Editorial and Site (`pad`). `IGNORED`
-in `builder/controls.tsx` carries one reason per theme per control; grep
-those two helpers in `src/components/published/` before editing it.
+**`p.layout.roleNav` only applies to Meridian.** It is the one theme built
+on `useTabFilter` with all four shapes (tabs, rail, scroll, lens). Aurora
+and Journey show every tab as a chapter on one scroll, Stage gives each tab a
+rail, and Arcade's tabs are its level-select menu. "Content grid" is read by
+Aurora, Meridian and Arcade (`gridCols`); "Density" by Aurora, Meridian and
+Journey. The Layout panel says so on screen rather than offering a control
+that silently does nothing: `IGNORED` in `builder/controls.tsx` carries one
+reason per theme per control — grep `useTabFilter`, `gridCols(` and
+`layout.density` under `src/components/published/themes/` before editing it.
+
+**Professions are looks, not data.** `PROFESSIONS` in `types.ts` maps ten
+professions to a theme, accent, picked ground and type pairing;
+`applyProfession()` writes those fields and nothing remembers which
+profession was picked. The Colour panel's palettes and the Type panel's
+pairings are read off the same list, so adding a profession extends all three.
+
+## Motion
+
+`p.layout.motion` is `full`, `subtle` or `off` (labelled Full / Subtle /
+Still), stored in the layout JSON like `photo` — no migration. `ThemeRoot`
+writes it to `data-motion`, and CSS under "motion themes" in `globals.css`
+does most of the work from there. Rules the code depends on:
+
+- **Frame-aware, always.** Every observer and scroll listener is built from
+  `node.ownerDocument.defaultView` with no explicit root, never this module's
+  globals and never Motion's `useScroll` / `whileInView` — inside the builder
+  canvas those measure the builder, and nothing in the page would ever
+  reveal or move.
+- **The visitor's reduced-motion setting is never read during render.** The
+  page is server-rendered and the server cannot know it; CSS escapes it and
+  JS re-checks at event time (`reducedNow`).
+- **Paper and no-JS see the finished page.** Anything that starts hidden has
+  a print rule, a reduced-motion rule and the `<noscript>` in `layout.tsx`.
+- **Motion owns its own transforms.** On an element with a Motion `style`
+  transform, depth is Motion's `z`, not the `.fx-z` class — the inline
+  transform overwrites the class.
+- **A grid always has a column template.** A grid with none gets an `auto`
+  column that grows past the viewport and `overflow-x: clip` on the theme
+  root hides it. `gridCols()` and every theme grid start from `grid-cols-1`.
+
+Testing motion headlessly lies in two ways: headless Edge clamps windows to
+492px (emulate a phone over CDP instead), and virtual-time budgets can catch
+transitions mid-flight. `CountUp` lands its exact value on a timer for that
+reason as much as for throttled tabs.
 
 ## Design system: Modernist
 
 Archivo throughout, `#f3f2f2` ground, `#201e1d` ink, one accent `#ec3013`.
-**Zero border radius anywhere** — `--radius-*` is `0` on purpose. 2px dividers,
+**Zero border radius in the app's own chrome** — `--radius-*` is `0` on
+purpose. The published motion themes are the exception: each picks its own
+corners, and `--fx-pill` rounds the shared `.btn` and `.tag` inside them. 2px dividers,
 flush-left labels (including inside wide buttons), photography in grayscale.
 Build with the `.btn` / `.tag` / `.input` / `.nav` / `.table` classes rather
 than inventing parallel ones, and take every colour from a token.
@@ -211,7 +258,7 @@ mid-tones wrong. The presets keep their hand-tuned maps; derivation runs only
 for a picked colour. Contrast is derived, not enforced — a mid-grey ground
 tops out around 4.2:1 whichever ink it gets.
 
-**Fourteen headline faces, and only Archivo is preloaded.** `layout.tsx`
+**Eighteen faces, and only the two house faces are preloaded.** `layout.tsx`
 declares them all through `next/font/google`; the thirteen alternates carry
 `preload: false`. Preloading is per-family rather than per-page, so with it
 on, every face would be fetched on every page load to serve the one a
@@ -393,6 +440,6 @@ claim to be the live page.
 - **Slugs are global.** Two accounts cannot both hold `rohan`, because the
   address is `facet.page/<slug>` with nothing in front of it. The create
   dialog surfaces the 409 as a message.
-- **The frontend has no test runner.** The backend has 271 pytest tests;
+- **The frontend has no test runner.** The backend has 281 pytest tests;
   changes here are checked with `npm run lint`, `npm run build` and by
   actually opening the app.

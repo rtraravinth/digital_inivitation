@@ -6,7 +6,7 @@
     "status": "live",
     "summary": "Everything: both businesses, the advisory practice, the letter and the clinic.",
     "meta": "6 sections · updated 2 days ago",
-    "theme": "site",
+    "theme": "aurora",
     "header": {
       "name": "Rohan Mehta",
       "current": "Founder, Northwell Kitchens · SEBI-registered investment adviser · Bengaluru",
@@ -228,7 +228,8 @@
       "density": "standard",
       "scale": "default",
       "tracking": "-0.015em",
-      "photo": "colour"
+      "photo": "colour",
+      "motion": "full"
     }
   },
   {
@@ -313,7 +314,7 @@
         "hidden": false
       }
     ],
-    "theme": "editorial",
+    "theme": "aurora",
     "accent": "#b5261e",
     "ground": "dark",
     "groundHex": "",
@@ -325,7 +326,8 @@
       "density": "standard",
       "scale": "default",
       "tracking": "-0.015em",
-      "photo": "colour"
+      "photo": "colour",
+      "motion": "full"
     }
   },
   {
@@ -334,6 +336,7 @@
     "slug": "advisory",
     "status": "live",
     "summary": "The practice, the fee, the clinic. Nothing about the businesses.",
+    "theme": "journey",
     "meta": "3 sections · updated 12 days ago",
     "header": {
       "name": "Rohan Mehta",
@@ -417,7 +420,6 @@
         "hidden": false
       }
     ],
-    "theme": "editorial",
     "accent": "#b5261e",
     "ground": "dark",
     "groundHex": "",
@@ -429,7 +431,8 @@
       "density": "standard",
       "scale": "default",
       "tracking": "-0.015em",
-      "photo": "colour"
+      "photo": "colour",
+      "motion": "full"
     }
   },
   {
@@ -439,7 +442,7 @@
     "status": "live",
     "summary": "For editors and podcast bookers. The letter and nothing else.",
     "meta": "2 sections · updated 1 month ago",
-    "theme": "poster",
+    "theme": "stage",
     "header": {
       "name": "Rohan Mehta",
       "current": "Writer of The Slow Compounding letter",
@@ -508,7 +511,8 @@
       "density": "standard",
       "scale": "default",
       "tracking": "-0.015em",
-      "photo": "colour"
+      "photo": "colour",
+      "motion": "full"
     }
   },
   {
@@ -518,7 +522,7 @@
     "status": "draft",
     "summary": "Governance work only — for trusts and boards doing diligence.",
     "meta": "2 sections · updated 1 month ago",
-    "theme": "resume",
+    "theme": "meridian",
     "header": {
       "name": "Rohan Mehta",
       "current": "Trustee, Sanjeevani Schools Trust · Chair, finance committee",
@@ -622,7 +626,8 @@
       "density": "standard",
       "scale": "default",
       "tracking": "-0.015em",
-      "photo": "colour"
+      "photo": "colour",
+      "motion": "full"
     }
   }
 ]

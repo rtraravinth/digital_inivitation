@@ -36,6 +36,7 @@ from app.models.enums import (
     DEFAULT_FONT,
     DEFAULT_GROUND,
     DEFAULT_TAB,
+    DEFAULT_THEME,
     DEFAULT_TRACKING,
     FONTS,
     GROUNDS,
@@ -58,6 +59,7 @@ def default_layout() -> dict[str, Any]:
         "scale": "default",
         "tracking": DEFAULT_TRACKING,
         "photo": "colour",
+        "motion": "full",
     }
 
 
@@ -87,7 +89,7 @@ class Portfolio(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     status: Mapped[str] = mapped_column(String(16), nullable=False, default="empty")
     summary: Mapped[str] = mapped_column(Text, nullable=False, default="")
 
-    theme: Mapped[str] = mapped_column(String(24), nullable=False, default="editorial")
+    theme: Mapped[str] = mapped_column(String(24), nullable=False, default=DEFAULT_THEME)
     accent: Mapped[str] = mapped_column(String(32), nullable=False, default=DEFAULT_ACCENT)
     ground: Mapped[str] = mapped_column(
         String(16), nullable=False, default=DEFAULT_GROUND, server_default=DEFAULT_GROUND

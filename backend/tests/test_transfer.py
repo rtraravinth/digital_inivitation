@@ -5,6 +5,7 @@ from __future__ import annotations
 import base64
 import io
 
+import pytest
 from PIL import Image
 
 
@@ -224,7 +225,32 @@ async def test_an_unknown_theme_in_an_import_falls_back(auth_client):
         p for p in (await auth_client.get("/api/v1/portfolios")).json()
         if p["slug"] == "dropped-theme"
     )
-    assert imported["theme"] == "editorial"
+    assert imported["theme"] == "aurora"
+
+
+@pytest.mark.parametrize(
+    ("old", "new"),
+    [
+        ("editorial", "aurora"),
+        ("site", "aurora"),
+        ("resume", "meridian"),
+        ("poster", "stage"),
+        ("links", "journey"),
+    ],
+)
+async def test_a_retired_theme_in_an_import_lands_on_its_successor(auth_client, old, new):
+    """Not on the default: an export from the catalogue build keeps its nearest look."""
+    payload = legacy_export()
+    payload[0]["theme"] = old
+    payload[0]["slug"] = f"retired-{old}"
+
+    await auth_client.post("/api/v1/import", json={"mode": "merge", "portfolios": payload})
+
+    imported = next(
+        p for p in (await auth_client.get("/api/v1/portfolios")).json()
+        if p["slug"] == f"retired-{old}"
+    )
+    assert imported["theme"] == new
 
 
 async def test_a_custom_ground_survives_an_export_and_import(auth_client, portfolio):

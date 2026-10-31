@@ -10,8 +10,23 @@ from __future__ import annotations
 
 from typing import Final, Literal
 
-ThemeId = Literal["resume", "editorial", "poster", "links", "site"]
-THEMES: Final[tuple[str, ...]] = ("resume", "editorial", "poster", "links", "site")
+ThemeId = Literal["aurora", "meridian", "stage", "arcade", "journey"]
+THEMES: Final[tuple[str, ...]] = ("aurora", "meridian", "stage", "arcade", "journey")
+
+#: The theme a new portfolio opens on, and the fallback for an unknown one.
+DEFAULT_THEME: Final[str] = "aurora"
+
+#: Themes this build no longer offers, and the one that took each one's place.
+#: Read wherever stored data from an older build can arrive — an import file,
+#: in particular — so a portfolio keeps the nearest look rather than the
+#: default. The migration that retired them applies the same map to the table.
+LEGACY_THEMES: Final[dict[str, str]] = {
+    "editorial": "aurora",
+    "site": "aurora",
+    "resume": "meridian",
+    "poster": "stage",
+    "links": "journey",
+}
 
 Ground = Literal["light", "dark", "paper"]
 GROUNDS: Final[tuple[str, ...]] = ("light", "dark", "paper")
@@ -33,6 +48,8 @@ FontId = Literal[
     "oswald",
     "syne",
     "jetbrains-mono",
+    "lexend",
+    "outfit",
 ]
 FONTS: Final[tuple[str, ...]] = (
     "bodoni-moda",
@@ -51,6 +68,8 @@ FONTS: Final[tuple[str, ...]] = (
     "oswald",
     "syne",
     "jetbrains-mono",
+    "lexend",
+    "outfit",
 )
 
 PortfolioStatus = Literal["live", "draft", "empty"]
@@ -68,6 +87,11 @@ TYPE_SCALES: Final[tuple[str, ...]] = ("compact", "default", "display")
 #: How photographs print on the published page. Mirrors ``PhotoTreatment`` in
 #: src/lib/types.ts; "colour" is the default for a layout that never set one.
 PhotoTreatment = Literal["colour", "bw"]
+
+#: How much the published page moves. Mirrors ``MotionLevel`` in
+#: src/lib/types.ts; "full" is the default for a layout that never set one.
+#: A visitor's own reduced-motion preference still wins over "full".
+MotionLevel = Literal["full", "subtle", "off"]
 
 PlanId = Literal["free", "pro"]
 PLANS: Final[tuple[str, ...]] = ("free", "pro")

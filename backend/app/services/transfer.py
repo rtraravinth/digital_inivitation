@@ -20,8 +20,10 @@ from app.models import Asset, Portfolio, PortfolioHeader, Section, User
 from app.models.enums import (
     DEFAULT_ACCENT,
     DEFAULT_TAB,
+    DEFAULT_THEME,
     FONTS,
     GROUNDS,
+    LEGACY_THEMES,
     STATUSES,
     TAB_MAX_LENGTH,
     THEMES,
@@ -145,7 +147,13 @@ class TransferService:
             slug=slug,
             status=_one_of(raw.get("status"), STATUSES, "draft"),
             summary=str(raw.get("summary") or "")[:2000],
-            theme=_one_of(raw.get("theme"), THEMES, "editorial"),
+            # An export from an older build names a retired theme; it lands on
+            # the one that replaced it rather than on the default.
+            theme=_one_of(
+                LEGACY_THEMES.get(str(raw.get("theme")), raw.get("theme")),
+                THEMES,
+                DEFAULT_THEME,
+            ),
             accent=str(raw.get("accent") or DEFAULT_ACCENT)[:32],
             ground=_one_of(raw.get("ground"), GROUNDS, "light"),
             ground_hex=_hex_or_blank(raw.get("groundHex")),

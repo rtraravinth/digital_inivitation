@@ -19,20 +19,21 @@ import {
   Space_Grotesk,
   Syne,
 } from "next/font/google";
+import { THEME_BOOT } from "@/lib/theme-boot";
 import "./globals.css";
 
 /**
- * The two house faces of the Catalogue system, and the only two preloaded.
+ * The published page's two house faces, preloaded.
  *
  * Bodoni Moda sets half-titles and plate numbers: a catalogue's didone, with a
  * real optical-size axis, so the same family holds at a 12px plate number and
  * at a 120px half-title instead of going spindly at one end. Schibsted
- * Grotesk sets captions, body and every control — a newspaper grotesk whose
- * small sizes stay legible, which is what a caption is.
+ * Grotesk sets captions and every control on a published page — the wrapper
+ * pins it there whatever the app around it uses.
  *
- * Both are used on every route, which is the whole test for preloading:
- * preload is per-family, not per-page, so a face that only some portfolios
- * pick must not have it (see the alternates below).
+ * Preload is per-family, not per-page, so only a face that renders on every
+ * visit to a route family earns it: these two on the published page, Inter
+ * (below) in the app. A face only some portfolios pick must not have it.
  */
 const bodoni = Bodoni_Moda({
   variable: "--font-bodoni-moda",
@@ -73,7 +74,9 @@ const archivo = Archivo({
  * Space Grotesk, Lora and Oswald top out at 700 — which is a real weight
  * rather than the smeared faux-bold a single-weight face would get.
  */
-const inter = Inter({ variable: "--font-inter", subsets: ["latin"], preload: false });
+// Inter is the application's whole interface — every screen behind sign-in
+// renders in it — so it is preloaded. It is still offered to authors below.
+const inter = Inter({ variable: "--font-inter", subsets: ["latin"] });
 const dmSans = DM_Sans({ variable: "--font-dm-sans", subsets: ["latin"], preload: false });
 const spaceGrotesk = Space_Grotesk({ variable: "--font-space-grotesk", subsets: ["latin"], preload: false });
 const manrope = Manrope({ variable: "--font-manrope", subsets: ["latin"], preload: false });
@@ -120,7 +123,21 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="en" className={`${fontVariables} h-full antialiased`}>
+    // `suppressHydrationWarning` because the boot script below sets
+    // `data-theme` and `color-scheme` on this element before React hydrates,
+    // which is the whole point of it; it covers this element's own
+    // attributes only, not its children.
+    <html lang="en" className={`${fontVariables} h-full antialiased`} suppressHydrationWarning>
+      <head>
+        {/* Applies the stored light/dark choice before first paint, so a
+            dark-theme user never sees a white flash. lib/theme.ts keeps it
+            current after load. It stays a bare <script>: next/script's
+            beforeInteractive only queues an inline body for Next's runtime,
+            which runs after first paint and brings the flash back. The cost
+            is a development-only React warning on the 404 page, which renders
+            this layout on the client. */}
+        <script dangerouslySetInnerHTML={{ __html: THEME_BOOT }} />
+      </head>
       <body className="min-h-full flex flex-col">
         {/*
           The themes' reveal-on-scroll starts every block at `opacity: 0` and a

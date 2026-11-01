@@ -1,16 +1,19 @@
 "use client";
 
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { LinkEditor } from "./LinkEditor";
-import { TabField } from "./TabField";
-import { TagEditor } from "./TagEditor";
 import { PortfolioExtras, PortraitField, SectionExtras } from "./SectionExtras";
 import { PublishedLock } from "./PublishedLock";
+import { TabField } from "./TabField";
+import { TagEditor } from "./TagEditor";
+import { ICON, Icon, IconButton, StatusPill, TiltPanel } from "./ui";
 import { Glyph } from "@/lib/glyphs";
 import { LinkIcon, iconFor } from "@/lib/icons";
 import { usePortfolios } from "@/lib/store";
 import {
+  assetSrc,
   previewPath,
   type LinkItem,
   type Portfolio,
@@ -18,210 +21,19 @@ import {
   type Section,
 } from "@/lib/types";
 
-const HEADER_KEY = "header";
+/* ── the editor ───────────────────────────────────────────────────────────
+   Artboards 4b and 4d as one responsive screen, rebuilt like the rest of
+   the app: the page is a column of cards — the header, then each section —
+   that read like the page and open in place to edit. An outline beside
+   them on a desk jumps to any card. Every change saves as you type.
+   ──────────────────────────────────────────────────────────────────────── */
 
-function sectionNumber(index: number) {
+const HEADER = "header";
+const EASE = [0.16, 1, 0.3, 1] as const;
+
+function nn(index: number) {
   return String(index + 1).padStart(2, "0");
 }
-
-function LinkList({ links }: { links: LinkItem[] }) {
-  if (links.length === 0) return null;
-  return (
-    <div className="flex flex-col gap-1.5 text-sm">
-      {links.map((l) => (
-        // The same glyph the published page will draw, resolved the same
-        // way: the row above this one picks it, and a read-only rendering
-        // that ignored the pick would be showing a different link.
-        <span key={l.id} className="flex items-center gap-1.5">
-          <LinkIcon id={iconFor(l)} />
-          {l.label || "Untitled"} — {l.url || "—"}
-        </span>
-      ))}
-    </div>
-  );
-}
-
-/* ── the four fields, identical everywhere ───────────────────────────── */
-
-function SectionFields({
-  section,
-  tabOptions,
-  onChange,
-}: {
-  section: Section;
-  /** Every tab already on the page, so the field offers them before a new one. */
-  tabOptions: string[];
-  onChange: (recipe: (s: Section) => Section) => void;
-}) {
-  return (
-    <>
-      <div className="field">
-        <label htmlFor={`title-${section.id}`}>Section title</label>
-        <input
-          id={`title-${section.id}`}
-          className="input"
-          style={{ fontWeight: 800, fontSize: 18, minHeight: 44 }}
-          placeholder="Section title"
-          value={section.title}
-          onChange={(e) => onChange((s) => ({ ...s, title: e.target.value }))}
-        />
-      </div>
-
-      <div className="field">
-        <label htmlFor={`desc-${section.id}`}>Description</label>
-        <textarea
-          id={`desc-${section.id}`}
-          className="input"
-          placeholder="What it is, in a few sentences"
-          value={section.description}
-          onChange={(e) => onChange((s) => ({ ...s, description: e.target.value }))}
-        />
-      </div>
-
-      <div className="field">
-        <label htmlFor={`tab-${section.id}`}>Tab</label>
-        <TabField
-          id={`tab-${section.id}`}
-          value={section.tab}
-          options={tabOptions}
-          onChange={(tab) => onChange((s) => ({ ...s, tab }))}
-        />
-      </div>
-
-      <div className="field">
-        <label>Links</label>
-        <LinkEditor
-          links={section.links}
-          onChange={(links) => onChange((s) => ({ ...s, links }))}
-        />
-      </div>
-
-      <SectionExtras section={section} onChange={onChange} />
-    </>
-  );
-}
-
-function HeaderFields({
-  header,
-  onChange,
-}: {
-  header: PortfolioHeader;
-  onChange: (recipe: (h: PortfolioHeader) => PortfolioHeader) => void;
-}) {
-  return (
-    <>
-      <div className="field">
-        <label htmlFor="h-name">Name</label>
-        <input
-          id="h-name"
-          className="input"
-          style={{ fontWeight: 800, fontSize: 22, minHeight: 48 }}
-          placeholder="Your name"
-          value={header.name}
-          onChange={(e) => onChange((h) => ({ ...h, name: e.target.value }))}
-        />
-      </div>
-
-      <div className="field">
-        <label htmlFor="h-current">Current</label>
-        <input
-          id="h-current"
-          className="input"
-          placeholder="What you're doing right now"
-          value={header.current}
-          onChange={(e) => onChange((h) => ({ ...h, current: e.target.value }))}
-        />
-      </div>
-
-      <div className="field">
-        <label htmlFor="h-desc">Description</label>
-        <textarea
-          id="h-desc"
-          className="input"
-          placeholder="A few lines about your work"
-          value={header.description}
-          onChange={(e) => onChange((h) => ({ ...h, description: e.target.value }))}
-        />
-      </div>
-
-      <div className="field">
-        <label>Tags</label>
-        <TagEditor
-          accentFirst
-          tags={header.tags}
-          onChange={(tags) => onChange((h) => ({ ...h, tags }))}
-        />
-      </div>
-
-      <div className="field">
-        <label>Links</label>
-        <LinkEditor
-          links={header.links}
-          onChange={(links) => onChange((h) => ({ ...h, links }))}
-        />
-      </div>
-
-      <PortraitField
-        portrait={header.portrait}
-        onChange={(portrait) => onChange((h) => ({ ...h, portrait }))}
-      />
-
-      <PortfolioExtras header={header} onChange={onChange} />
-    </>
-  );
-}
-
-/* ── the document row, desktop ────────────────────────────────────────── */
-
-function DocRow({
-  label,
-  editing = false,
-  onOpen,
-  children,
-  last = false,
-  innerRef,
-}: {
-  label: React.ReactNode;
-  editing?: boolean;
-  onOpen?: () => void;
-  children: React.ReactNode;
-  last?: boolean;
-  innerRef?: React.Ref<HTMLDivElement>;
-}) {
-  const interactive = Boolean(onOpen) && !editing;
-  return (
-    <div
-      ref={innerRef}
-      className={[
-        "border-divider grid grid-cols-[120px_1fr]",
-        last ? "" : "border-b",
-        editing
-          ? "bg-surface shadow-[inset_1px_0_0_var(--color-foil)]"
-          : interactive
-            ? "hover:bg-neutral-100 cursor-pointer"
-            : "",
-      ].join(" ")}
-      {...(interactive
-        ? {
-            role: "button",
-            tabIndex: 0,
-            onClick: onOpen,
-            onKeyDown: (e: React.KeyboardEvent) => {
-              if (e.key === "Enter" || e.key === " ") {
-                e.preventDefault();
-                onOpen?.();
-              }
-            },
-          }
-        : {})}
-    >
-      <div className="py-[22px] pl-5">{label}</div>
-      <div className="flex flex-col gap-3 py-[22px] pr-6">{children}</div>
-    </div>
-  );
-}
-
-/* ── the editor ───────────────────────────────────────────────────────── */
 
 export function Editor({ id }: { id: string }) {
   const {
@@ -233,526 +45,709 @@ export function Editor({ id }: { id: string }) {
     addSectionAsync,
     deleteSection,
     moveSection,
+    toggleSectionHidden,
   } = usePortfolios();
+  const reduced = useReducedMotion();
+  const [open, setOpen] = useState<string | null>(null);
+  /** Refs, not state: focusing a new section must not cost a render of its own. */
+  const justAdded = useRef<string | null>(null);
 
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [reordering, setReordering] = useState(false);
-  const [mobileOpen, setMobileOpen] = useState<string | null>(null);
-
-  const editingRef = useRef<HTMLDivElement>(null);
-  /** Refs, not state — this must not cause a render of its own. */
-  const justAddedRef = useRef<string | null>(null);
-
-  // A new section lands at the end of a long document, well below the button
-  // that created it. Bring it into view, and put the cursor in its title.
+  // Opening a card brings it into view; a section just added also gets the
+  // cursor in its title, since typing one is the next thing anyone does.
   useEffect(() => {
-    if (!editingId) return;
-    editingRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
-    if (justAddedRef.current === editingId) {
-      justAddedRef.current = null;
-      document.getElementById(`title-${editingId}`)?.focus({ preventScroll: true });
+    if (!open) return;
+    const node = document.getElementById(`card-${open}`);
+    node?.scrollIntoView({ behavior: reduced ? "auto" : "smooth", block: "start" });
+    if (justAdded.current === open) {
+      justAdded.current = null;
+      window.setTimeout(() => document.getElementById(`title-${open}`)?.focus({ preventScroll: true }), 350);
     }
-  }, [editingId]);
-
-  // The mobile form replaces the list, so it must start at the top.
-  useEffect(() => {
-    if (mobileOpen) window.scrollTo({ top: 0 });
-  }, [mobileOpen]);
+  }, [open, reduced]);
 
   const portfolio = getPortfolio(id);
 
   if (!portfolio) {
     return (
-      <div className="p-10">
-        <h2>{ready ? "That portfolio doesn't exist." : "Loading…"}</h2>
-        {ready && <Link href="/">← Back to portfolios</Link>}
+      <div className="mx-auto w-full max-w-[720px] px-6 py-16">
+        <h2 className="m-0 text-[22px]">{ready ? "That portfolio doesn’t exist." : "Loading…"}</h2>
+        {ready && (
+          <Link href="/" className="btn btn-secondary mt-4">
+            <Glyph id="back" size={15} />
+            Back to portfolios
+          </Link>
+        )}
       </div>
     );
   }
 
   // A live page is frozen — the API refuses every write to it — so this
-  // screen steps aside for Preview and Unpublish rather than rendering
-  // controls that can only fail.
+  // screen steps aside for Preview and Unpublish.
   if (portfolio.status === "live") {
     return <PublishedLock portfolio={portfolio} />;
   }
 
   const p: Portfolio = portfolio;
-
-  // Hidden sections count: their tab is still a tab the author is using, and
-  // dropping it from the picker would make it unpickable for anything else.
+  // Hidden sections count: their tab is still one the author is using.
   const pageTabs = [...new Set(p.sections.map((s) => s.tab.trim()).filter(Boolean))];
+  const hidden = p.sections.filter((s) => s.hidden).length;
 
   const setHeader = (recipe: (h: PortfolioHeader) => PortfolioHeader) =>
     updatePortfolio(p.id, (prev) => ({ ...prev, header: recipe(prev.header) }));
 
-  const publish = () =>
-    updatePortfolio(p.id, (prev) => ({ ...prev, status: "live" }));
-
-  async function addAndEdit() {
-    // The server mints the id, so the new section can only be focused once
-    // it answers.
+  async function add() {
+    // The server mints the id, so the new card can only open once it answers.
     const added = await addSectionAsync(p.id);
     if (!added) return;
-    justAddedRef.current = added;
-    setEditingId(added);
+    justAdded.current = added;
+    setOpen(added);
   }
-
-  const openSection = mobileOpen
-    ? p.sections.find((s) => s.id === mobileOpen)
-    : undefined;
-  const openSectionIndex = p.sections.findIndex((s) => s.id === mobileOpen);
 
   return (
     <>
-      {/* ── top bar ─────────────────────────────────────────────────── */}
-      <div className="nav bg-bg gap-3.5">
-        <Link href="/" className="font-heading text-[13px]">
-          ← Portfolios
-        </Link>
-        <span className="nav-brand mr-0 hidden text-[15px] sm:inline">{p.name}</span>
-        <span className="status status-draft mr-auto">Not published — saved</span>
-        <Link href={`/builder/${p.id}`} className="btn btn-secondary">
-          Builder
-        </Link>
-        <Link
-          href={previewPath(p.id)}
-          className="btn btn-secondary"
-          // A new tab, because the point of a preview is seeing the page
-          // with nothing of the app around it — exactly what a visitor gets.
-          target="_blank"
-          rel="noopener noreferrer"
+      <div aria-hidden className="app-backdrop" />
+      <div className="flex min-h-dvh flex-col">
+        {/* ── top bar ─────────────────────────────────────────────── */}
+        <header
+          className="sticky top-0 z-30 flex h-14 flex-none items-center gap-2 px-3 sm:gap-3 sm:px-6"
+          style={{
+            background: "color-mix(in srgb, var(--color-bg) 86%, transparent)",
+            backdropFilter: "blur(12px)",
+            WebkitBackdropFilter: "blur(12px)",
+            borderBottom: "1px solid var(--color-divider)",
+          }}
         >
-          Preview
-        </Link>
-        <button type="button" className="btn btn-primary" onClick={publish}>
-          Publish
-        </button>
-      </div>
-
-      {storageError && (
-        <div
-          role="alert"
-          className="px-4 py-2.5 text-[13px]"
-          style={{ background: "var(--color-accent)", color: "var(--color-bg)" }}
-        >
-          {storageError}
-        </div>
-      )}
-
-      {/* ══ desktop — the document ═══════════════════════════════════ */}
-      <div className="hidden lg:block">
-        <div className="border-divider bg-surface flex items-center gap-5 border-b px-6 py-2.5">
-          <button
-            type="button"
-            className="btn btn-secondary"
-            onClick={addAndEdit}
-          >
-            <Glyph id="plus" size={15} />
-            Add section
-          </button>
-          <button
-            type="button"
-            className={`btn ${reordering ? "btn-primary" : "btn-ghost"}`}
-            onClick={() => {
-              setReordering((v) => !v);
-              setEditingId(null);
-            }}
-          >
-            Reorder
-          </button>
-          <span className="mono-label ml-auto">
-            1 header · {p.sections.length} section{p.sections.length === 1 ? "" : "s"}
-            {p.sections.some((s) => s.hidden) &&
-              ` · ${p.sections.filter((s) => s.hidden).length} hidden`}
+          <Link href="/" className="btn btn-ghost" aria-label="Back to portfolios" style={{ marginTop: 0 }}>
+            <Glyph id="back" size={16} />
+            <span className="hidden sm:inline">Portfolios</span>
+          </Link>
+          <span className="hidden h-5 w-px sm:block" style={{ background: "var(--color-divider)" }} />
+          <span className="min-w-0 truncate text-[14.5px] font-semibold tracking-[-0.01em]">{p.name}</span>
+          <span className="hidden sm:inline-flex">
+            <StatusPill live={false} />
           </span>
-        </div>
+          <span className="ml-auto flex flex-none items-center gap-2">
+            <Link href={`/builder/${p.id}`} className="btn btn-secondary hidden md:inline-flex" style={{ marginTop: 0, minHeight: 34 }}>
+              Builder
+            </Link>
+            <a
+              href={previewPath(p.id)}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="btn btn-secondary"
+              style={{ marginTop: 0, minHeight: 34 }}
+            >
+              <Icon d={ICON.eye} size={14} />
+              <span className="hidden sm:inline">Preview</span>
+            </a>
+            <button
+              type="button"
+              className="btn btn-primary"
+              style={{ marginTop: 0, minHeight: 34 }}
+              onClick={() => updatePortfolio(p.id, (prev) => ({ ...prev, status: "live" }))}
+            >
+              Publish
+            </button>
+          </span>
+        </header>
 
-        {/* The desk is the deeper board and the document is a sheet laid on
-            it: a hairline trim and the page's own lift, so the thing being
-            edited reads as an object rather than as the window's background. */}
-        <div className="bg-surface flex justify-center p-7 md:p-10">
-          <div
-            className="bg-bg w-[860px] max-w-full"
-            style={{ boxShadow: "0 0 0 1px var(--color-divider), var(--shadow-lg)" }}
-          >
-            {/* header block */}
-            {editingId === HEADER_KEY ? (
-              <DocRow
-                editing
-                innerRef={editingRef}
-                label={
-                  <>
-                    <div className="mono-label text-accent">Header</div>
-                    <div className="mono-label mt-1.5">Editing</div>
-                  </>
-                }
+        <main className="mx-auto w-full max-w-[1180px] flex-1 px-4 pt-8 pb-24 sm:px-6 sm:pt-10">
+          <AnimatePresence>
+            {storageError && (
+              <motion.div
+                role="alert"
+                initial={{ opacity: 0, y: -8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0 }}
+                className="mb-6 flex items-start gap-3 rounded-xl px-4 py-3 text-[13.5px]"
+                style={{ border: "1px solid var(--color-ink)", background: "var(--color-bg)" }}
               >
-                <HeaderFields header={p.header} onChange={setHeader} />
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    className="btn btn-primary"
-                    onClick={() => setEditingId(null)}
-                  >
-                    Done
-                  </button>
-                </div>
-              </DocRow>
-            ) : (
-              <DocRow
-                label={<div className="mono-label">Header</div>}
-                onOpen={reordering ? undefined : () => setEditingId(HEADER_KEY)}
-              >
-                <Field label="Name">
-                  <div className="font-heading text-[34px] leading-[1.05]">
-                    {p.header.name || (
-                      <span className="text-neutral-400">Your name</span>
-                    )}
-                  </div>
-                </Field>
-                <Field label="Current">
-                  <div className="text-[15px]">
-                    {p.header.current || (
-                      <span className="text-neutral-400 font-normal">
-                        What you&rsquo;re doing right now
-                      </span>
-                    )}
-                  </div>
-                </Field>
-                <Field label="Description">
-                  <p className="text-neutral-800 m-0 max-w-[62ch] text-[15px]">
-                    {p.header.description || (
-                      <span className="text-neutral-400">
-                        A few lines about your work
-                      </span>
-                    )}
-                  </p>
-                </Field>
-                {p.header.tags.length > 0 && (
-                  <Field label="Tags">
-                    <div className="flex flex-wrap gap-1.5">
-                      {p.header.tags.map((t, i) => (
-                        <span
-                          key={t}
-                          className={`tag ${i === 0 ? "tag-accent" : "tag-neutral"}`}
-                        >
-                          {t}
-                        </span>
-                      ))}
-                    </div>
-                  </Field>
-                )}
-                {p.header.links.length > 0 && (
-                  <Field label="Links">
-                    <LinkList links={p.header.links} />
-                  </Field>
-                )}
-              </DocRow>
+                <span
+                  aria-hidden
+                  className="mt-px grid h-5 w-5 flex-none place-items-center rounded-full text-[12px] font-bold"
+                  style={{ background: "var(--color-ink)", color: "var(--color-bg)" }}
+                >
+                  !
+                </span>
+                <span className="min-w-0 flex-1">{storageError}</span>
+              </motion.div>
             )}
+          </AnimatePresence>
 
-            {/* sections */}
-            {p.sections.map((s, i) => {
-              const editing = editingId === s.id;
-              return (
-                <DocRow
-                  key={s.id}
-                  editing={editing}
-                  innerRef={editing ? editingRef : undefined}
-                  onOpen={reordering ? undefined : () => setEditingId(s.id)}
-                  label={
-                    reordering ? (
-                      <div className="flex flex-col gap-1">
-                        <div className="mono-label">Section {sectionNumber(i)}</div>
-                        <div className="flex gap-1">
-                          <button
-                            type="button"
-                            className="btn btn-secondary btn-icon"
-                            aria-label="Move section up"
-                            disabled={i === 0}
-                            onClick={() => moveSection(p.id, s.id, -1)}
-                          >
-                            ↑
-                          </button>
-                          <button
-                            type="button"
-                            className="btn btn-secondary btn-icon"
-                            aria-label="Move section down"
-                            disabled={i === p.sections.length - 1}
-                            onClick={() => moveSection(p.id, s.id, 1)}
-                          >
-                            <Glyph id="down" size={16} />
-                          </button>
-                        </div>
-                      </div>
-                    ) : (
-                      <>
-                        <div
-                          className={`mono-label ${editing ? "text-accent" : ""}`}
-                        >
-                          Section {sectionNumber(i)}
-                        </div>
-                        {editing && <div className="mono-label mt-1.5">Editing</div>}
-                      </>
-                    )
-                  }
-                >
-                  {editing ? (
-                    <>
-                      <SectionFields
-                        section={s}
-                        tabOptions={pageTabs}
-                        onChange={(recipe) => updateSection(p.id, s.id, recipe)}
-                      />
-                      <div className="flex gap-2">
-                        <button
-                          type="button"
-                          className="btn btn-primary"
-                          onClick={() => setEditingId(null)}
-                        >
-                          Done
-                        </button>
-                        <button
-                          type="button"
-                          className="btn btn-ghost"
-                          onClick={() => {
-                            deleteSection(p.id, s.id);
-                            setEditingId(null);
-                          }}
-                        >
-                          Delete section
-                        </button>
-                      </div>
-                    </>
-                  ) : (
-                    <>
-                      <div className="font-heading text-2xl leading-[1.1]">
-                        {s.title || (
-                          <span className="text-neutral-400">Section title</span>
-                        )}
-                      </div>
-                      <p className="text-neutral-800 m-0 max-w-[62ch] text-[15px]">
-                        {s.description || (
-                          <span className="text-neutral-400">
-                            What it is, in a few sentences
-                          </span>
-                        )}
-                      </p>
-                      <div className="flex flex-wrap gap-1.5">
-                        <span className="tag tag-neutral">{s.tab}</span>
-                      </div>
-                      <LinkList links={s.links} />
-                    </>
-                  )}
-                </DocRow>
-              );
-            })}
-
-            {/* add section */}
-            <div className="grid grid-cols-[120px_1fr]">
-              <div />
-              <div className="pb-6 pr-6 pt-5">
-                <button
-                  type="button"
-                  className="btn btn-secondary btn-block shadow-[inset_0_0_0_2px_var(--color-divider)]"
-                  style={{ padding: 14 }}
-                  onClick={addAndEdit}
-                >
-                  <Glyph id="plus" size={15} />
-                  Add section
-                </button>
-              </div>
+          {/* ── title ───────────────────────────────────────────── */}
+          <div className="mb-7 flex flex-wrap items-end gap-x-6 gap-y-3">
+            <div className="min-w-0">
+              <motion.h1
+                initial={reduced ? false : { opacity: 0, y: 14, filter: "blur(6px)" }}
+                animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+                transition={{ duration: 0.6, ease: EASE }}
+                className="m-0 text-[26px] leading-tight tracking-[-0.03em] sm:text-[32px]"
+              >
+                Edit content
+              </motion.h1>
+              <motion.p
+                initial={reduced ? false : { opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ duration: 0.5, delay: 0.15 }}
+                className="m-0 mt-1.5 max-w-[62ch] text-[14px] text-muted"
+              >
+                The words on your page. Open a card to edit it — every change saves as you
+                type. The look lives in the{" "}
+                <Link href={`/builder/${p.id}`} className="underline underline-offset-2" style={{ color: "var(--color-ink)" }}>
+                  builder
+                </Link>
+                .
+              </motion.p>
             </div>
+            <span className="ml-auto font-mono text-[12px]" style={{ color: "var(--color-neutral-600)" }}>
+              1 header · {p.sections.length} {p.sections.length === 1 ? "section" : "sections"}
+              {hidden > 0 && ` · ${hidden} hidden`}
+            </span>
           </div>
-        </div>
-      </div>
 
-      {/* ══ mobile — a list of sections, one form at a time ═══════════ */}
-      <div className="lg:hidden">
-        {openSection ? (
-          <>
-            <div className="border-divider flex items-center gap-2.5 border-b px-4 py-3">
-              <button
-                type="button"
-                className="font-heading text-xs"
-                onClick={() => setMobileOpen(null)}
-                aria-label="Back to sections"
-              >
-                ←
-              </button>
-              <span className="font-heading text-sm">
-                Section {sectionNumber(openSectionIndex)}
+          <div className="grid grid-cols-1 gap-8 lg:grid-cols-[230px_minmax(0,1fr)]">
+            {/* ── outline ─────────────────────────────────────────── */}
+            <nav aria-label="Outline" className="hidden lg:sticky lg:top-20 lg:block lg:self-start">
+              <span className="mb-2 block px-3 text-[12px] font-medium" style={{ color: "var(--color-neutral-600)" }}>
+                Outline
               </span>
-              <button
-                type="button"
-                className="btn btn-primary ml-auto"
-                style={{ fontSize: 12, padding: "6px 10px" }}
-                onClick={() => setMobileOpen(null)}
-              >
-                Done
-              </button>
-            </div>
-            <div className="flex flex-col gap-3.5 p-4">
-              <SectionFields
-                section={openSection}
-                tabOptions={pageTabs}
-                onChange={(recipe) => updateSection(p.id, openSection.id, recipe)}
-              />
-              <button
-                type="button"
-                className="btn btn-ghost self-start"
-                onClick={() => {
-                  deleteSection(p.id, openSection.id);
-                  setMobileOpen(null);
-                }}
-              >
-                Delete section
-              </button>
-            </div>
-          </>
-        ) : mobileOpen === HEADER_KEY ? (
-          <>
-            <div className="border-divider flex items-center gap-2.5 border-b px-4 py-3">
-              <button
-                type="button"
-                className="font-heading text-xs"
-                onClick={() => setMobileOpen(null)}
-                aria-label="Back to sections"
-              >
-                ←
-              </button>
-              <span className="font-heading text-sm">Header</span>
-              <button
-                type="button"
-                className="btn btn-primary ml-auto"
-                style={{ fontSize: 12, padding: "6px 10px" }}
-                onClick={() => setMobileOpen(null)}
-              >
-                Done
-              </button>
-            </div>
-            <div className="flex flex-col gap-3.5 p-4">
-              <HeaderFields header={p.header} onChange={setHeader} />
-            </div>
-          </>
-        ) : (
-          <>
-            <div className="border-divider bg-surface border-b px-4 py-3.5">
-              <div className="mono-label mb-1.5">Header</div>
-              <div className="font-heading text-xl">
-                {p.header.name || (
-                  <span className="text-neutral-400">Your name</span>
-                )}
-              </div>
-              <div className="text-neutral-700 text-xs">{p.header.current}</div>
-              {p.header.tags.length > 0 && (
-                <div className="mt-2 flex flex-wrap gap-1.5">
-                  {p.header.tags.map((t, i) => (
-                    <span
-                      key={t}
-                      className={`tag ${i === 0 ? "tag-accent" : "tag-neutral"}`}
-                    >
-                      {t}
-                    </span>
-                  ))}
-                </div>
-              )}
-              <button
-                type="button"
-                className="font-heading mt-2.5 inline-block text-xs"
-                onClick={() => setMobileOpen(HEADER_KEY)}
-              >
-                Edit header
-                <Glyph id="arrow" size={15} />
-              </button>
-            </div>
-
-            <div className="flex items-baseline px-4 pb-1.5 pt-3">
-              <h6 className="m-0">Sections</h6>
-              <button
-                type="button"
-                className="text-neutral-600 ml-auto text-[11px] underline"
-                onClick={() => setReordering((v) => !v)}
-              >
-                {reordering ? "Done reordering" : "Reorder"}
-              </button>
-            </div>
-
-            {p.sections.map((s, i) => (
-              <div
-                key={s.id}
-                className="border-divider flex items-center gap-3 border-b px-4 py-3"
-              >
-                <span className="font-heading text-neutral-400 text-[11px]">
-                  {sectionNumber(i)}
-                </span>
-                <span className="flex min-w-0 flex-col gap-0.5">
-                  <span className="font-heading truncate text-sm leading-tight">
-                    {s.title || (
-                      <span className="text-neutral-400">Untitled section</span>
-                    )}
-                  </span>
-                  <span className="text-neutral-700 text-[11px]">
-                    {s.tab} · {s.links.length} link{s.links.length === 1 ? "" : "s"}
-                  </span>
-                </span>
-
-                {reordering ? (
-                  <span className="ml-auto flex gap-1">
-                    <button
-                      type="button"
-                      className="btn btn-secondary btn-icon"
-                      aria-label="Move section up"
-                      disabled={i === 0}
-                      onClick={() => moveSection(p.id, s.id, -1)}
-                    >
-                      ↑
-                    </button>
-                    <button
-                      type="button"
-                      className="btn btn-secondary btn-icon"
-                      aria-label="Move section down"
-                      disabled={i === p.sections.length - 1}
-                      onClick={() => moveSection(p.id, s.id, 1)}
-                    >
-                      <Glyph id="down" size={16} />
-                    </button>
-                  </span>
-                ) : (
-                  <button
-                    type="button"
-                    className="font-heading text-neutral-600 ml-auto text-[13px]"
-                    aria-label={`Edit ${s.title || "untitled section"}`}
-                    onClick={() => setMobileOpen(s.id)}
-                  >
-                    <Glyph id="chevron" size={16} />
-                  </button>
-                )}
-              </div>
-            ))}
-
-            <div className="p-4">
-              <button
-                type="button"
-                className="btn btn-primary btn-block"
-                onClick={async () => setMobileOpen(await addSectionAsync(p.id))}
-              >
-                <Glyph id="plus" size={15} />
+              <ul className="m-0 flex list-none flex-col gap-0.5 p-0">
+                <OutlineItem
+                  on={open === HEADER}
+                  number="—"
+                  title={p.header.name || "Header"}
+                  sub="Header"
+                  onPick={() => setOpen(HEADER)}
+                />
+                {p.sections.map((s, i) => (
+                  <OutlineItem
+                    key={s.id}
+                    on={open === s.id}
+                    number={nn(i)}
+                    title={s.title || "Untitled section"}
+                    sub={s.hidden ? `${s.tab} · hidden` : s.tab}
+                    dim={s.hidden}
+                    onPick={() => setOpen(s.id)}
+                  />
+                ))}
+              </ul>
+              <button type="button" className="btn btn-ghost mt-2 w-full justify-start" onClick={add}>
+                <Glyph id="plus" size={14} />
                 Add section
               </button>
+            </nav>
+
+            {/* ── the document ────────────────────────────────────── */}
+            <div className="flex min-w-0 flex-col gap-4" style={{ perspective: 1600 }}>
+              <HeaderCard
+                header={p.header}
+                open={open === HEADER}
+                onOpen={() => setOpen(HEADER)}
+                onClose={() => setOpen(null)}
+                onChange={setHeader}
+              />
+
+              <AnimatePresence initial={true}>
+                {p.sections.map((s, i) => (
+                  <motion.div
+                    key={s.id}
+                    layout={!reduced}
+                    initial={reduced ? { opacity: 0 } : { opacity: 0, y: 24, rotateX: -10 }}
+                    animate={{ opacity: 1, y: 0, rotateX: 0 }}
+                    exit={{ opacity: 0, scale: 0.97, transition: { duration: 0.18 } }}
+                    transition={{ duration: 0.55, delay: Math.min(i, 8) * 0.05, ease: EASE }}
+                    style={{ transformOrigin: "50% 100%" }}
+                  >
+                    <SectionCard
+                      section={s}
+                      number={nn(i)}
+                      first={i === 0}
+                      last={i === p.sections.length - 1}
+                      tabOptions={pageTabs}
+                      open={open === s.id}
+                      onOpen={() => setOpen(s.id)}
+                      onClose={() => setOpen(null)}
+                      onChange={(recipe) => updateSection(p.id, s.id, recipe)}
+                      onMove={(delta) => moveSection(p.id, s.id, delta)}
+                      onToggleHidden={() => toggleSectionHidden(p.id, s.id)}
+                      onDelete={() => {
+                        deleteSection(p.id, s.id);
+                        setOpen(null);
+                      }}
+                    />
+                  </motion.div>
+                ))}
+              </AnimatePresence>
+
+              {p.sections.length === 0 && (
+                <div
+                  className="rounded-2xl px-6 py-10 text-center"
+                  style={{ border: "1.5px dashed var(--color-neutral-400)", background: "var(--color-bg)" }}
+                >
+                  <p className="m-0 text-[15px] font-medium">No sections yet</p>
+                  <p className="m-0 mt-1 text-[13.5px] text-muted">
+                    A section is one thing you do or did — a job, a project, a cause. Each one
+                    files under a tab on your page.
+                  </p>
+                </div>
+              )}
+
+              <motion.button
+                type="button"
+                layout={!reduced}
+                onClick={add}
+                whileHover={reduced ? undefined : { y: -2 }}
+                className="group flex cursor-pointer items-center justify-center gap-2.5 rounded-2xl py-5 text-[14px] font-medium"
+                style={{
+                  border: "1.5px dashed var(--color-neutral-400)",
+                  background: "color-mix(in srgb, var(--color-bg) 70%, transparent)",
+                }}
+              >
+                <span
+                  className="grid h-7 w-7 place-items-center rounded-full transition-all duration-300 group-hover:rotate-90 group-hover:bg-[var(--color-ink)] group-hover:text-[var(--color-bg)]"
+                  style={{ boxShadow: "inset 0 0 0 1px var(--color-divider)" }}
+                >
+                  <Glyph id="plus" size={15} />
+                </span>
+                Add section
+              </motion.button>
             </div>
-          </>
-        )}
+          </div>
+        </main>
       </div>
     </>
   );
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+/* ── outline ──────────────────────────────────────────────────────────── */
+
+function OutlineItem({
+  on,
+  number,
+  title,
+  sub,
+  dim,
+  onPick,
+}: {
+  on: boolean;
+  number: string;
+  title: string;
+  sub: string;
+  dim?: boolean;
+  onPick: () => void;
+}) {
   return (
-    <div>
-      <div className="mono-label mb-1">{label}</div>
-      {children}
+    <li>
+      <button
+        type="button"
+        aria-current={on ? "true" : undefined}
+        onClick={onPick}
+        className="relative flex w-full cursor-pointer items-start gap-2.5 rounded-lg px-3 py-2 text-left"
+        style={{ opacity: dim ? 0.55 : 1 }}
+      >
+        {on && (
+          <motion.span
+            layoutId="outline-current"
+            aria-hidden
+            className="absolute inset-0 rounded-lg"
+            style={{ background: "var(--color-bg)", border: "1px solid var(--color-divider)", boxShadow: "var(--shadow-sm)" }}
+            transition={{ type: "spring", stiffness: 500, damping: 40 }}
+          />
+        )}
+        <span className="relative mt-px w-5 flex-none font-mono text-[11px]" style={{ color: "var(--color-neutral-600)" }}>
+          {number}
+        </span>
+        <span className="relative flex min-w-0 flex-col">
+          <span className="truncate text-[13px] font-medium">{title}</span>
+          <span className="truncate text-[11.5px] text-muted">{sub}</span>
+        </span>
+      </button>
+    </li>
+  );
+}
+
+/* ── cards ────────────────────────────────────────────────────────────── */
+
+/**
+ * A card that reads like the page until it is opened, then holds the form.
+ * Closed, the whole card is one big button; open, it is a form with a Done.
+ */
+function Card({
+  id,
+  open,
+  onOpen,
+  label,
+  tools,
+  preview,
+  children,
+  dim,
+}: {
+  id: string;
+  open: boolean;
+  onOpen: () => void;
+  label: React.ReactNode;
+  tools?: React.ReactNode;
+  preview: React.ReactNode;
+  children: React.ReactNode;
+  dim?: boolean;
+}) {
+  return (
+    <TiltPanel
+      max={open ? 0 : 2.5}
+      lift={open ? 0 : 3}
+      className="scroll-mt-20 rounded-2xl"
+      style={open ? { border: "1.5px solid var(--color-ink)" } : undefined}
+    >
+      <div id={`card-${id}`} className="scroll-mt-20" />
+      <div className="flex items-center gap-2 px-5 pt-4 sm:px-6">
+        <span className="min-w-0 flex-1 text-[12px] font-medium" style={{ color: "var(--color-neutral-600)" }}>
+          {label}
+        </span>
+        {tools}
+      </div>
+      {open ? (
+        <div className="relative px-5 pt-3 pb-5 sm:px-6">{children}</div>
+      ) : (
+        <button
+          type="button"
+          onClick={onOpen}
+          aria-label="Edit"
+          className="relative block w-full cursor-pointer px-5 pt-2 pb-5 text-left sm:px-6"
+          style={{ opacity: dim ? 0.55 : 1 }}
+        >
+          {preview}
+          <span
+            className="mt-3 inline-flex items-center gap-1.5 text-[12.5px] font-medium"
+            style={{ color: "var(--color-neutral-700)" }}
+          >
+            <Icon d={ICON.pencil} size={12} />
+            Click to edit
+          </span>
+        </button>
+      )}
+    </TiltPanel>
+  );
+}
+
+function Placeholder({ children }: { children: React.ReactNode }) {
+  return <span style={{ color: "var(--color-neutral-500)" }}>{children}</span>;
+}
+
+function LinkList({ links }: { links: LinkItem[] }) {
+  if (links.length === 0) return null;
+  return (
+    <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1.5 text-[13px]">
+      {links.map((l) => (
+        // The glyph the published page will draw, resolved the same way.
+        <span key={l.id} className="inline-flex min-w-0 items-center gap-1.5">
+          <LinkIcon id={iconFor(l)} />
+          <span className="truncate">{l.label || l.url || "Untitled link"}</span>
+        </span>
+      ))}
     </div>
+  );
+}
+
+function Grouped({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <fieldset className="m-0 mt-5 min-w-0 border-0 p-0 pt-5" style={{ borderTop: "1px solid var(--color-divider)" }}>
+      <legend className="float-left mb-3 w-full p-0 text-[13px] font-semibold">{title}</legend>
+      <div className="clear-both flex flex-col gap-4">{children}</div>
+    </fieldset>
+  );
+}
+
+function HeaderCard({
+  header,
+  open,
+  onOpen,
+  onClose,
+  onChange,
+}: {
+  header: PortfolioHeader;
+  open: boolean;
+  onOpen: () => void;
+  onClose: () => void;
+  onChange: (recipe: (h: PortfolioHeader) => PortfolioHeader) => void;
+}) {
+  return (
+    <Card
+      id={HEADER}
+      open={open}
+      onOpen={onOpen}
+      label="Header — the top of your page"
+      tools={
+        open ? (
+          <button type="button" className="btn btn-primary" style={{ marginTop: 0, minHeight: 32, fontSize: 13 }} onClick={onClose}>
+            Done
+          </button>
+        ) : undefined
+      }
+      preview={
+        <div className="flex items-start gap-4">
+          {header.portrait && (
+            // An API URL — nothing for next/image to optimise.
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={assetSrc(header.portrait)} alt="" className="h-16 w-16 flex-none rounded-full object-cover" />
+          )}
+          <div className="min-w-0">
+            <div className="text-[26px] leading-tight font-semibold tracking-[-0.025em]">
+              {header.name || <Placeholder>Your name</Placeholder>}
+            </div>
+            <div className="mt-1 text-[14px]">
+              {header.current || <Placeholder>What you’re doing right now</Placeholder>}
+            </div>
+            <p className="m-0 mt-2 line-clamp-3 max-w-[64ch] text-[14px] leading-relaxed text-muted">
+              {header.description || <Placeholder>A few lines about your work</Placeholder>}
+            </p>
+            {header.tags.length > 0 && (
+              <div className="mt-3 flex flex-wrap gap-1.5">
+                {header.tags.map((t, i) => (
+                  <span key={t} className={`tag ${i === 0 ? "tag-accent" : "tag-neutral"}`}>
+                    {t}
+                  </span>
+                ))}
+              </div>
+            )}
+            <LinkList links={header.links} />
+          </div>
+        </div>
+      }
+    >
+      <div className="flex flex-col gap-4">
+        <div className="field">
+          <label htmlFor="h-name">Name</label>
+          <input
+            id="h-name"
+            className="input"
+            style={{ fontWeight: 600, fontSize: 20, minHeight: 48 }}
+            placeholder="Your name"
+            value={header.name}
+            onChange={(e) => onChange((h) => ({ ...h, name: e.target.value }))}
+          />
+        </div>
+        <div className="field">
+          <label htmlFor="h-current">What you do now</label>
+          <input
+            id="h-current"
+            className="input"
+            placeholder="Founder, Northwell Kitchens · Bengaluru"
+            value={header.current}
+            onChange={(e) => onChange((h) => ({ ...h, current: e.target.value }))}
+          />
+        </div>
+        <div className="field">
+          <label htmlFor="h-desc">About you</label>
+          <textarea
+            id="h-desc"
+            className="input"
+            rows={4}
+            placeholder="A few lines about your work"
+            value={header.description}
+            onChange={(e) => onChange((h) => ({ ...h, description: e.target.value }))}
+          />
+        </div>
+      </div>
+
+      <Grouped title="Tags and links">
+        <div className="field">
+          <label>Tags</label>
+          <TagEditor accentFirst tags={header.tags} onChange={(tags) => onChange((h) => ({ ...h, tags }))} />
+        </div>
+        <div className="field">
+          <label>Links</label>
+          <LinkEditor links={header.links} onChange={(links) => onChange((h) => ({ ...h, links }))} />
+        </div>
+      </Grouped>
+
+      <Grouped title="Photo">
+        <PortraitField portrait={header.portrait} onChange={(portrait) => onChange((h) => ({ ...h, portrait }))} />
+      </Grouped>
+
+      {/* Draws its own rule and "Add to this portfolio (optional)" label. */}
+      <div className="mt-5">
+        <PortfolioExtras header={header} onChange={onChange} />
+      </div>
+
+      <div className="mt-6 flex justify-end">
+        <button type="button" className="btn btn-primary" onClick={onClose}>
+          Done
+        </button>
+      </div>
+    </Card>
+  );
+}
+
+function SectionCard({
+  section: s,
+  number,
+  first,
+  last,
+  tabOptions,
+  open,
+  onOpen,
+  onClose,
+  onChange,
+  onMove,
+  onToggleHidden,
+  onDelete,
+}: {
+  section: Section;
+  number: string;
+  first: boolean;
+  last: boolean;
+  tabOptions: string[];
+  open: boolean;
+  onOpen: () => void;
+  onClose: () => void;
+  onChange: (recipe: (s: Section) => Section) => void;
+  onMove: (delta: -1 | 1) => void;
+  onToggleHidden: () => void;
+  onDelete: () => void;
+}) {
+  const [confirming, setConfirming] = useState(false);
+  const extras = [s.image && "Image", s.file && "File", s.quote?.text && "Quote"].filter(Boolean) as string[];
+
+  return (
+    <Card
+      id={s.id}
+      open={open}
+      onOpen={onOpen}
+      dim={s.hidden}
+      label={
+        <span className="flex items-center gap-2">
+          <span className="font-mono">{number}</span>
+          <span>Section</span>
+          {s.hidden && (
+            <span className="rounded-full px-2 py-0.5 text-[11px]" style={{ boxShadow: "inset 0 0 0 1px var(--color-divider)" }}>
+              Hidden from the page
+            </span>
+          )}
+        </span>
+      }
+      tools={
+        <span className="flex items-center">
+          <IconButton label="Move up" onClick={() => !first && onMove(-1)}>
+            <span style={{ opacity: first ? 0.3 : 1 }}>
+              <Glyph id="up" size={15} />
+            </span>
+          </IconButton>
+          <IconButton label="Move down" onClick={() => !last && onMove(1)}>
+            <span style={{ opacity: last ? 0.3 : 1 }}>
+              <Glyph id="down" size={15} />
+            </span>
+          </IconButton>
+          <IconButton label={s.hidden ? "Show on the page" : "Hide from the page"} onClick={onToggleHidden}>
+            <Icon
+              d={
+                s.hidden ? (
+                  <>
+                    <path d="M3 3l18 18M10.6 5.1A10 10 0 0 1 12 5c6.4 0 10 7 10 7a17 17 0 0 1-3.2 4M6.6 6.6C3.8 8.4 2 12 2 12s3.6 7 10 7a9.7 9.7 0 0 0 4.4-1" />
+                  </>
+                ) : (
+                  ICON.eye
+                )
+              }
+              size={15}
+            />
+          </IconButton>
+          {open && (
+            <button type="button" className="btn btn-primary ml-1" style={{ marginTop: 0, minHeight: 32, fontSize: 13 }} onClick={onClose}>
+              Done
+            </button>
+          )}
+        </span>
+      }
+      preview={
+        <>
+          <div className="text-[19px] leading-snug font-semibold tracking-[-0.015em]">
+            {s.title || <Placeholder>Section title</Placeholder>}
+          </div>
+          <p className="m-0 mt-1.5 line-clamp-3 max-w-[64ch] text-[14px] leading-relaxed text-muted">
+            {s.description || <Placeholder>What it is, in a few sentences</Placeholder>}
+          </p>
+          <div className="mt-3 flex flex-wrap items-center gap-1.5">
+            <span className="tag tag-neutral">{s.tab}</span>
+            {extras.map((x) => (
+              <span key={x} className="tag tag-neutral">
+                {x}
+              </span>
+            ))}
+          </div>
+          <LinkList links={s.links} />
+        </>
+      }
+    >
+      <div className="flex flex-col gap-4">
+        <div className="field">
+          <label htmlFor={`title-${s.id}`}>Title</label>
+          <input
+            id={`title-${s.id}`}
+            className="input"
+            style={{ fontWeight: 600, fontSize: 18, minHeight: 46 }}
+            placeholder="Section title"
+            value={s.title}
+            onChange={(e) => onChange((x) => ({ ...x, title: e.target.value }))}
+          />
+        </div>
+        <div className="field">
+          <label htmlFor={`desc-${s.id}`}>Description</label>
+          <textarea
+            id={`desc-${s.id}`}
+            className="input"
+            rows={4}
+            placeholder="What it is, in a few sentences"
+            value={s.description}
+            onChange={(e) => onChange((x) => ({ ...x, description: e.target.value }))}
+          />
+        </div>
+        <div className="field">
+          <label htmlFor={`tab-${s.id}`}>Tab</label>
+          <TabField id={`tab-${s.id}`} value={s.tab} options={tabOptions} onChange={(tab) => onChange((x) => ({ ...x, tab }))} />
+          <p className="m-0 mt-1.5 text-[12px] text-muted">
+            Visitors reach this section through its tab. Pick one you already use, or name a new one.
+          </p>
+        </div>
+      </div>
+
+      <Grouped title="Links">
+        <LinkEditor links={s.links} onChange={(links) => onChange((x) => ({ ...x, links }))} />
+      </Grouped>
+
+      {/* Draws its own rule and "Add to this section (optional)" label. */}
+      <div className="mt-5">
+        <SectionExtras section={s} onChange={onChange} />
+      </div>
+
+      <div className="mt-6 flex flex-wrap items-center gap-2">
+        <AnimatePresence mode="wait" initial={false}>
+          {confirming ? (
+            <motion.span
+              key="confirm"
+              initial={{ opacity: 0, x: -6 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0 }}
+              className="flex flex-wrap items-center gap-2"
+            >
+              <span className="text-[13px] font-medium">Delete this section for good?</span>
+              <button type="button" className="btn btn-primary" style={{ marginTop: 0 }} onClick={onDelete}>
+                Delete
+              </button>
+              <button type="button" className="btn btn-ghost" style={{ marginTop: 0 }} onClick={() => setConfirming(false)}>
+                Keep it
+              </button>
+            </motion.span>
+          ) : (
+            <motion.span key="ask" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+              <button type="button" className="btn btn-ghost" style={{ marginTop: 0 }} onClick={() => setConfirming(true)}>
+                Delete section…
+              </button>
+            </motion.span>
+          )}
+        </AnimatePresence>
+        <button type="button" className="btn btn-primary ml-auto" style={{ marginTop: 0 }} onClick={onClose}>
+          Done
+        </button>
+      </div>
+    </Card>
   );
 }

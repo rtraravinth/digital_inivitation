@@ -1,99 +1,166 @@
 @import "tailwindcss";
 
 /* ══════════════════════════════════════════════════════════════════════════
-   Catalogue — design tokens.
+   Mono — the application's design tokens.
 
-   The world is an exhibition catalogue: work reproduced at plate scale
-   against board, each plate carrying a factual caption beneath it, and the
-   page's required tabs read as the catalogue's numbered plate list.
+   The app is a tool, so it is black and white and nothing else: one ink, one
+   ground, a ramp of greys between them, and two themes that swap which end
+   is which. Colour belongs to the portfolios people make, never to the
+   machinery they make them with.
 
-   This block is the source of truth for the look: retune here, never
-   hard-code a hex or a font name.
+   - **Light is the default token set** (@theme, below); `[data-theme="dark"]`
+     redefines the same names. The inline script in app/layout.tsx sets the
+     attribute before first paint from the stored preference or the device.
+   - **The neutral ramp inverts in dark**, so a step keeps its meaning rather
+     than its value: 700 is "muted text" and 300 is "a quiet fill" in both.
+   - **Accent and foil are the ink.** They are the names every component
+     marks state with; in the app they resolve to black or white, and the
+     published page's `groundStyle()` sets them back to the author's colours.
 
-   Two rules the palette enforces rather than suggests:
-
-   - **Cloth red fills, foil marks.** Cloth red on board measures 2.44:1, so
-     it can never be text on the board — it is the fill of the one primary
-     action, where white sits on it at 6.44:1. Anything that marks a state
-     (the open plate, a link, a live page) is foil, which reads 9.00:1.
-   - **Board is the ground everywhere**, including the owner's own chrome.
-     There is no neutral application shell behind the world.
+   The published page is the one place none of this applies — see
+   `groundStyle()` in published/shared.tsx, which pins the catalogue tokens
+   the themes were drawn against.
    ══════════════════════════════════════════════════════════════════════ */
 @theme {
-  /* Board, and the deeper board a recess is cut into. */
-  --color-bg: #16233b;
-  --color-surface: #0e1729;
-  /* Plate white — the ink on board, and the paper a plate is printed on. */
-  --color-ink: #ffffff;
-  /* A catalogue rules hairlines, not bars: 38% ink at 1px, never 2px. */
-  --color-divider: #ffffff38;
-  /* Book cloth. The binding colour, and the only fill a primary action gets. */
-  --color-accent: #b5261e;
-  --color-accent-2: #cc4136;
-  /* Foil. Stamped on the open plate, its number, and every live mark. */
-  --color-foil: #d9c37a;
-  --color-foil-dim: #8a7a46;
-  /* The same cloth red, lightened until it reads on board: 2.44:1 becomes
-     5.21:1. An error has to be legible at the moment it appears, and foil is
-     the mark colour, not the alarm one — so a failure gets its own ink. */
-  --color-alert: #d37d78;
+  --color-bg: #ffffff;
+  /* A panel, a recess, a sidebar: one step toward the ink. */
+  --color-surface: #f6f6f6;
+  --color-ink: #0a0a0a;
+  --color-divider: #0a0a0a1a;
+  --color-accent: #0a0a0a;
+  /* What reads on an accent fill. The published page derives it from the
+     author's accent; in the app the accent is the ink, so this is the ground.
+     Without it `.btn-primary` falls back to white — invisible on dark's
+     white button. */
+  --color-accent-ink: #ffffff;
+  --color-accent-2: #262626;
+  --color-foil: #0a0a0a;
+  --color-foil-dim: #a3a3a3;
+  /* Monochrome includes failure: an error is told by its words and its
+     icon, and `role="alert"` tells assistive tech. */
+  --color-alert: #0a0a0a;
 
-  /* Tonal ramps, tinted from the board's own hue rather than neutral grey, so
-     a muted caption on board reads as board shadow and not as dirty white.
-     100 is lightest and 900 is the board itself; the published page's ground
-     presets override 700 and 800, which are the two steps captions use. */
-  --color-neutral-100: #f2f4f7;
-  --color-neutral-200: #dfe3ea;
-  --color-neutral-300: #c3cad6;
-  --color-neutral-400: #9ba5b6;
-  --color-neutral-500: #7a8598;
-  --color-neutral-600: #5e6a7d;
-  --color-neutral-700: #46526a;
-  --color-neutral-800: #2c3850;
-  --color-neutral-900: #16233b;
+  --color-neutral-100: #f5f5f5;
+  --color-neutral-200: #ebebeb;
+  --color-neutral-300: #dedede;
+  --color-neutral-400: #b3b3b3;
+  --color-neutral-500: #8a8a8a;
+  --color-neutral-600: #6b6b6b;
+  --color-neutral-700: #545454;
+  --color-neutral-800: #2e2e2e;
+  --color-neutral-900: #0a0a0a;
 
-  --color-accent-100: #fdf0ee;
-  --color-accent-200: #f8d5d1;
-  --color-accent-300: #f0aea7;
-  --color-accent-400: #e07b70;
-  --color-accent-500: #cc4136;
-  --color-accent-600: #b5261e;
-  --color-accent-700: #961b14;
-  --color-accent-800: #71150f;
-  --color-accent-900: #4a120e;
+  /* The accent ramp is the grey ramp: callers that ask for "a lighter
+     accent" get a lighter ink, which is the only lighter accent there is. */
+  --color-accent-100: #f5f5f5;
+  --color-accent-200: #ebebeb;
+  --color-accent-300: #dedede;
+  --color-accent-400: #b3b3b3;
+  --color-accent-500: #2e2e2e;
+  --color-accent-600: #0a0a0a;
+  --color-accent-700: #545454;
+  --color-accent-800: #2e2e2e;
+  --color-accent-900: #0a0a0a;
 
-  /* A plate is trimmed, not rounded. Zero radius is no longer a brand
-     commitment carried over from Modernist — it is what a mounted
-     reproduction looks like, which is why it still reads 0 here. */
-  --radius-sm: 0px;
-  --radius-md: 0px;
-  --radius-lg: 0px;
+  /* Tool corners: soft enough to read as controls, small enough to stay
+     out of the way. The published page sets these back to 0. */
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
 
-  /* Exponential ease-out: almost all of the distance in the first third, then
-     a long settle. Everything in the product moves on this one curve, except
-     the plate turn, which carries weight into its start. */
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
   --ease-turn: cubic-bezier(0.33, 0, 0.1, 1);
 
-  /* Offset plus blur, keyed to a colour below the board rather than black, so
-     a plate reads as lifted off the board instead of outlined on it. */
-  --shadow-sm: 0 1px 3px color-mix(in srgb, #050a14 42%, transparent);
-  --shadow-md: 0 4px 14px color-mix(in srgb, #050a14 48%, transparent);
-  --shadow-lg: 0 18px 48px color-mix(in srgb, #050a14 55%, transparent);
+  --shadow-sm: 0 1px 2px #0000000f;
+  --shadow-md: 0 4px 16px -4px #0000001f, 0 1px 3px #00000014;
+  --shadow-lg: 0 24px 48px -16px #00000033, 0 2px 6px #0000001a;
 }
 
-@theme inline {
-  /* Bodoni Moda sets half-titles and plate numbers; Schibsted Grotesk sets
-     captions, body and every control. The published page overwrites both from
-     the portfolio's own type pairing — these are the house defaults. */
-  --font-heading: var(--font-bodoni-moda), Georgia, serif;
-  --font-body: var(--font-schibsted-grotesk), system-ui, sans-serif;
-  --font-sans: var(--font-schibsted-grotesk), system-ui, sans-serif;
-  /* The apparatus — plate numbers, captions, labels, rules — keeps the house
-     faces whatever a portfolio picks for its own content. The catalogue's
-     voice is the catalogue's, not the author's. */
-  --font-apparatus: var(--font-schibsted-grotesk), system-ui, sans-serif;
-  --font-plate-no: var(--font-bodoni-moda), Georgia, serif;
+/* Not `@theme inline`. Inline compiles a utility with the value written in,
+   so `.font-heading` would be Inter everywhere — including on a published
+   page, where `groundStyle()` sets `--font-heading` to the author's face and
+   every `font-heading` element ignored it. A plain @theme makes the utility
+   read `var(--font-heading)`, which the wrapper can override. */
+@theme {
+  /* Inter sets the whole interface; JetBrains Mono sets what a person might
+     copy or compare — addresses, counts, ids. The published page overwrites
+     every one of these from the portfolio's own pairing and the catalogue's
+     house faces. */
+  --font-heading: var(--font-inter), system-ui, sans-serif;
+  --font-body: var(--font-inter), system-ui, sans-serif;
+  --font-sans: var(--font-inter), system-ui, sans-serif;
+  --font-apparatus: var(--font-inter), system-ui, sans-serif;
+  --font-plate-no: var(--font-jetbrains-mono), ui-monospace, monospace;
+  --font-mono: var(--font-jetbrains-mono), ui-monospace, monospace;
+}
+
+/* The interface's control voice. Every label-like class reads these with its
+   catalogue value as the fallback, so the app sets plain sentence-case
+   labels here while `groundStyle()` sets each one to `initial` — which makes
+   `var()` take the fallback — and the published page keeps its tracked
+   capitals untouched. */
+:root {
+  --ui-case: none;
+  --ui-track: -0.005em;
+  --ui-weight: 500;
+  --ui-label: 12.5px;
+  --ui-btn: 14px;
+  --ui-btn-pad: 0.5rem 0.9rem;
+  --ui-btn-h: 36px;
+  --ui-tag: 12px;
+  --ui-pill: 999px;
+  --ui-heading-weight: 640;
+  --ui-label-ink: color-mix(in srgb, var(--color-ink) 64%, var(--color-bg));
+  --ui-meta: 12px;
+  --ui-meta-font: var(--font-mono);
+  --ui-meta-track: 0;
+  /* The two chart series, run through the dataviz validator against each
+     theme's surface: separation ΔE 36 (normal and colour-blind), both above
+     3:1. Monochrome fails its chroma check by design, so identity is never
+     shade alone — the second series is also dashed, legended and labelled. */
+  --chart-1: #2b2b2b;
+  --chart-2: #8f8f8f;
+  color-scheme: light;
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --chart-1: #d4d4d4;
+  --chart-2: #6e6e6e;
+  --color-bg: #0a0a0a;
+  --color-surface: #141414;
+  --color-ink: #fafafa;
+  --color-divider: #ffffff1f;
+  --color-accent: #fafafa;
+  --color-accent-ink: #0a0a0a;
+  --color-accent-2: #d4d4d4;
+  --color-foil: #fafafa;
+  --color-foil-dim: #525252;
+  --color-alert: #fafafa;
+
+  --color-neutral-100: #171717;
+  --color-neutral-200: #1f1f1f;
+  --color-neutral-300: #2b2b2b;
+  --color-neutral-400: #474747;
+  --color-neutral-500: #737373;
+  --color-neutral-600: #8f8f8f;
+  --color-neutral-700: #a8a8a8;
+  --color-neutral-800: #d4d4d4;
+  --color-neutral-900: #fafafa;
+
+  --color-accent-100: #171717;
+  --color-accent-200: #1f1f1f;
+  --color-accent-300: #2b2b2b;
+  --color-accent-400: #474747;
+  --color-accent-500: #d4d4d4;
+  --color-accent-600: #fafafa;
+  --color-accent-700: #a8a8a8;
+  --color-accent-800: #d4d4d4;
+  --color-accent-900: #fafafa;
+
+  --shadow-sm: 0 1px 2px #00000066;
+  --shadow-md: 0 4px 16px -4px #00000099, 0 0 0 1px #ffffff0f;
+  --shadow-lg: 0 24px 48px -16px #000000b3, 0 0 0 1px #ffffff14;
 }
 
 /* — base — */
@@ -114,10 +181,10 @@
   h5,
   h6 {
     font-family: var(--font-heading);
-    /* 700, not 800. A didone carries a half-title on its own stroke contrast,
-       and the author-pickable faces that stop at 700 then get a real instance
-       rather than a clamp. */
-    font-weight: 700;
+    /* 700 on the published page — a didone carries a half-title on its own
+       stroke contrast, and the faces that stop at 700 get a real instance.
+       The app's Inter reads heavier at the same number, so it asks for 640. */
+    font-weight: var(--ui-heading-weight, 700);
     line-height: 1.08;
     /* Retuned per portfolio by the Layout panel; groundStyle() sets the var
        on the published page's wrapper. */
@@ -141,10 +208,11 @@
   }
   h6 {
     font-family: var(--font-apparatus);
-    font-size: 11px;
-    font-weight: 600;
-    letter-spacing: 0.14em;
-    text-transform: uppercase;
+    font-size: var(--ui-label, 11px);
+    font-weight: var(--ui-weight, 600);
+    letter-spacing: var(--ui-track, 0.14em);
+    text-transform: var(--ui-case, uppercase);
+    color: var(--ui-label-ink, inherit);
     line-height: 1.3;
   }
   p {
@@ -231,10 +299,10 @@
      face as a costume for "technical" is exactly what this world refuses. */
   .mono-label {
     font-family: var(--font-apparatus);
-    font-weight: 600;
-    font-size: 11px;
-    letter-spacing: 0.14em;
-    text-transform: uppercase;
+    font-weight: var(--ui-weight, 600);
+    font-size: var(--ui-label, 11px);
+    letter-spacing: var(--ui-track, 0.14em);
+    text-transform: var(--ui-case, uppercase);
     color: color-mix(in srgb, var(--color-ink) 62%, var(--color-bg));
   }
 
@@ -295,10 +363,10 @@
   /* role · date · credit. Always present: an empty field shows as an em dash
      rather than dropping the line, so two plates' captions stay comparable. */
   .caption-credit {
-    font-family: var(--font-apparatus);
-    font-size: 11.5px;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
+    font-family: var(--ui-meta-font, var(--font-apparatus));
+    font-size: var(--ui-meta, 11.5px);
+    letter-spacing: var(--ui-meta-track, 0.06em);
+    text-transform: var(--ui-case, uppercase);
     font-variant-numeric: tabular-nums lining-nums;
     color: color-mix(in srgb, var(--color-ink) 62%, var(--color-bg));
   }
@@ -337,15 +405,16 @@
     text-decoration: none;
     white-space: nowrap;
     font-family: var(--font-apparatus);
-    font-weight: 600;
-    font-size: 13px;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
+    font-weight: var(--ui-weight, 600);
+    font-size: var(--ui-btn, 13px);
+    letter-spacing: var(--ui-track, 0.08em);
+    text-transform: var(--ui-case, uppercase);
     line-height: 1.2;
     color: var(--color-ink);
     background: transparent;
     border: 1px solid transparent;
-    padding: 0.6rem 1rem;
+    padding: var(--ui-btn-pad, 0.6rem 1rem);
+    min-height: var(--ui-btn-h, auto);
     border-radius: var(--radius-md);
     transition:
       background-color 180ms var(--ease-out),
@@ -364,11 +433,13 @@
     background: var(--color-accent);
     color: var(--color-accent-ink, #ffffff);
   }
+  /* Mixed from whatever the accent is, so the same rule gives a grey step on
+     the app's black or white and a lighter step on an author's colour. */
   .btn-primary:hover:not(:disabled) {
-    background: var(--color-accent-500);
+    background: color-mix(in srgb, var(--color-accent) 84%, var(--color-bg));
   }
   .btn-primary:active:not(:disabled) {
-    background: var(--color-accent-700);
+    background: color-mix(in srgb, var(--color-accent) 72%, var(--color-bg));
   }
   .btn-secondary {
     border-color: var(--color-divider);
@@ -409,10 +480,10 @@
   .field > label {
     display: block;
     font-family: var(--font-apparatus);
-    font-size: 11px;
-    font-weight: 600;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
+    font-size: var(--ui-label, 11px);
+    font-weight: var(--ui-weight, 600);
+    letter-spacing: var(--ui-track, 0.1em);
+    text-transform: var(--ui-case, uppercase);
     margin-bottom: 7px;
     color: color-mix(in srgb, var(--color-ink) 62%, var(--color-bg));
   }
@@ -464,6 +535,9 @@
     width: 14px;
     height: 14px;
     flex: none;
+    /* Round in the app, square on the published page (`--ui-pill` is set
+       to `initial` there, so the fallback wins). */
+    border-radius: var(--ui-pill, 0px);
     border: 1px solid var(--color-divider);
     transition:
       border-color 160ms var(--ease-out),
@@ -493,10 +567,10 @@
     gap: 6px;
     padding: 8px 13px;
     font-family: var(--font-apparatus);
-    font-size: 11px;
-    font-weight: 600;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
+    font-size: var(--ui-label, 11px);
+    font-weight: var(--ui-weight, 600);
+    letter-spacing: var(--ui-track, 0.08em);
+    text-transform: var(--ui-case, uppercase);
     cursor: pointer;
     transition:
       background-color 160ms var(--ease-out),
@@ -519,10 +593,10 @@
     display: inline-flex;
     align-items: center;
     font-family: var(--font-apparatus);
-    font-size: 10.5px;
-    font-weight: 600;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
+    font-size: var(--ui-tag, 10.5px);
+    font-weight: var(--ui-weight, 600);
+    letter-spacing: var(--ui-track, 0.1em);
+    text-transform: var(--ui-case, uppercase);
     padding: 4px 9px;
     border-radius: var(--radius-sm);
     white-space: nowrap;
@@ -552,11 +626,12 @@
     align-items: center;
     gap: 8px;
     font-family: var(--font-apparatus);
-    font-size: 10px;
-    font-weight: 600;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
+    font-size: var(--ui-tag, 10px);
+    font-weight: var(--ui-weight, 600);
+    letter-spacing: var(--ui-track, 0.1em);
+    text-transform: var(--ui-case, uppercase);
     padding: 5px 10px;
+    border-radius: var(--ui-pill, 0px);
     white-space: nowrap;
   }
   .status::before {
@@ -564,6 +639,7 @@
     width: 6px;
     height: 6px;
     flex: none;
+    border-radius: var(--ui-pill, 0px);
   }
   .status-live {
     background: var(--color-foil);
@@ -604,10 +680,10 @@
     color: inherit;
     text-decoration: none;
     font-family: var(--font-apparatus);
-    font-size: 11px;
-    font-weight: 600;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
+    font-size: var(--ui-label, 11px);
+    font-weight: var(--ui-weight, 600);
+    letter-spacing: var(--ui-track, 0.1em);
+    text-transform: var(--ui-case, uppercase);
     transition: color 160ms var(--ease-out);
   }
   .nav a:hover,
@@ -624,10 +700,10 @@
   .table th {
     font-family: var(--font-apparatus);
     text-align: left;
-    font-size: 10.5px;
-    font-weight: 600;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
+    font-size: var(--ui-label, 10.5px);
+    font-weight: var(--ui-weight, 600);
+    letter-spacing: var(--ui-track, 0.1em);
+    text-transform: var(--ui-case, uppercase);
     color: color-mix(in srgb, var(--color-ink) 62%, var(--color-bg));
     padding: 0.6rem 0.5rem;
     border-bottom: 1px solid var(--color-ink);
@@ -669,6 +745,64 @@
     justify-content: flex-end;
     gap: 0.5rem;
     margin-top: 0.5rem;
+  }
+
+  /* ── the app's backdrop ────────────────────────────────────────────────
+     A dot grid fading out down the page, a soft light at the top, and a
+     glow that follows the pointer (`--mx` / `--my`, written by the page).
+     All of it from the ink, so it is the same pattern in either theme. */
+  .app-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background:
+      radial-gradient(
+        600px circle at var(--mx, 50%) var(--my, -200px),
+        color-mix(in srgb, var(--color-ink) 6%, transparent),
+        transparent 70%
+      ),
+      radial-gradient(
+        ellipse 80% 50% at 50% -10%,
+        color-mix(in srgb, var(--color-ink) 7%, transparent),
+        transparent 70%
+      );
+  }
+  .app-backdrop::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background-image: radial-gradient(
+      color-mix(in srgb, var(--color-ink) 16%, transparent) 1px,
+      transparent 1px
+    );
+    background-size: 22px 22px;
+    mask-image: radial-gradient(ellipse 90% 70% at 50% 0%, #000 30%, transparent 85%);
+    -webkit-mask-image: radial-gradient(ellipse 90% 70% at 50% 0%, #000 30%, transparent 85%);
+  }
+
+  /* A picker's panel drops in from just above where it settles. */
+  .picker-pop {
+    animation: picker-pop 160ms var(--ease-out);
+    transform-origin: top;
+  }
+
+  /* A published page's status dot: solid, with a ring that keeps leaving it. */
+  .app-live-dot {
+    position: relative;
+    width: 7px;
+    height: 7px;
+    border-radius: 999px;
+    background: currentColor;
+    flex: none;
+  }
+  .app-live-dot::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: currentColor;
+    animation: fx-ping 1.8s var(--ease-out) infinite;
   }
 
   /* A link inside a published section. The rule sweeps in from the left on
@@ -1302,6 +1436,12 @@
   }
 }
 
+@keyframes picker-pop {
+  from {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.98);
+  }
+}
 @keyframes fx-marquee {
   to {
     transform: translateX(-50%);
@@ -1403,6 +1543,13 @@
   }
   .plate-sheen::before {
     display: none;
+  }
+  .app-live-dot::after {
+    animation: none;
+    opacity: 0;
+  }
+  .picker-pop {
+    animation: none;
   }
   /* The motion themes, finished and still. */
   .fx-reveal,

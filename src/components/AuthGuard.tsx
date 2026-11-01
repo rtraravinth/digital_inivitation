@@ -3,15 +3,7 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useSession } from "@/lib/session";
-
-function Waiting({ note }: { note: string }) {
-  return (
-    <main className="mx-auto w-full max-w-[900px] px-6 py-16">
-      <p className="mono-label">Facet</p>
-      <p className="text-muted mt-2 text-[14px]">{note}</p>
-    </main>
-  );
-}
+import { PageState } from "./ui";
 
 /**
  * Wraps everything that needs an account. The published page is deliberately
@@ -27,8 +19,8 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
     if (status === "out") router.replace("/signin");
   }, [status, router]);
 
-  if (status === "loading") return <Waiting note="Loading…" />;
-  if (status === "out") return <Waiting note="Taking you to sign in…" />;
+  if (status === "loading") return <PageState busy title="Loading…" />;
+  if (status === "out") return <PageState busy title="Taking you to sign in…" />;
 
   return <>{children}</>;
 }

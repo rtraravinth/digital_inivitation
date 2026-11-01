@@ -201,6 +201,44 @@ function palette(p: Portfolio): Record<string, string> {
   return p.groundHex ? derivedGround(p.groundHex) : GROUNDS[p.ground];
 }
 
+/**
+ * The catalogue's own apparatus, pinned on the published wrapper.
+ *
+ * The app around the page is the Mono tool system — Inter, sentence-case
+ * controls, soft corners, black and white, in a light or a dark theme the
+ * viewer picks. None of that may reach a portfolio: the themes were drawn
+ * against tracked capitals, square trim and the house faces, and an author's
+ * page must look the same whoever opens it in whichever theme.
+ *
+ * The `--ui-*` voice tokens are set to `initial`, which makes every
+ * `var(--ui-x, fallback)` in globals.css take its fallback — the catalogue
+ * value written beside it. The rest are set outright.
+ */
+const CATALOGUE_APPARATUS: Record<string, string> = {
+  "--ui-case": "initial",
+  "--ui-track": "initial",
+  "--ui-weight": "initial",
+  "--ui-label": "initial",
+  "--ui-btn": "initial",
+  "--ui-btn-pad": "initial",
+  "--ui-btn-h": "initial",
+  "--ui-tag": "initial",
+  "--ui-pill": "initial",
+  "--ui-heading-weight": "initial",
+  "--ui-label-ink": "initial",
+  "--ui-meta": "initial",
+  "--ui-meta-font": "initial",
+  "--ui-meta-track": "initial",
+  "--font-apparatus": "var(--font-schibsted-grotesk), system-ui, sans-serif",
+  "--font-plate-no": "var(--font-bodoni-moda), Georgia, serif",
+  "--radius-sm": "0px",
+  "--radius-md": "0px",
+  "--radius-lg": "0px",
+  "--shadow-sm": "0 1px 3px color-mix(in srgb, #050a14 42%, transparent)",
+  "--shadow-md": "0 4px 14px color-mix(in srgb, #050a14 48%, transparent)",
+  "--shadow-lg": "0 18px 48px color-mix(in srgb, #050a14 55%, transparent)",
+};
+
 /** Overriding the system's own variables lets every .btn/.tag follow along. */
 export function groundStyle(p: Portfolio): CSSProperties {
   const face = FONTS.find((x) => x.id === p.font) ?? FONTS[0];
@@ -209,6 +247,7 @@ export function groundStyle(p: Portfolio): CSSProperties {
   const ground = palette(p);
   const bg = ground["--color-bg"];
   return {
+    ...CATALOGUE_APPARATUS,
     ...ground,
     "--color-accent": p.accent,
     /**

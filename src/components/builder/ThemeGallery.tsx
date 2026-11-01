@@ -81,17 +81,29 @@ export function ThemeGallery({ id }: { id: string }) {
   };
 
   return (
+    <>
+    <div aria-hidden className="app-backdrop" />
     <div className="flex min-h-dvh flex-col lg:h-dvh">
-      <div className="nav bg-bg flex-none">
-        <Link href={`/builder/${saved.id}`} className="btn btn-ghost" aria-label="Back to the builder">
+      <header
+        className="sticky top-0 z-30 flex h-14 flex-none items-center gap-2 px-3 sm:gap-3 sm:px-5"
+        style={{
+          background: "color-mix(in srgb, var(--color-bg) 86%, transparent)",
+          backdropFilter: "blur(12px)",
+          WebkitBackdropFilter: "blur(12px)",
+          borderBottom: "1px solid var(--color-divider)",
+        }}
+      >
+        <Link href={`/builder/${saved.id}`} className="btn btn-ghost" aria-label="Back to the builder" style={{ marginTop: 0 }}>
           <Glyph id="back" size={16} />
+          <span className="hidden sm:inline">Builder</span>
         </Link>
-        <span className="nav-brand">Choose a look</span>
-        <span className="text-neutral-700 hidden text-xs sm:inline">{saved.name}</span>
-        <Link href={`/builder/${saved.id}`} className="btn btn-ghost ml-auto">
+        <span className="hidden h-5 w-px sm:block" style={{ background: "var(--color-divider)" }} />
+        <span className="min-w-0 truncate text-[14.5px] font-semibold tracking-[-0.01em]">Choose a look</span>
+        <span className="hidden truncate text-[13px] text-muted sm:inline">· {saved.name}</span>
+        <Link href={`/builder/${saved.id}`} className="btn btn-ghost ml-auto" style={{ marginTop: 0 }}>
           Skip for now
         </Link>
-      </div>
+      </header>
 
       <div className="min-h-0 flex-1 lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)]">
         {/* ── the choices ─────────────────────────────────────────── */}
@@ -111,15 +123,15 @@ export function ThemeGallery({ id }: { id: string }) {
                     type="button"
                     aria-pressed={on}
                     onClick={() => pickProfession(x.id)}
-                    className="flex cursor-pointer flex-col gap-2 p-3 text-left"
+                    className="flex cursor-pointer flex-col gap-2 rounded-xl p-3 text-left transition-transform duration-200 hover:-translate-y-0.5"
                     style={{
                       background: on ? "var(--color-surface)" : "var(--color-bg)",
-                      boxShadow: on ? "inset 0 0 0 2px var(--color-foil)" : "inset 0 0 0 1px var(--color-divider)",
+                      boxShadow: on ? "inset 0 0 0 2px var(--color-ink)" : "inset 0 0 0 1px var(--color-divider)",
                     }}
                   >
                     <span
                       aria-hidden
-                      className="relative block h-12 w-full overflow-hidden"
+                      className="relative block h-12 w-full overflow-hidden rounded-lg"
                       style={{ background: x.groundHex }}
                     >
                       <span
@@ -152,10 +164,10 @@ export function ThemeGallery({ id }: { id: string }) {
                       setProfession(null);
                       setDraft((prev) => ({ ...(prev ?? {}), theme: t.id }));
                     }}
-                    className="flex cursor-pointer flex-col text-left"
+                    className="flex cursor-pointer flex-col overflow-hidden rounded-2xl text-left transition-transform duration-200 hover:-translate-y-1"
                     style={{
                       background: on ? "var(--color-surface)" : "var(--color-bg)",
-                      boxShadow: on ? "inset 0 0 0 2px var(--color-foil)" : "inset 0 0 0 1px var(--color-divider)",
+                      boxShadow: on ? "inset 0 0 0 2px var(--color-ink)" : "inset 0 0 0 1px var(--color-divider)",
                     }}
                   >
                     <ThemeThumb theme={t.id} accent={shown.accent} size="lg" />
@@ -185,7 +197,7 @@ export function ThemeGallery({ id }: { id: string }) {
         </div>
 
         {/* ── the preview ─────────────────────────────────────────── */}
-        <div className="flex min-h-0 flex-col" style={{ background: "var(--color-surface)" }}>
+        <div className="flex min-h-0 flex-col">
           <div className="border-divider flex flex-none flex-wrap items-center gap-3 border-b px-5 py-2.5">
             <div className="seg hidden sm:inline-flex" role="radiogroup" aria-label="Device">
               {(["desktop", "mobile"] as Device[]).map((d) => (
@@ -210,7 +222,7 @@ export function ThemeGallery({ id }: { id: string }) {
             <Canvas p={shown} handle={handle} device={device} />
           </div>
 
-          <div className="border-divider bg-bg flex flex-none flex-wrap items-center gap-2.5 border-t px-5 py-3.5">
+          <div className="flex flex-none flex-wrap items-center gap-2.5 px-5 py-3.5" style={{ background: "var(--color-bg)", borderTop: "1px solid var(--color-divider)" }}>
             {theme && <span className="text-neutral-700 min-w-0 flex-1 text-[12px]">{theme.depth}</span>}
             {dirty && (
               <button
@@ -249,5 +261,6 @@ export function ThemeGallery({ id }: { id: string }) {
         </div>
       </div>
     </div>
+    </>
   );
 }

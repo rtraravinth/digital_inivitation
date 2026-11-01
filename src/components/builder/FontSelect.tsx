@@ -103,8 +103,14 @@ export function FontSelect({
         <span className="font-heading truncate text-sm">
           {current.name}
         </span>
-        <span className="text-neutral-700 ml-auto flex-none pl-2 text-[11px]">
-          {open ? "▲" : "▼"}
+        <span
+          aria-hidden
+          className="ml-auto flex-none pl-2 transition-transform duration-200"
+          style={{ color: "var(--color-neutral-600)", transform: open ? "rotate(180deg)" : "none" }}
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="m6 9 6 6 6-6" />
+          </svg>
         </span>
       </button>
 
@@ -124,14 +130,15 @@ export function FontSelect({
             ref={list}
             role="listbox"
             aria-label={label}
-            className="absolute z-20 max-h-[320px] w-full overflow-y-auto"
+            className="picker-pop absolute z-20 max-h-[320px] w-full overflow-y-auto rounded-xl p-1"
             style={{
-              top: "calc(100% + 2px)",
-              background: "var(--color-divider)",
+              top: "calc(100% + 6px)",
+              background: "var(--color-bg)",
               border: "1px solid var(--color-divider)",
+              boxShadow: "var(--shadow-lg)",
               display: "flex",
               flexDirection: "column",
-              gap: 1,
+              gap: 2,
             }}
           >
             {FONTS.map((face, index) => {
@@ -149,17 +156,20 @@ export function FontSelect({
                     trigger.current?.focus();
                   }}
                   onKeyDown={(e) => move(e, index)}
-                  className="flex cursor-pointer items-center gap-3 p-2.5 text-left"
+                  className="flex cursor-pointer items-center gap-3 rounded-lg p-2.5 text-left hover:bg-[var(--color-surface)] focus-visible:bg-[var(--color-surface)]"
                   style={{
-                    background: on ? "var(--color-surface)" : "var(--color-bg)",
+                    background: on ? "var(--color-surface)" : undefined,
                   }}
                 >
+                  {/* "Aa", not the specimen: a row's sample column is 38px,
+                      and a full name overflowed it into the face's own label.
+                      The trigger above still sets the specimen at length. */}
                   <FontSample
                     cssVar={face.cssVar}
                     eager={on}
                     className="w-[38px] flex-none text-xl leading-none"
                   >
-                    {specimen}
+                    Aa
                   </FontSample>
                   <span className="flex min-w-0 flex-col gap-0.5">
                     <span className="font-heading truncate text-sm">

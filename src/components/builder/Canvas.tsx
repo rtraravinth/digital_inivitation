@@ -7,7 +7,8 @@ import {
   PublishedBody,
   PublishedHandleProvider,
 } from "../published/themes";
-import { pageAddress, type Portfolio } from "@/lib/types";
+import { displayUrl, liveUrl } from "@/lib/slug";
+import { type Portfolio } from "@/lib/types";
 
 export type Device = "desktop" | "tablet" | "mobile";
 
@@ -113,7 +114,9 @@ export function Canvas({
                 className="mx-auto truncate rounded-full px-4 py-0.5 text-[11px]"
                 style={{ background: "var(--color-bg)", color: "var(--color-neutral-700)", maxWidth: "60%" }}
               >
-                {pageAddress(handle || "you", p.slug)}
+                {/* The address it will have once published — the real route,
+                    not the facet.page vanity domain, which serves nothing. */}
+                {displayUrl(liveUrl(handle || "your-handle", p.slug))}
               </span>
             </div>
           )}
@@ -156,17 +159,24 @@ function useHeadSheets(): Sheet[] {
   const [sheets, setSheets] = useState<Sheet[]>([]);
 
   useEffect(() => {
-    const read = () =>
-      setSheets(
-        [...document.querySelectorAll<HTMLElement>('style, link[rel="stylesheet"]')].map(
-          (node, index) => {
-            const href = node.getAttribute("href");
-            return href
-              ? { key: `l${href}`, href }
-              : { key: `s${index}`, css: node.textContent ?? "" };
-          },
-        ),
-      );
+    const read = () => {
+      // Once per address. During a hot reload the dev server briefly links
+      // the new stylesheet beside the old one under the same href, and two
+      // links with one key is a React key collision; the frame needs the
+      // sheet once either way.
+      const seen = new Set<string>();
+      const next: Sheet[] = [];
+      document.querySelectorAll<HTMLElement>('style, link[rel="stylesheet"]').forEach((node, index) => {
+        const href = node.getAttribute("href");
+        const sheet = href
+          ? { key: `l${href}`, href }
+          : { key: `s${index}`, css: node.textContent ?? "" };
+        if (seen.has(sheet.key)) return;
+        seen.add(sheet.key);
+        next.push(sheet);
+      });
+      setSheets(next);
+    };
 
     read();
     const observer = new MutationObserver(read);

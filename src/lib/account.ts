@@ -232,6 +232,17 @@ export async function deleteAccount() {
   await api.del("/account");
 }
 
+/**
+ * Forget the last failed save's message. The panel that made the save shows
+ * its own error beside the form; once the author has moved on — discarded
+ * the edit, opened another group — a page-wide banner repeating it is stale.
+ */
+export function clearAccountError() {
+  if (syncError === null) return;
+  syncError = null;
+  notify();
+}
+
 export async function refreshAccount() {
   await load();
 }

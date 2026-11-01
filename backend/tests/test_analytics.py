@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import UTC, datetime, timedelta
 
 import pytest
-from sqlalchemy import update
+from sqlalchemy import select, update
 
 from app.models import PageView
 from app.services.analytics import source_from_referrer
@@ -121,8 +121,39 @@ async def test_an_empty_summary_is_empty_never_invented(auth_client, published):
         "views": {},
         "clicks": {},
         "sources": {},
+        "daily": {},
         "totals": {"views": 0, "clicks": 0},
     }
+
+
+async def test_the_daily_series_counts_views_and_clicks_by_utc_day(
+    auth_client, client, published, db_session
+):
+    slug = published["slug"]
+    section_id = published["sections"][0]["id"]
+    for key in ("a", "b"):
+        await client.post(
+            f"/api/v1/public/p/{TEST_HANDLE}/{slug}/views",
+            json={"referrer": "", "dedupeKey": key},
+        )
+    await client.post(
+        f"/api/v1/public/p/{TEST_HANDLE}/{slug}/clicks", json={"sectionId": section_id}
+    )
+    # One of the two views moves to three days ago: the series has to split
+    # them across two days rather than lump them into today.
+    three_days_ago = datetime.now(UTC) - timedelta(days=3)
+    first = (await db_session.execute(select(PageView.id).limit(1))).scalar_one()
+    await db_session.execute(
+        update(PageView).where(PageView.id == first).values(occurred_at=three_days_ago)
+    )
+
+    daily = (await auth_client.get("/api/v1/analytics/summary")).json()["daily"][slug]
+    today = datetime.now(UTC).date().isoformat()
+    earlier = three_days_ago.date().isoformat()
+    assert daily[today] == {"views": 1, "clicks": 1}
+    assert daily[earlier] == {"views": 1, "clicks": 0}
+    # Sparse: the days in between are absent, not zero.
+    assert len(daily) == 2
 
 
 async def test_the_range_window_excludes_older_events(

@@ -119,8 +119,8 @@ export function QrCode({
       // button never sits over the modules — a covered module is a code that
       // may not scan, and the quiet zone around it is part of the code too.
       <div
-        className="inline-flex flex-col"
-        style={{ boxShadow: "inset 0 0 0 2px var(--color-divider)" }}
+        className="inline-flex flex-none flex-col overflow-hidden rounded-xl"
+        style={{ border: "1px solid var(--color-divider)" }}
       >
         <div className="p-2.5">{svg}</div>
         {downloadName && (
@@ -129,11 +129,11 @@ export function QrCode({
             aria-label="Download the code as a PNG"
             title="Download PNG"
             onClick={download}
-            className="hover:bg-accent hover:text-bg flex h-11 cursor-pointer items-center justify-center gap-2 text-[11px] uppercase tracking-[0.06em] transition-colors"
-            style={{ boxShadow: "inset 0 2px 0 var(--color-divider)" }}
+            className="flex h-10 cursor-pointer items-center justify-center gap-2 text-[12.5px] font-medium transition-colors hover:bg-[var(--color-neutral-200)]"
+            style={{ borderTop: "1px solid var(--color-divider)", color: "var(--color-ink)" }}
           >
             <DownloadGlyph />
-            PNG
+            Download PNG
           </button>
         )}
       </div>

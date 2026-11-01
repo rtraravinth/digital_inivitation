@@ -1,185 +1,230 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import type { StartFrom } from "@/lib/store";
-import { PAGE_DOMAIN, type Portfolio } from "@/lib/types";
+import { useState } from "react";
+import { ICON, Icon, Modal } from "./ui";
 import { useAccount } from "@/lib/account";
+import { Glyph } from "@/lib/glyphs";
+import { displayUrl, isSlug, liveUrl, slugify } from "@/lib/slug";
+import type { StartFrom } from "@/lib/store";
+import type { Portfolio } from "@/lib/types";
 
-function slugify(name: string) {
-  return name
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-|-$/g, "");
-}
-
+/**
+ * Making a new page: what to call it, where it will live, and what it starts
+ * with. Rendered inside an `<AnimatePresence>` by the caller.
+ *
+ * The caller owns the request, because the server mints the id and the page
+ * navigates to it; this only waits for the answer, keeps itself open while
+ * it is pending, and shows the server's reason if it says no.
+ */
 export function CreatePortfolioDialog({
   portfolios,
+  error,
   onCancel,
   onCreate,
 }: {
   portfolios: Portfolio[];
+  /** The server's answer to the last attempt, shown in the dialog. */
+  error?: string | null;
   onCancel: () => void;
-  onCreate: (
-    name: string,
-    slug: string,
-    startFrom: StartFrom,
-    summary: string,
-  ) => void;
+  onCreate: (name: string, slug: string, startFrom: StartFrom, summary: string) => Promise<void> | void;
 }) {
   const handle = useAccount().account.profile.handle;
-  const [name, setName] = useState("Investor one-pager");
-  // One segment: the handle in front is the namespace now.
-  const [slug, setSlug] = useState("investors");
+  const [name, setName] = useState("");
+  const [slug, setSlug] = useState("");
   const [slugTouched, setSlugTouched] = useState(false);
   const [summary, setSummary] = useState("");
   const [kind, setKind] = useState<StartFrom["kind"]>("blank");
   const [copyId, setCopyId] = useState(portfolios[0]?.id ?? "");
+  const [busy, setBusy] = useState(false);
 
-  useEffect(() => {
-    function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape") onCancel();
-    }
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [onCancel]);
+  const taken = portfolios.some((p) => p.slug === slug);
+  const slugError = !slug
+    ? null
+    : slug.length < 2
+      ? "At least two characters."
+      : slug.endsWith("-")
+        ? "Can’t end with a hyphen."
+        : !isSlug(slug)
+          ? "Lowercase letters, numbers and hyphens only."
+          : taken
+            ? "You already have a page at this address."
+            : null;
+  const ready = name.trim() !== "" && isSlug(slug) && !taken && !busy;
 
   function changeName(value: string) {
     setName(value);
-    if (!slugTouched) setSlug(`rohan/${slugify(value)}`);
+    if (!slugTouched) setSlug(slugify(value));
   }
 
-  function submit(e: React.FormEvent) {
+  async function submit(e: React.FormEvent) {
     e.preventDefault();
-    if (!name.trim()) return;
-    const startFrom: StartFrom =
-      kind === "copy" ? { kind: "copy", id: copyId } : { kind };
-    onCreate(name.trim(), slug.trim(), startFrom, summary.trim());
+    if (!ready) return;
+    const startFrom: StartFrom = kind === "copy" ? { kind: "copy", id: copyId } : { kind };
+    setBusy(true);
+    try {
+      await onCreate(name.trim(), slug, startFrom, summary.trim());
+    } finally {
+      setBusy(false);
+    }
   }
 
-  const source = portfolios.find((p) => p.id === copyId);
+  const options: Array<{ id: StartFrom["kind"]; title: string; desc: string; icon: React.ReactNode; disabled?: boolean }> = [
+    {
+      id: "blank",
+      title: "Blank",
+      desc: "A header and one empty section.",
+      icon: <Glyph id="plus" size={16} />,
+    },
+    {
+      id: "copy",
+      title: "Copy a page",
+      desc: portfolios.length ? "Start from one you have, then cut it down." : "You have no pages to copy yet.",
+      icon: <Icon d={ICON.copy} size={16} />,
+      disabled: portfolios.length === 0,
+    },
+    {
+      id: "founder",
+      title: "Founder",
+      desc: "Suggested sections for a founder.",
+      icon: <Icon d={<path d="M4 20V9l8-5 8 5v11M9 20v-6h6v6" />} size={16} />,
+    },
+  ];
 
   return (
-    <div
-      className="dialog-backdrop z-50"
-      onMouseDown={(e) => {
-        if (e.target === e.currentTarget) onCancel();
-      }}
+    <Modal
+      title="New portfolio"
+      description="A page with a header and as many sections as you need. You can change all of this later."
+      onClose={onCancel}
+      width={520}
+      footer={
+        <>
+          <button type="button" className="btn btn-secondary" style={{ marginTop: 0 }} onClick={onCancel}>
+            Cancel
+          </button>
+          <button type="submit" form="create-portfolio" className="btn btn-primary" style={{ marginTop: 0 }} disabled={!ready}>
+            {busy ? "Creating…" : "Create portfolio"}
+          </button>
+        </>
+      }
     >
-      <form
-        className="dialog"
-        role="dialog"
-        aria-modal="true"
-        aria-label="Create a portfolio"
-        onSubmit={submit}
-      >
-        <div className="dialog-title">Create a portfolio</div>
-
-        <div>
-          <div className="field mb-3.5">
-            <label htmlFor="cp-name">Name it (only you see this)</label>
-            <input
-              id="cp-name"
-              autoFocus
-              className="input"
-              value={name}
-              onChange={(e) => changeName(e.target.value)}
-            />
-          </div>
-
-          <div className="field mb-3.5">
-            <label htmlFor="cp-slug">Page address</label>
-            <div className="flex items-center gap-0">
-              <span className="text-muted shrink-0 pr-1 text-sm">
-                {PAGE_DOMAIN}/{handle}/
-              </span>
-              <input
-                id="cp-slug"
-                className="input"
-                value={slug}
-                onChange={(e) => {
-                  setSlugTouched(true);
-                  setSlug(e.target.value);
-                }}
-              />
-            </div>
-          </div>
-
-          <div className="field mb-3.5">
-            <label htmlFor="cp-summary">Card note (optional)</label>
-            <input
-              id="cp-summary"
-              className="input"
-              placeholder="One line about this page — which room it is for"
-              value={summary}
-              onChange={(e) => setSummary(e.target.value)}
-            />
-            <span className="text-neutral-700 text-[11px]">
-              Shown on the portfolio card, never on the page itself.
+      <form id="create-portfolio" onSubmit={submit} className="flex flex-col gap-4">
+        {error && (
+          <p
+            role="alert"
+            className="m-0 flex items-start gap-2.5 rounded-xl px-3.5 py-2.5 text-[13px]"
+            style={{ border: "1px solid var(--color-ink)" }}
+          >
+            <span
+              aria-hidden
+              className="mt-px grid h-[18px] w-[18px] flex-none place-items-center rounded-full text-[11px] font-bold"
+              style={{ background: "var(--color-ink)", color: "var(--color-bg)" }}
+            >
+              !
             </span>
+            {error}
+          </p>
+        )}
+
+        <div className="field">
+          <label htmlFor="cp-name">Name</label>
+          <input
+            id="cp-name"
+            autoFocus
+            className="input"
+            placeholder="Investor one-pager"
+            value={name}
+            onChange={(e) => changeName(e.target.value)}
+          />
+          <p className="m-0 mt-1.5 text-[12px] text-muted">Only you see this — it names the card on Portfolios.</p>
+        </div>
+
+        <div className="field">
+          <label htmlFor="cp-slug">Address</label>
+          <div
+            className="flex items-center overflow-hidden rounded-[var(--radius-md)]"
+            style={{ border: "1px solid var(--color-divider)", background: "var(--color-surface)" }}
+          >
+            <span className="max-w-[55%] flex-none truncate py-2 pl-3 font-mono text-[12.5px]" style={{ color: "var(--color-neutral-600)" }}>
+              {displayUrl(liveUrl(handle || "your-handle", ""))}
+            </span>
+            <input
+              id="cp-slug"
+              className="min-w-0 flex-1 bg-transparent py-2 pr-3 font-mono text-[13px] outline-none"
+              style={{ color: "var(--color-ink)", border: 0 }}
+              placeholder="investors"
+              value={slug}
+              aria-invalid={!!slugError || undefined}
+              onChange={(e) => {
+                setSlugTouched(true);
+                // Cleaned as typed, not slugified: slugify trims a trailing
+                // hyphen, which would make "my-page" impossible to type.
+                setSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]+/g, "-").replace(/-{2,}/g, "-").replace(/^-+/, "").slice(0, 120));
+              }}
+            />
           </div>
+          <p className="m-0 mt-1.5 text-[12px] text-muted">
+            {slugError ?? "Filled in from the name. Not public until you publish."}
+          </p>
+        </div>
 
-          <div className="text-neutral-700 mb-2 text-xs">Start from</div>
-          <div className="flex flex-col gap-2.5">
-            <label className="radio">
-              <input
-                type="radio"
-                name="startFrom"
-                checked={kind === "blank"}
-                onChange={() => setKind("blank")}
-              />
-              <span className="dot" />
-              Blank — a header and one empty section
-            </label>
+        <div className="field">
+          <label htmlFor="cp-summary">Note for yourself (optional)</label>
+          <input
+            id="cp-summary"
+            className="input"
+            placeholder="Who this version is for"
+            value={summary}
+            onChange={(e) => setSummary(e.target.value)}
+          />
+        </div>
 
-            <label className="radio">
-              <input
-                type="radio"
-                name="startFrom"
-                checked={kind === "copy"}
-                onChange={() => setKind("copy")}
-                disabled={portfolios.length === 0}
-              />
-              <span className="dot" />
-              {source ? `Copy “${source.name}”` : "Copy an existing portfolio"}
-            </label>
-
-            {kind === "copy" && portfolios.length > 1 && (
-              <select
-                className="input ml-6"
-                aria-label="Portfolio to copy"
-                value={copyId}
-                onChange={(e) => setCopyId(e.target.value)}
-              >
+        <fieldset className="m-0 min-w-0 border-0 p-0">
+          <legend className="mb-2 p-0 text-[12.5px] font-medium" style={{ color: "var(--color-neutral-700)" }}>
+            Start from
+          </legend>
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+            {options.map((o) => {
+              const on = kind === o.id;
+              return (
+                <label
+                  key={o.id}
+                  className={`relative flex flex-col gap-1.5 rounded-xl p-3 transition-colors ${o.disabled ? "cursor-not-allowed opacity-50" : "cursor-pointer hover:bg-[var(--color-surface)]"}`}
+                  style={{ boxShadow: on ? "inset 0 0 0 1.5px var(--color-ink)" : "inset 0 0 0 1px var(--color-divider)" }}
+                >
+                  <input
+                    type="radio"
+                    name="startFrom"
+                    className="peer sr-only"
+                    checked={on}
+                    disabled={o.disabled}
+                    onChange={() => setKind(o.id)}
+                  />
+                  <span
+                    className="grid h-8 w-8 place-items-center rounded-lg peer-focus-visible:outline-2"
+                    style={on ? { background: "var(--color-ink)", color: "var(--color-bg)" } : { background: "var(--color-surface)" }}
+                  >
+                    {o.icon}
+                  </span>
+                  <span className="text-[13.5px] font-medium">{o.title}</span>
+                  <span className="text-[12px] leading-snug text-muted">{o.desc}</span>
+                </label>
+              );
+            })}
+          </div>
+          {kind === "copy" && portfolios.length > 0 && (
+            <div className="field mt-3">
+              <label htmlFor="cp-copy">Page to copy</label>
+              <select id="cp-copy" className="input" value={copyId} onChange={(e) => setCopyId(e.target.value)}>
                 {portfolios.map((p) => (
                   <option key={p.id} value={p.id}>
                     {p.name}
                   </option>
                 ))}
               </select>
-            )}
-
-            <label className="radio">
-              <input
-                type="radio"
-                name="startFrom"
-                checked={kind === "founder"}
-                onChange={() => setKind("founder")}
-              />
-              <span className="dot" />
-              Suggested sections for a founder
-            </label>
-          </div>
-        </div>
-
-        <div className="dialog-actions">
-          <button type="button" className="btn btn-secondary" onClick={onCancel}>
-            Cancel
-          </button>
-          <button type="submit" className="btn btn-primary" disabled={!name.trim()}>
-            Create
-          </button>
-        </div>
+            </div>
+          )}
+        </fieldset>
       </form>
-    </div>
+    </Modal>
   );
 }

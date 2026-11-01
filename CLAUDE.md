@@ -215,13 +215,42 @@ Testing motion headlessly lies in two ways: headless Edge clamps windows to
 transitions mid-flight. `CountUp` lands its exact value on a timer for that
 reason as much as for throttled tabs.
 
-## Design system: Modernist
+## Design system: Mono (the app) and the catalogue (published pages)
 
-Archivo throughout, `#f3f2f2` ground, `#201e1d` ink, one accent `#ec3013`.
-**Zero border radius in the app's own chrome** — `--radius-*` is `0` on
-purpose. The published motion themes are the exception: each picks its own
-corners, and `--fx-pill` rounds the shared `.btn` and `.tag` inside them. 2px dividers,
-flush-left labels (including inside wide buttons), photography in grayscale.
+**The app is black and white, in a light and a dark theme.** Inter for the
+interface, JetBrains Mono for things a person copies or compares (addresses,
+counts). No colour of its own anywhere — accent and foil resolve to the ink,
+errors are told by words and an icon, and portfolio thumbnails on the list
+are greyscale. Tool corners: `--radius-sm/md/lg` are 6/8/12px.
+
+- **Light is the `@theme` token set; `:root[data-theme="dark"]` redefines
+  the same names.** The neutral ramp *inverts* in dark, so a step keeps its
+  meaning: `neutral-700` is muted text and `neutral-200` a quiet fill in
+  both. Never hard-code a grey; take it from the ramp or it will be wrong in
+  one of the two themes.
+- **The theme is applied before first paint** by `THEME_BOOT`
+  (`lib/theme-boot.ts`, inlined in `app/layout.tsx`'s `<head>`); `<html>`
+  carries `suppressHydrationWarning` for exactly that. `lib/theme.ts` keeps
+  it current after load. The switch is `ThemeSwitch` in `AppHeader.tsx`,
+  which is the one header for Portfolios, Stats and Account.
+- **Control voice is tokens, with the catalogue value as the fallback.**
+  Label-like classes (`.btn`, `.tag`, `.mono-label`, `.caption-credit`,
+  `.field > label`, `.seg-opt`, `.status`, `.nav a`, `.table th`, `h6`) read
+  `var(--ui-*, <catalogue value>)`. The app sets sentence case and Inter on
+  `:root`; `groundStyle()` sets every `--ui-*` to `initial`, which makes
+  `var()` take the fallback, so a published page keeps its tracked capitals.
+  Add a new label class the same way or it will leak the app's voice into
+  portfolios.
+- **Font tokens are a plain `@theme`, not `@theme inline`.** Inline compiles
+  `.font-heading` with the face written in, so a published page's
+  `font-heading` elements ignored the author's pick.
+
+**Published pages are the catalogue, untouched by any of the above.**
+`groundStyle()` pins `CATALOGUE_APPARATUS` — the house faces, square trim,
+catalogue shadows — and its palette, whichever app theme the viewer is in.
+The motion themes then pick their own corners: `--fx-pill` rounds the shared
+`.btn` and `.tag` inside them.
+
 Build with the `.btn` / `.tag` / `.input` / `.nav` / `.table` classes rather
 than inventing parallel ones, and take every colour from a token.
 

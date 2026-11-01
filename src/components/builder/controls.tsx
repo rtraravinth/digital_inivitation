@@ -1,9 +1,9 @@
 "use client";
 
 import { useId, useState } from "react";
-import type { CSSProperties } from "react";
 import { ColourPicker } from "@/components/builder/ColourPicker";
 import { FontSelect } from "@/components/builder/FontSelect";
+import { ThemeThumb } from "./ThemeThumb";
 import { Glyph } from "@/lib/glyphs";
 import {
   DEFAULT_TRACKING,
@@ -26,87 +26,9 @@ import {
 
 export type Recipe = (recipe: (p: Portfolio) => Portfolio) => void;
 
-/* ── theme thumbnails ─────────────────────────────────────────────────────
-   A small moving picture of each theme's one piece of depth, drawn in CSS so
-   the gallery costs no screenshots and follows the author's accent. Every
-   loop carries `.fx-loop`, which the reduced-motion rule in globals.css
-   stops.
-   ──────────────────────────────────────────────────────────────────────── */
-
-export function ThemeThumb({
-  theme,
-  accent,
-  size = "sm",
-}: {
-  theme: ThemeId;
-  accent: string;
-  size?: "sm" | "md" | "lg";
-}) {
-  const box =
-    size === "lg"
-      ? "h-[190px] w-full"
-      : size === "md"
-        ? "h-[96px] w-full"
-        : "h-[44px] w-[56px] flex-none";
-  const style = { "--thumb-accent": accent } as CSSProperties;
-
-  return (
-    <span
-      aria-hidden
-      className={`thumb relative block overflow-hidden ${box}`}
-      data-thumb={theme}
-      data-size={size}
-      style={style}
-    >
-      {theme === "aurora" && (
-        <>
-          <span className="thumb-orb fx-loop" style={{ left: "-10%", top: "-30%" }} />
-          <span className="thumb-orb fx-loop" style={{ right: "-15%", top: "20%", animationDelay: "-4s", opacity: 0.6 }} />
-          <span className="thumb-glass thumb-bob fx-loop" />
-        </>
-      )}
-      {theme === "meridian" && (
-        <>
-          <span className="thumb-plate" style={{ background: "var(--thumb-accent)", transform: "rotate(-6deg) translateX(-8%)" }} />
-          <span className="thumb-plate thumb-bob fx-loop" style={{ background: "#e7e2d8" }} />
-          <span className="thumb-lines">
-            <i style={{ width: "70%" }} />
-            <i style={{ width: "50%" }} />
-            <i style={{ width: "60%" }} />
-          </span>
-        </>
-      )}
-      {theme === "stage" && (
-        <>
-          <span className="thumb-billboard" />
-          <span className="thumb-rail">
-            <span className="thumb-rail-track fx-loop">
-              {[0, 1, 2, 3, 4, 5, 6, 7].map((i) => (
-                <i key={i} style={{ opacity: i % 3 === 0 ? 1 : 0.55 }} />
-              ))}
-            </span>
-          </span>
-        </>
-      )}
-      {theme === "arcade" && (
-        <>
-          <span className="thumb-sun" />
-          <span className="thumb-floor-wrap">
-            <span className="thumb-floor arcade-floor fx-loop" />
-          </span>
-        </>
-      )}
-      {theme === "journey" && (
-        <>
-          <span className="thumb-card" style={{ transform: "translate(-50%, 0) scale(0.84)", top: "18%", opacity: 0.5 }} />
-          <span className="thumb-card" style={{ transform: "translate(-50%, 0) scale(0.92)", top: "28%", opacity: 0.75 }} />
-          <span className="thumb-card thumb-rise fx-loop" style={{ top: "38%" }} />
-          <span className="thumb-ring fx-loop" />
-        </>
-      )}
-    </span>
-  );
-}
+// In its own module so the portfolio list can draw one without loading every
+// control on this page; re-exported so existing imports keep working.
+export { ThemeThumb } from "./ThemeThumb";
 
 /* ── shared pieces ────────────────────────────────────────────────────── */
 
@@ -120,9 +42,9 @@ function Section({
   children: React.ReactNode;
 }) {
   return (
-    <section className="mb-6">
-      <h6 className={note ? "mb-1.5" : "mb-2.5"}>{title}</h6>
-      {note && <p className="text-neutral-700 mb-3 text-xs">{note}</p>}
+    <section className="mb-7">
+      <h3 className={`m-0 text-[14px] tracking-[-0.01em] ${note ? "mb-1" : "mb-3"}`}>{title}</h3>
+      {note && <p className="m-0 mb-3 text-[12.5px] leading-snug text-muted">{note}</p>}
       {children}
     </section>
   );
@@ -174,16 +96,16 @@ export function ProfessionControl({
                 setApplied({ id: x.id, before: p });
                 onChange((prev) => applyProfession(prev, x.id));
               }}
-              className="group flex min-h-[52px] cursor-pointer items-center gap-2.5 px-2.5 py-2 text-left"
+              className="group flex min-h-[52px] cursor-pointer items-center gap-2.5 rounded-xl px-2.5 py-2 text-left transition-colors hover:bg-[var(--color-surface)]"
               style={{
                 background: on ? "var(--color-surface)" : "var(--color-bg)",
-                boxShadow: on ? "inset 0 0 0 1px var(--color-foil)" : "inset 0 0 0 1px var(--color-divider)",
+                boxShadow: on ? "inset 0 0 0 1.5px var(--color-ink)" : "inset 0 0 0 1px var(--color-divider)",
                 transition: "box-shadow 160ms var(--ease-out)",
               }}
             >
               <span
                 aria-hidden
-                className="relative h-7 w-7 flex-none"
+                className="relative h-7 w-7 flex-none overflow-hidden rounded-lg"
                 style={{ background: x.groundHex, boxShadow: "inset 0 0 0 1px #ffffff26" }}
               >
                 <span
@@ -204,7 +126,7 @@ export function ProfessionControl({
       {applied && (
         <div
           role="status"
-          className="mt-2.5 flex items-center gap-3 px-3 py-2 text-[12px]"
+          className="mt-2.5 flex items-center gap-3 rounded-lg px-3 py-2 text-[12px]"
           style={{ background: "var(--color-surface)" }}
         >
           <span className="min-w-0 flex-1 truncate">
@@ -251,10 +173,10 @@ export function ThemeControl({ p, onChange }: { p: Portfolio; onChange: Recipe }
               type="button"
               aria-pressed={on}
               onClick={() => onChange((prev) => ({ ...prev, theme: t.id }))}
-              className="flex cursor-pointer flex-col text-left"
+              className="flex cursor-pointer flex-col overflow-hidden rounded-xl text-left transition-transform duration-200 hover:-translate-y-0.5"
               style={{
                 background: on ? "var(--color-surface)" : "var(--color-bg)",
-                boxShadow: on ? "inset 0 0 0 1px var(--color-foil)" : "inset 0 0 0 1px var(--color-divider)",
+                boxShadow: on ? "inset 0 0 0 1.5px var(--color-ink)" : "inset 0 0 0 1px var(--color-divider)",
               }}
             >
               <ThemeThumb theme={t.id} accent={p.accent} size="md" />
@@ -301,11 +223,11 @@ export function ColourControl({ p, onChange }: { p: Portfolio; onChange: Recipe 
                 aria-label={`${x.name} palette`}
                 title={`${x.name} palette`}
                 onClick={() => onChange((prev) => ({ ...prev, accent: x.accent, groundHex: x.groundHex }))}
-                className="relative aspect-square cursor-pointer"
+                className="relative aspect-square cursor-pointer overflow-hidden rounded-lg transition-transform duration-200 hover:scale-105"
                 style={{
                   background: x.groundHex,
                   boxShadow: on
-                    ? "0 0 0 2px var(--color-bg), 0 0 0 3px var(--color-foil)"
+                    ? "0 0 0 2px var(--color-bg), 0 0 0 3.5px var(--color-ink)"
                     : "inset 0 0 0 1px #8883",
                 }}
               >
@@ -416,10 +338,10 @@ export function TypeControl({ p, onChange }: { p: Portfolio; onChange: Recipe })
                 type="button"
                 aria-pressed={on}
                 onClick={() => onChange((prev) => ({ ...prev, font: pair.font, bodyFont: pair.bodyFont }))}
-                className="flex cursor-pointer flex-col items-start gap-1 p-3 text-left"
+                className="flex cursor-pointer flex-col items-start gap-1 rounded-xl p-3 text-left transition-colors hover:bg-[var(--color-surface)]"
                 style={{
                   background: on ? "var(--color-surface)" : "var(--color-bg)",
-                  boxShadow: on ? "inset 0 0 0 1px var(--color-foil)" : "inset 0 0 0 1px var(--color-divider)",
+                  boxShadow: on ? "inset 0 0 0 1.5px var(--color-ink)" : "inset 0 0 0 1px var(--color-divider)",
                 }}
               >
                 <span style={{ fontFamily: faceVar(pair.font), fontSize: 24, fontWeight: 700, lineHeight: 1 }}>
@@ -512,20 +434,29 @@ export function MotionControl({ p, onChange }: { p: Portfolio; onChange: Recipe 
           return (
             <label
               key={m.id}
-              className="flex cursor-pointer items-start gap-3 p-3"
+              className="flex cursor-pointer items-start gap-3 rounded-xl p-3"
               style={{
                 background: on ? "var(--color-surface)" : "var(--color-bg)",
-                boxShadow: on ? "inset 0 0 0 1px var(--color-foil)" : "inset 0 0 0 1px var(--color-divider)",
+                boxShadow: on ? "inset 0 0 0 1.5px var(--color-ink)" : "inset 0 0 0 1px var(--color-divider)",
               }}
             >
+              {/* The real radio stays for the keyboard and assistive tech; the
+                  dot beside it is drawn, because a native radio is painted
+                  however the browser likes — one rendering showed unchosen
+                  options as solid black, which reads as chosen. */}
               <input
                 type="radio"
-                className="mt-1 accent-[var(--color-foil)]"
+                className="peer sr-only"
                 name={`motion-${group}`}
                 checked={on}
                 onChange={() =>
                   onChange((prev) => ({ ...prev, layout: { ...prev.layout, motion: m.id } }))
                 }
+              />
+              <span
+                aria-hidden
+                className="mt-0.5 grid h-[18px] w-[18px] flex-none place-items-center rounded-full peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2"
+                style={{ boxShadow: `inset 0 0 0 ${on ? 5 : 1.5}px ${on ? "var(--color-ink)" : "var(--color-neutral-500)"}`, transition: "box-shadow 160ms" }}
               />
               <span className="flex flex-col gap-0.5">
                 <span className="font-heading text-sm">{m.name}</span>
@@ -574,7 +505,7 @@ const IGNORED: Record<ThemeId, { nav?: string; grid?: string; density?: string }
 
 function IgnoredNote({ reason }: { reason: string }) {
   return (
-    <p className="mb-3 text-[11px]" style={{ color: "var(--color-accent-700)" }} role="note">
+    <p className="mb-3 text-[11px]" style={{ color: "var(--color-neutral-700)" }} role="note">
       {reason} The setting is stored and applies again when you switch theme.
     </p>
   );
@@ -591,8 +522,8 @@ export function LayoutControl({ p, onChange }: { p: Portfolio; onChange: Recipe 
 
   return (
     <>
-      <h6 className="mb-1.5">Tab navigation</h6>
-      <p className="text-neutral-700 text-xs">How visitors move between your tabs.</p>
+      <h3 className="m-0 mb-1 text-[14px] tracking-[-0.01em]">Tab navigation</h3>
+      <p className="m-0 mb-3 text-[12.5px] text-muted">How visitors move between your tabs.</p>
       {ignored.nav && <IgnoredNote reason={ignored.nav} />}
       <div className={`mb-5 flex flex-col gap-2.5 ${ignored.nav ? "opacity-50" : ""}`}>
         {ROLE_NAVS.map((n) => (
@@ -611,7 +542,7 @@ export function LayoutControl({ p, onChange }: { p: Portfolio; onChange: Recipe 
         ))}
       </div>
 
-      <h6 className={ignored.grid ? "mb-1.5" : "mb-2.5"}>Content grid</h6>
+      <h3 className={`m-0 text-[14px] tracking-[-0.01em] ${ignored.grid ? "mb-1.5" : "mb-3"}`}>Content grid</h3>
       {ignored.grid && <IgnoredNote reason={ignored.grid} />}
       <div className={`seg mb-5 ${ignored.grid ? "opacity-50" : ""}`}>
         {([1, 2, 3] as GridCols[]).map((n) => (
@@ -629,7 +560,7 @@ export function LayoutControl({ p, onChange }: { p: Portfolio; onChange: Recipe 
         ))}
       </div>
 
-      <h6 className={ignored.density ? "mb-1.5" : "mb-2.5"}>Density</h6>
+      <h3 className={`m-0 text-[14px] tracking-[-0.01em] ${ignored.density ? "mb-1.5" : "mb-3"}`}>Density</h3>
       {ignored.density && <IgnoredNote reason={ignored.density} />}
       <div className={`flex flex-col gap-2.5 ${ignored.density ? "opacity-50" : ""}`}>
         {DENSITIES.map((d) => (

@@ -1,91 +1,148 @@
 "use client";
 
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import Link from "next/link";
+import { useState } from "react";
+import { PagePreview } from "./PagePreview";
+import { ICON, Icon, StatusPill, TiltPanel } from "./ui";
 import { Glyph } from "@/lib/glyphs";
 import { useAccount } from "@/lib/account";
+import { displayUrl, liveUrl } from "@/lib/slug";
 import { usePortfolios } from "@/lib/store";
-import { pageAddress, pagePath, previewPath, type Portfolio } from "@/lib/types";
+import { previewPath, type Portfolio } from "@/lib/types";
 
 /**
  * What every editing screen shows in place of itself while the portfolio is
  * live. The page a visitor is reading is frozen: the API answers 409 to any
- * write, so offering the controls would only produce error banners. Preview
- * and Unpublish are the two things that still make sense here.
+ * write, so offering the controls would only produce error banners. Preview,
+ * the live address and Unpublish are what still make sense here.
  */
 export function PublishedLock({ portfolio }: { portfolio: Portfolio }) {
   const { updatePortfolio, storageError } = usePortfolios();
   const handle = useAccount().account.profile.handle;
+  const reduced = useReducedMotion();
+  const [copied, setCopied] = useState(false);
+  const url = handle ? liveUrl(handle, portfolio.slug) : "";
 
-  const unpublish = () =>
-    updatePortfolio(portfolio.id, (prev) => ({ ...prev, status: "draft" }));
+  const unpublish = () => updatePortfolio(portfolio.id, (prev) => ({ ...prev, status: "draft" }));
 
   return (
     <>
-      <div className="nav bg-bg gap-3.5">
-        <Link href="/" className="font-heading text-[13px]">
-          ← Portfolios
-        </Link>
-        <span className="nav-brand mr-0 hidden text-[15px] sm:inline">{portfolio.name}</span>
-        <span className="status status-live mr-auto">Published</span>
-        <Link
-          href={previewPath(portfolio.id)}
-          className="btn btn-secondary"
-          target="_blank"
-          rel="noopener noreferrer"
+      <div aria-hidden className="app-backdrop" />
+      <div className="flex min-h-dvh flex-col">
+        <header
+          className="sticky top-0 z-30 flex h-14 flex-none items-center gap-2 px-3 sm:gap-3 sm:px-6"
+          style={{
+            background: "color-mix(in srgb, var(--color-bg) 86%, transparent)",
+            backdropFilter: "blur(12px)",
+            WebkitBackdropFilter: "blur(12px)",
+            borderBottom: "1px solid var(--color-divider)",
+          }}
         >
-          Preview
-        </Link>
-        <button type="button" className="btn btn-primary" onClick={unpublish}>
-          Unpublish
-        </button>
-      </div>
+          <Link href="/" className="btn btn-ghost" aria-label="Back to portfolios" style={{ marginTop: 0 }}>
+            <Glyph id="back" size={16} />
+            <span className="hidden sm:inline">Portfolios</span>
+          </Link>
+          <span className="hidden h-5 w-px sm:block" style={{ background: "var(--color-divider)" }} />
+          <span className="min-w-0 truncate text-[14.5px] font-semibold tracking-[-0.01em]">{portfolio.name}</span>
+          <StatusPill live />
+        </header>
 
-      {storageError && (
-        <div
-          role="alert"
-          className="px-4 py-2.5 text-[13px]"
-          style={{ background: "var(--color-accent)", color: "var(--color-bg)" }}
-        >
-          {storageError}
-        </div>
-      )}
+        <main className="mx-auto w-full max-w-[880px] flex-1 px-4 pt-10 pb-20 sm:px-6 sm:pt-14">
+          <AnimatePresence>
+            {storageError && (
+              <motion.div
+                role="alert"
+                initial={{ opacity: 0, y: -8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0 }}
+                className="mb-6 rounded-xl px-4 py-3 text-[13.5px]"
+                style={{ border: "1px solid var(--color-ink)", background: "var(--color-bg)" }}
+              >
+                {storageError}
+              </motion.div>
+            )}
+          </AnimatePresence>
 
-      <div className="border-divider border-b px-6 pb-10 pt-10 sm:px-10">
-        <span className="status status-live mb-4 inline-flex">Published</span>
-        <h1 className="mb-2.5 text-[32px] sm:text-[40px]">{portfolio.name} is published</h1>
-        <p className="m-0 max-w-[56ch] text-base">
-          It is at {pageAddress(handle, portfolio.slug)}, and anyone with the address
-          can read it. A published page cannot be edited or deleted — unpublish it
-          first, make the changes, then publish again.
-        </p>
-
-        <div className="mt-7 flex flex-wrap gap-2.5">
-          <Link
-            href={previewPath(portfolio.id)}
-            className="btn btn-secondary"
-            target="_blank"
-            rel="noopener noreferrer"
+          <motion.div
+            initial={reduced ? { opacity: 0 } : { opacity: 0, y: 24, rotateX: -10 }}
+            animate={{ opacity: 1, y: 0, rotateX: 0 }}
+            transition={{ duration: 0.65, ease: [0.16, 1, 0.3, 1] }}
+            style={{ transformOrigin: "50% 100%", perspective: 1400 }}
           >
-            Preview the page
-          </Link>
-          {/* The visitor's own address, which exists only while this is
-              live — the one place in the app where that is the right link. */}
-          <Link
-            href={pagePath(handle, portfolio.slug)}
-            className="btn btn-secondary"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Published page
-            <Glyph id="out" size={15} />
-          </Link>
-          <button type="button" className="btn btn-primary" onClick={unpublish}>
-            Unpublish to edit
-          </button>
-          <Link href={`/stats?p=${portfolio.id}`} className="btn btn-ghost">
-            Views and clicks
-          </Link>
-        </div>
+            <TiltPanel max={3} className="overflow-hidden rounded-2xl">
+              <div className="relative aspect-[16/7] overflow-hidden" style={{ borderBottom: "1px solid var(--color-divider)", background: "var(--color-surface)" }}>
+                <PagePreview p={portfolio} handle={handle} />
+              </div>
+              <div className="p-6 sm:p-8">
+                <h1 className="m-0 text-[26px] leading-tight tracking-[-0.03em] sm:text-[30px]">
+                  This page is live
+                </h1>
+                <p className="m-0 mt-2 max-w-[60ch] text-[14.5px] leading-relaxed text-muted">
+                  Anyone with the link can read it, so it can’t be edited while it’s live.
+                  Unpublish it to make changes, then publish again — the address stays the same.
+                </p>
+
+                {url ? (
+                  <div
+                    className="mt-5 flex min-w-0 items-center gap-2 rounded-xl px-3.5 py-2.5"
+                    style={{ background: "var(--color-surface)", border: "1px solid var(--color-divider)" }}
+                  >
+                    <a
+                      href={url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex min-w-0 flex-1 items-center gap-1.5 font-mono text-[13px] underline-offset-2 hover:underline"
+                      style={{ color: "var(--color-ink)" }}
+                    >
+                      <span className="truncate">{displayUrl(url)}</span>
+                      <span className="flex-none">
+                        <Icon d={ICON.out} size={12} />
+                      </span>
+                    </a>
+                    <button
+                      type="button"
+                      className="btn btn-ghost"
+                      style={{ marginTop: 0, minHeight: 30, padding: "0.3rem 0.6rem", fontSize: 13 }}
+                      onClick={async () => {
+                        try {
+                          await navigator.clipboard.writeText(url);
+                          setCopied(true);
+                          window.setTimeout(() => setCopied(false), 1400);
+                        } catch {
+                          // Clipboard refused — the link is right there to select.
+                        }
+                      }}
+                    >
+                      <Icon d={copied ? ICON.check : ICON.copy} size={13} />
+                      {copied ? "Copied" : "Copy link"}
+                    </button>
+                  </div>
+                ) : (
+                  <p className="m-0 mt-5 rounded-xl px-3.5 py-2.5 text-[13.5px]" style={{ border: "1px solid var(--color-ink)" }}>
+                    Your account has no handle, so this page has no address anyone can open.{" "}
+                    <Link href="/account" className="font-medium underline underline-offset-2" style={{ color: "var(--color-ink)" }}>
+                      Choose a handle
+                    </Link>
+                  </p>
+                )}
+
+                <div className="mt-6 flex flex-wrap gap-2">
+                  <button type="button" className="btn btn-primary" onClick={unpublish}>
+                    Unpublish to edit
+                  </button>
+                  <a href={previewPath(portfolio.id)} target="_blank" rel="noopener noreferrer" className="btn btn-secondary">
+                    <Icon d={ICON.eye} size={14} />
+                    Preview
+                  </a>
+                  <Link href={`/stats?p=${portfolio.id}`} className="btn btn-ghost">
+                    Views and clicks
+                  </Link>
+                </div>
+              </div>
+            </TiltPanel>
+          </motion.div>
+        </main>
       </div>
     </>
   );

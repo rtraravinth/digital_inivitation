@@ -1,18 +1,22 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { AnimatePresence, motion } from "motion/react";
+import Link from "next/link";
+import { useState } from "react";
 import { QrCode } from "./QrCode";
-import { Glyph } from "@/lib/glyphs";
+import { ICON, Icon, Modal, StatusPill } from "./ui";
 import { useAccount } from "@/lib/account";
-import { pageAddress, type Portfolio } from "@/lib/types";
+import { LinkIcon, iconFor } from "@/lib/icons";
+import { displayUrl, liveUrl } from "@/lib/slug";
+import type { Portfolio } from "@/lib/types";
 
 /**
- * Sharing one page: its address, a scannable code, and the four places
- * people actually paste it.
+ * Sharing one page: its address, a code a phone can scan, and the places
+ * people actually paste it. Rendered inside an `<AnimatePresence>`.
  *
- * This used to be a column on /stats, wedged next to the numbers it has
- * nothing to do with. It belongs where the pages are listed, so it opens
- * from the list and asks which page when there is more than one.
+ * Every link here is the page's real address — the route that serves it.
+ * It used to be built from the facet.page vanity domain, which serves
+ * nothing, so every copied link, QR code and share it produced was dead.
  */
 export function ShareDialog({
   portfolios,
@@ -26,194 +30,208 @@ export function ShareDialog({
   const handle = useAccount().account.profile.handle;
   const [id, setId] = useState(initialId);
   const [note, setNote] = useState("");
+  const [copied, setCopied] = useState(false);
 
-  useEffect(() => {
-    function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape") onClose();
-    }
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [onClose]);
-
-  const p = portfolios.find((x) => x.id === id) ?? portfolios[0];
+  // Live pages first: they are the ones a link can open.
+  const ordered = [...portfolios].sort((a, b) => Number(b.status === "live") - Number(a.status === "live"));
+  const p = portfolios.find((x) => x.id === id) ?? ordered[0];
   if (!p) return null;
 
-  const address = pageAddress(handle, p.slug);
-  const url = `https://${address}`;
+  const live = p.status === "live";
+  const url = handle ? liveUrl(handle, p.slug) : "";
+  const canShare = live && !!url;
   const signature = `${p.header.name || p.name}\n${p.header.current}\n${url}`;
+  const nativeShare = typeof navigator !== "undefined" && typeof navigator.share === "function";
 
-  async function copyText(text: string, said: string) {
+  async function copyText(text: string, said: string, mark = false) {
     try {
       await navigator.clipboard.writeText(text);
       setNote(said);
+      if (mark) {
+        setCopied(true);
+        window.setTimeout(() => setCopied(false), 1500);
+      }
       window.setTimeout(() => setNote(""), 2400);
     } catch {
       // Say so rather than claim a copy that never happened.
-      setNote("This browser blocked the clipboard — copy the address by hand.");
+      setNote("This browser blocked the clipboard — select the address and copy it by hand.");
     }
   }
 
+  const targets: Array<{ label: string; href?: string; onClick?: () => void; icon: React.ReactNode }> = [
+    {
+      label: "WhatsApp",
+      href: `https://wa.me/?text=${encodeURIComponent(url)}`,
+      icon: <LinkIcon id={iconFor({ url: "https://wa.me" })} size={17} />,
+    },
+    {
+      label: "LinkedIn",
+      href: `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(url)}`,
+      icon: <LinkIcon id={iconFor({ url: "https://linkedin.com" })} size={17} />,
+    },
+    {
+      label: "X",
+      href: `https://x.com/intent/post?url=${encodeURIComponent(url)}`,
+      icon: <LinkIcon id={iconFor({ url: "https://x.com" })} size={17} />,
+    },
+    {
+      label: "Email",
+      href: `mailto:?subject=${encodeURIComponent(p.header.name || p.name)}&body=${encodeURIComponent(url)}`,
+      icon: <LinkIcon id={iconFor({ url: "someone@example.com" })} size={17} />,
+    },
+    {
+      label: "Email signature",
+      onClick: () => copyText(signature, "Signature copied — paste it into your email settings."),
+      icon: <Icon d={<path d="M4 18c3-6 5-6 6-3s3 3 5-1 3-4 5 1" />} size={17} />,
+    },
+    ...(nativeShare
+      ? [
+          {
+            label: "More…",
+            onClick: () => void navigator.share({ title: p.header.name || p.name, url }).catch(() => {}),
+            icon: <Icon d={ICON.share} size={17} />,
+          },
+        ]
+      : []),
+  ];
+
   return (
-    <div
-      className="dialog-backdrop z-50"
-      onMouseDown={(e) => {
-        if (e.target === e.currentTarget) onClose();
-      }}
-    >
-      <div
-        className="dialog gap-0 p-0"
-        role="dialog"
-        aria-modal="true"
-        aria-label="Share your page"
-      >
-        {/* ── title ─────────────────────────────────────────────── */}
-        <div className="border-divider flex items-center gap-3 border-b px-4 py-3.5">
-          <div className="dialog-title">Share your page</div>
+    <Modal title="Share your page" description="Send people straight to it." onClose={onClose} width={520}>
+      <div className="flex flex-col gap-4">
+        {portfolios.length > 1 && (
+          <div className="field">
+            <label htmlFor="share-page">Page</label>
+            <select id="share-page" className="input" value={p.id} onChange={(e) => setId(e.target.value)}>
+              {ordered.map((x) => (
+                <option key={x.id} value={x.id}>
+                  {x.name}
+                  {x.status === "live" ? "" : " — draft"}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+
+        {!handle ? (
+          <Notice>
+            Your account has no handle, so your pages have no address yet.{" "}
+            <Link href="/account" className="font-medium underline underline-offset-2" style={{ color: "var(--color-ink)" }}>
+              Choose a handle
+            </Link>
+          </Notice>
+        ) : !live ? (
+          <Notice>
+            <span className="mb-1 flex items-center gap-2">
+              <StatusPill live={false} />
+            </span>
+            This page isn’t published, so its link won’t open for anyone yet. Publish it from its
+            card on Portfolios, then share it.
+          </Notice>
+        ) : null}
+
+        {/* The address and the act of taking it, as one control. */}
+        <div
+          className="flex items-center gap-2 rounded-xl py-1.5 pr-1.5 pl-3.5"
+          style={{
+            background: "var(--color-surface)",
+            border: "1px solid var(--color-divider)",
+            opacity: canShare ? 1 : 0.5,
+          }}
+        >
+          <span className="min-w-0 flex-1 truncate font-mono text-[13px]" title={url}>
+            {url ? displayUrl(url) : "No address yet"}
+          </span>
           <button
             type="button"
-            aria-label="Close"
-            title="Close"
-            onClick={onClose}
-            className="hover:bg-accent hover:text-bg ml-auto flex h-11 w-11 flex-none cursor-pointer items-center justify-center transition-colors"
-            style={{ boxShadow: "inset 0 0 0 2px var(--color-divider)" }}
+            disabled={!canShare}
+            className="btn btn-primary"
+            style={{ marginTop: 0, minHeight: 34, padding: "0.35rem 0.8rem", fontSize: 13 }}
+            onClick={() => copyText(url, "Link copied.", true)}
           >
-            <CloseGlyph />
+            <AnimatePresence mode="wait" initial={false}>
+              <motion.span
+                key={copied ? "done" : "copy"}
+                initial={{ opacity: 0, scale: 0.7 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.7 }}
+                transition={{ duration: 0.12 }}
+                className="flex items-center gap-1.5"
+              >
+                <Icon d={copied ? ICON.check : ICON.copy} size={14} />
+                {copied ? "Copied" : "Copy link"}
+              </motion.span>
+            </AnimatePresence>
           </button>
         </div>
 
-        {/* ── which page ────────────────────────────────────────── */}
-        <div className="border-divider flex items-center gap-3 border-b px-4 py-3">
-          <label htmlFor="share-page" className="font-heading text-xs">
-            Page
-          </label>
-          <select
-            id="share-page"
-            className="input w-auto flex-1"
-            value={p.id}
-            onChange={(e) => setId(e.target.value)}
-          >
-            {portfolios.map((x) => (
-              <option key={x.id} value={x.id}>
-                {x.name}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        {/* ── the address ───────────────────────────────────────── */}
-        <div className="border-divider border-b px-4 py-4">
-          {/* One box holds the address and the act of taking it, so the two
-              read as one control rather than a label beside a button. */}
-          <div
-            className="flex items-stretch"
-            style={{ boxShadow: "inset 0 0 0 2px var(--color-divider)" }}
-          >
-            <span className="font-heading min-w-0 flex-1 self-center break-all px-3 py-2.5 text-[15px] leading-snug">
-              {address}
-            </span>
-            <button
-              type="button"
-              aria-label="Copy the address"
-              title="Copy address"
-              onClick={() => copyText(url, "Address copied.")}
-              className="hover:bg-accent hover:text-bg flex w-12 flex-none cursor-pointer items-center justify-center transition-colors"
-              style={{ boxShadow: "inset 2px 0 0 var(--color-divider)" }}
+        {canShare && (
+          <>
+            {/* The same address for a phone camera, big enough to scan off a
+                screen across a table. */}
+            <div
+              className="flex flex-col items-center gap-3 rounded-xl p-4 sm:flex-row sm:items-center"
+              style={{ border: "1px solid var(--color-divider)" }}
             >
-              <CopyGlyph />
-            </button>
-          </div>
+              {/* The code paints its own white quiet zone; a second white
+                  backing here hid its download button on a dark ground. */}
+              <QrCode text={url} size={132} downloadName={`facet-${p.slug}.png`} downloadVariant="attached" />
+              <span className="text-center text-[13px] leading-relaxed text-muted sm:text-left">
+                <span className="mb-1 block text-[14px] font-medium" style={{ color: "var(--color-ink)" }}>
+                  Scan to open
+                </span>
+                Point a phone’s camera at it. Download it for a slide, a card or a printed CV.
+              </span>
+            </div>
 
-          {p.status !== "live" && (
-            <p className="text-neutral-700 m-0 mt-2.5 text-[11px]">
-              Not published yet, so this address answers “no page here” until you
-              publish it.
-            </p>
-          )}
+            <div>
+              <span className="mb-2 block text-[12.5px] font-medium" style={{ color: "var(--color-neutral-700)" }}>
+                Send it
+              </span>
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                {targets.map((t) =>
+                  t.href ? (
+                    <a
+                      key={t.label}
+                      href={t.href}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex min-h-[44px] items-center gap-2.5 rounded-xl px-3 text-[13.5px] font-medium no-underline transition-colors hover:bg-[var(--color-surface)]"
+                      style={{ border: "1px solid var(--color-divider)", color: "var(--color-ink)" }}
+                    >
+                      {t.icon}
+                      {t.label}
+                    </a>
+                  ) : (
+                    <button
+                      key={t.label}
+                      type="button"
+                      onClick={t.onClick}
+                      className="flex min-h-[44px] cursor-pointer items-center gap-2.5 rounded-xl px-3 text-left text-[13.5px] font-medium transition-colors hover:bg-[var(--color-surface)]"
+                      style={{ border: "1px solid var(--color-divider)" }}
+                    >
+                      {t.icon}
+                      {t.label}
+                    </button>
+                  ),
+                )}
+              </div>
+            </div>
+          </>
+        )}
 
-          {/* The same address for a phone camera, big enough to scan off a
-              screen across a table. */}
-          <div className="mt-3.5 flex justify-center">
-            <QrCode
-              text={url}
-              size={176}
-              downloadName={`facet-${p.slug}.png`}
-              downloadVariant="attached"
-            />
-          </div>
-        </div>
-
-        {/* ── where it goes ─────────────────────────────────────── */}
-        <div className="px-4 py-4">
-          <h6 className="mb-2.5">Send it somewhere</h6>
-          <div className="grid gap-2 sm:grid-cols-2">
-            <a
-              href={`https://wa.me/?text=${encodeURIComponent(url)}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="btn btn-secondary btn-block no-underline"
-            >
-              WhatsApp
-              <Glyph id="out" size={15} />
-            </a>
-            <a
-              href={`https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(url)}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="btn btn-secondary btn-block no-underline"
-            >
-              LinkedIn
-              <Glyph id="out" size={15} />
-            </a>
-            <button
-              type="button"
-              className="btn btn-secondary btn-block"
-              onClick={() => copyText(signature, "Email signature copied.")}
-            >
-              Copy email signature
-            </button>
-            <button
-              type="button"
-              className="btn btn-secondary btn-block"
-              onClick={() => copyText(url, "Address copied — paste it in your bio.")}
-            >
-              Copy for your bio
-            </button>
-          </div>
-
-          {/* One line, always present, so nothing below it moves when a copy
-              lands. */}
-          <p
-            className="m-0 mt-3 min-h-[15px] text-[11px]"
-            role="status"
-            style={{ color: "var(--color-accent-700)" }}
-          >
-            {note}
-          </p>
-        </div>
+        {/* One line, always present, so nothing moves when a copy lands. */}
+        <p className="m-0 min-h-[18px] text-[12.5px]" role="status" style={{ color: "var(--color-neutral-700)" }}>
+          {note}
+        </p>
       </div>
+    </Modal>
+  );
+}
+
+function Notice({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="rounded-xl px-3.5 py-3 text-[13.5px] leading-relaxed" style={{ border: "1px dashed color-mix(in srgb, var(--color-ink) 45%, transparent)" }}>
+      {children}
     </div>
-  );
-}
-
-/** Two offset sheets. Drawn rather than a font glyph, so it stays aligned. */
-function CopyGlyph() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 14 14" aria-hidden focusable="false">
-      <path
-        d="M4.5 4.5h8v8h-8zM1.5 9.5v-8h8"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-      />
-    </svg>
-  );
-}
-
-/** A cross at the same weight as the dividers around it. */
-function CloseGlyph() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 14 14" aria-hidden focusable="false">
-      <path d="M2 2l10 10M12 2L2 12" fill="none" stroke="currentColor" strokeWidth="2" />
-    </svg>
   );
 }

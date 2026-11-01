@@ -149,10 +149,11 @@ export function IconSelect({
             aria-hidden
           />
           <div
-            className="absolute left-0 z-30 mt-1 w-[260px] p-2"
+            className="picker-pop absolute left-0 z-30 mt-1.5 w-[272px] rounded-xl p-2"
             style={{
-              background: "var(--color-surface)",
-              border: "2px solid var(--color-ink)",
+              background: "var(--color-bg)",
+              border: "1px solid var(--color-divider)",
+              boxShadow: "var(--shadow-lg)",
             }}
           >
             <input
@@ -184,10 +185,9 @@ export function IconSelect({
                   role="option"
                   aria-selected={!overridden}
                   tabIndex={-1}
-                  className="col-span-4 flex cursor-pointer items-center gap-2 px-2 py-2 text-left text-xs"
+                  className="col-span-4 mb-1 flex cursor-pointer items-center gap-2 rounded-lg px-2 py-2 text-left text-xs hover:bg-[var(--color-surface)] focus-visible:bg-[var(--color-surface)]"
                   style={{
-                    borderBottom: "1px solid var(--color-divider)",
-                    color: overridden ? "inherit" : "var(--color-foil)",
+                    boxShadow: overridden ? "none" : "inset 0 0 0 1.5px var(--color-ink)",
                   }}
                   onClick={() => pick("")}
                   onKeyDown={move}
@@ -209,8 +209,8 @@ export function IconSelect({
                     tabIndex={-1}
                     title={ICONS[id].name}
                     aria-label={ICONS[id].name}
-                    className="flex cursor-pointer flex-col items-center gap-1 px-1 py-2 text-[10px]"
-                    style={{ color: on ? "var(--color-foil)" : "inherit" }}
+                    className="flex cursor-pointer flex-col items-center gap-1 rounded-lg px-1 py-2 text-[10px] hover:bg-[var(--color-surface)] focus-visible:bg-[var(--color-surface)]"
+                    style={{ boxShadow: on ? "inset 0 0 0 1.5px var(--color-ink)" : "none" }}
                     onClick={() => pick(id)}
                     onKeyDown={move}
                   >

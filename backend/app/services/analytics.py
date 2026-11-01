@@ -17,7 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.ids import new_id
 from app.models import AccountSettings, LinkClick, PageView, Portfolio, User
-from app.schemas.analytics import SummaryOut, Totals
+from app.schemas.analytics import DayCount, SummaryOut, Totals
 
 
 def source_from_referrer(referrer: str) -> str:
@@ -136,10 +136,37 @@ class AnalyticsService:
         for slug, section_id, count in click_rows.all():
             clicks.setdefault(slug, {})[str(section_id)] = count
 
+        # The same two counts again, by UTC calendar day, for the trend line.
+        # Truncated in SQL for the same reason as above: one row per page per
+        # day, however many events fell in it.
+        daily: dict[str, dict[str, DayCount]] = {}
+        view_day = func.date_trunc("day", func.timezone("UTC", PageView.occurred_at))
+        for slug, day, count in (
+            await self.session.execute(
+                select(Portfolio.slug, view_day, func.count(PageView.id))
+                .join(PageView, PageView.portfolio_id == Portfolio.id)
+                .where(Portfolio.user_id == user.id, PageView.occurred_at >= since)
+                .group_by(Portfolio.slug, view_day)
+            )
+        ).all():
+            daily.setdefault(slug, {}).setdefault(day.date().isoformat(), DayCount()).views = count
+
+        click_day = func.date_trunc("day", func.timezone("UTC", LinkClick.occurred_at))
+        for slug, day, count in (
+            await self.session.execute(
+                select(Portfolio.slug, click_day, func.count(LinkClick.id))
+                .join(LinkClick, LinkClick.portfolio_id == Portfolio.id)
+                .where(Portfolio.user_id == user.id, LinkClick.occurred_at >= since)
+                .group_by(Portfolio.slug, click_day)
+            )
+        ).all():
+            daily.setdefault(slug, {}).setdefault(day.date().isoformat(), DayCount()).clicks = count
+
         return SummaryOut(
             views=views,
             clicks=clicks,
             sources=sources,
+            daily=daily,
             totals=Totals(
                 views=sum(views.values()),
                 clicks=sum(sum(row.values()) for row in clicks.values()),

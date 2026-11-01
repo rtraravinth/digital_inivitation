@@ -46,9 +46,29 @@ class Settings(BaseSettings):
     asset_url_ttl_minutes: int = Field(default=60 * 24, ge=5, le=60 * 24 * 30)
 
     cors_origins: list[str] = ["http://localhost:3000", "http://127.0.0.1:3000"]
+    # Outside production, any private-network origin on the dev server's port
+    # is also allowed. The frontend is opened from this machine's LAN address
+    # to test on a phone, and the router hands that address out by DHCP, so a
+    # fixed list goes stale — and a refused origin fails silently: the page
+    # loads, but every view and click it reports is dropped by CORS and the
+    # owner's stats read zero. Off in prod, where origins are listed outright.
+    cors_dev_lan: bool = True
     public_base_url: str = "http://localhost:8000"
 
     media_root: Path = Path("media")
+
+    @property
+    def cors_origin_regex(self) -> str | None:
+        """Private-network origins on :3000, in dev and test only."""
+        if self.is_prod or not self.cors_dev_lan:
+            return None
+        return (
+            r"^https?://("
+            r"192\.168\.\d{1,3}\.\d{1,3}"
+            r"|10\.\d{1,3}\.\d{1,3}\.\d{1,3}"
+            r"|172\.(1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3}"
+            r"):3000$"
+        )
 
     @field_validator("media_root")
     @classmethod

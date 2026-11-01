@@ -8,6 +8,8 @@ import {
   PublishedBody,
   PublishedHandleProvider,
 } from "./published/themes";
+import { ThemeSwitch } from "./AppHeader";
+import { PageState } from "./ui";
 import { useAccount } from "@/lib/account";
 import { usePortfolios } from "@/lib/store";
 
@@ -35,22 +37,39 @@ export function PrintAll() {
 
   return (
     <>
-      <div className="no-print nav bg-bg gap-3">
-        <Link href="/account" className="font-heading text-[13px]">
-          ← Account
+      <header
+        className="no-print sticky top-0 z-30 flex min-h-14 flex-wrap items-center gap-x-3 gap-y-2 px-3 py-2 sm:px-6"
+        style={{
+          background: "color-mix(in srgb, var(--color-bg) 86%, transparent)",
+          backdropFilter: "blur(12px)",
+          WebkitBackdropFilter: "blur(12px)",
+          borderBottom: "1px solid var(--color-divider)",
+        }}
+      >
+        <Link
+          href="/account"
+          className="flex h-8 items-center gap-1.5 rounded-md px-2 text-[13.5px] font-medium no-underline hover:bg-[var(--color-neutral-200)]"
+          style={{ color: "var(--color-ink)" }}
+        >
+          <span aria-hidden>←</span> Account
         </Link>
-        <span className="nav-brand mr-auto text-[15px]">
-          {pages.length} {pages.length === 1 ? "page" : "pages"} to print
+        <span className="mr-auto min-w-0 text-[13.5px]" style={{ color: "var(--color-neutral-700)" }}>
+          <span className="font-semibold" style={{ color: "var(--color-ink)" }}>
+            {pages.length} {pages.length === 1 ? "page" : "pages"}
+          </span>{" "}
+          <span className="hidden sm:inline">· each starts on a new sheet. Choose <strong>Save as PDF</strong> in the dialog.</span>
         </span>
-        <button type="button" className="btn btn-primary" onClick={() => window.print()}>
+        <ThemeSwitch />
+        <button
+          type="button"
+          className="btn btn-primary"
+          style={{ marginTop: 0 }}
+          disabled={pages.length === 0}
+          onClick={() => window.print()}
+        >
           Print / Save as PDF
         </button>
-      </div>
-
-      <p className="no-print text-neutral-700 m-0 px-4 py-3 text-[13px] sm:px-6">
-        Your browser&rsquo;s print dialog has a <strong>Save as PDF</strong> destination.
-        Each portfolio starts on a new page.
-      </p>
+      </header>
 
       {/* The owner's own copy of every page: no click belongs in the
           analytics, and nothing here is a visitor. */}
@@ -65,7 +84,11 @@ export function PrintAll() {
       </PreviewProvider>
 
       {ready && pages.length === 0 && (
-        <p className="p-10">Nothing to print — no portfolios yet.</p>
+        <PageState title="Nothing to print yet" note="Create a portfolio and it will appear here, one page per sheet.">
+          <Link href="/" className="btn btn-primary" style={{ marginTop: 0 }}>
+            Go to portfolios
+          </Link>
+        </PageState>
       )}
     </>
   );

@@ -18,42 +18,107 @@ export type Analytics = {
   clicks: Record<string, Record<string, number>>;
   /** slug -> source label -> view count */
   sources: Record<string, Record<string, number>>;
+  /**
+   * slug -> UTC day ("YYYY-MM-DD") -> that day's counts. Sparse: a day with
+   * nothing on it is absent, and `dailySeries()` fills the window's gaps.
+   */
+  daily: Record<string, Record<string, { views: number; clicks: number }>>;
 };
 
 type Summary = Analytics & { totals: { views: number; clicks: number } };
 
-const EMPTY: Analytics = { views: {}, clicks: {}, sources: {} };
+const EMPTY: Analytics = { views: {}, clicks: {}, sources: {}, daily: {} };
+
+/** The windows /stats offers. Each is a fresh count from the server. */
+export const RANGES = [7, 30, 90] as const;
+export type RangeDays = (typeof RANGES)[number];
 
 let state: Analytics = EMPTY;
 let ready = false;
+let range: RangeDays = 30;
+/** Bumped per request, so a slow answer for an old range cannot land last. */
+let generation = 0;
 const listeners = new Set<() => void>();
 
 function notify() {
   for (const listener of listeners) listener();
 }
 
-let loadStarted = false;
-
 async function load() {
+  const mine = ++generation;
   try {
-    const summary = await api.get<Summary>("/analytics/summary?days=30");
-    state = { views: summary.views, clicks: summary.clicks, sources: summary.sources };
+    const summary = await api.get<Summary>(`/analytics/summary?days=${range}`);
+    if (mine !== generation) return;
+    state = {
+      views: summary.views,
+      clicks: summary.clicks,
+      sources: summary.sources,
+      daily: summary.daily ?? {},
+    };
   } catch {
+    if (mine !== generation) return;
     // Signed out, or the API is down. An empty state is the honest answer;
     // /stats says on screen that there is nothing to show.
     state = EMPTY;
-  } finally {
-    ready = true;
-    notify();
   }
+  ready = true;
+  notify();
 }
 
+/** Switches the window and re-reads it. The figures stay until the new ones land. */
+export function setAnalyticsRange(days: RangeDays) {
+  if (days === range) return;
+  range = days;
+  notify();
+  void load();
+}
+
+const getRange = () => range;
+const defaultRange = (): RangeDays => 30;
+
+export function useAnalyticsRange(): RangeDays {
+  return useSyncExternalStore(subscribe, getRange, defaultRange);
+}
+
+/**
+ * One portfolio's daily counts across the whole window, oldest first, with
+ * the days nothing happened filled in as zero — the server sends only the
+ * days that had events, and a trend line with missing days is a lie about
+ * the shape.
+ */
+export function dailySeries(
+  a: Analytics,
+  slugs: string[],
+  days: number,
+  now = new Date(),
+): Array<{ day: string; views: number; clicks: number }> {
+  const out: Array<{ day: string; views: number; clicks: number }> = [];
+  const today = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+  for (let i = days - 1; i >= 0; i--) {
+    const day = new Date(today - i * 86_400_000).toISOString().slice(0, 10);
+    let views = 0;
+    let clicks = 0;
+    for (const slug of slugs) {
+      const hit = a.daily[slug]?.[day];
+      if (hit) {
+        views += hit.views;
+        clicks += hit.clicks;
+      }
+    }
+    out.push({ day, views, clicks });
+  }
+  return out;
+}
+
+/**
+ * Re-read every time something starts watching from nothing — in practice,
+ * each time /stats opens. It used to load once per session and keep that
+ * answer, so visits that arrived after the first look never appeared until a
+ * full reload, and a page that had just started getting traffic read zero.
+ */
 function subscribe(cb: () => void) {
   listeners.add(cb);
-  if (!loadStarted) {
-    loadStarted = true;
-    void load();
-  }
+  if (listeners.size === 1) void load();
   return () => {
     listeners.delete(cb);
   };

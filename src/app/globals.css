@@ -781,6 +781,50 @@
     -webkit-mask-image: radial-gradient(ellipse 90% 70% at 50% 0%, #000 30%, transparent 85%);
   }
 
+  /* ── the portfolio grid ────────────────────────────────────────────────
+     Hovering a card sets the others back, so the one under the pointer is
+     the only thing at full strength. A pointer that hovers only: on touch a
+     tap would leave every other card dimmed. */
+  .portfolio-grid [data-card] {
+    transition: opacity 400ms var(--ease-out);
+  }
+  @media (hover: hover) {
+    .portfolio-grid:has([data-card]:hover) [data-card]:not(:hover) {
+      opacity: 0.45;
+    }
+  }
+
+  /* The featured card's edge: one light that keeps travelling round it. A
+     conic gradient turned by a registered angle (`--orbit`, below), masked
+     to the 1px ring the card leaves round its body. */
+  .card-orbit {
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    pointer-events: none;
+    padding: 1px;
+    background: conic-gradient(
+      from var(--orbit),
+      transparent 0 72%,
+      color-mix(in srgb, var(--color-ink) 75%, transparent) 88%,
+      transparent 100%
+    );
+    mask:
+      linear-gradient(#000 0 0) content-box exclude,
+      linear-gradient(#000 0 0);
+    animation: card-orbit 6s linear infinite;
+  }
+  @keyframes card-orbit {
+    to {
+      --orbit: 360deg;
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .card-orbit {
+      animation: none;
+    }
+  }
+
   /* A picker's panel drops in from just above where it settles. */
   .picker-pop {
     animation: picker-pop 160ms var(--ease-out);
@@ -1661,4 +1705,13 @@
   .fx-sticky {
     position: static !important;
   }
+}
+
+/* The featured card's travelling light turns this; registered so it animates
+   as an angle rather than jumping from 0 to 360. Top level: @property is not
+   allowed inside a layer. */
+@property --orbit {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 0deg;
 }

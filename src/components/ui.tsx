@@ -78,6 +78,7 @@ export const ICON = {
     </>
   ),
   check: <path d="m5 12 5 5 9-10" />,
+  chart: <path d="M4 20V11M10 20V5M16 20v-6M21 20H3" />,
   eye: (
     <>
       <path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12Z" />

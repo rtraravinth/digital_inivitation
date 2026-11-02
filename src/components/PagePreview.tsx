@@ -31,7 +31,7 @@ import type { Portfolio } from "@/lib/types";
  * because its breakpoints answer to the window, and a desktop layout squeezed
  * into a phone's card would be neither.
  */
-export function PagePreview({ p, handle }: { p: Portfolio; handle: string }) {
+export function PagePreview({ p, handle, screens = 1 }: { p: Portfolio; handle: string; screens?: number }) {
   const [width, setWidth] = useState(0);
   const [near, setNear] = useState(false);
 
@@ -70,8 +70,9 @@ export function PagePreview({ p, handle }: { p: Portfolio; handle: string }) {
           // Clipped to the first screen at the card's own 16:10. Without it
           // the layer is the whole page — 1280 × 6000px and up — under the
           // card's greyscale filter, which is a lot to paint for a glimpse,
-          // and which a renderer without a GPU simply dropped.
-          style={{ width: device, height: device * 0.625, transform: `scale(${scale})` }}
+          // and which a renderer without a GPU simply dropped. A card that
+          // pans down the page on hover asks for a second screen.
+          style={{ width: device, height: device * 0.625 * screens, transform: `scale(${scale})` }}
         >
           <PreviewProvider value>
             <PublishedHandleProvider value={handle}>

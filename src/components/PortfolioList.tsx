@@ -11,6 +11,7 @@ import {
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { AppHeader } from "./AppHeader";
 import { ICON, Icon, IconButton, Modal, NoHandleNotice, Segmented, StatusPill } from "./ui";
 import { CreatePortfolioDialog } from "./CreatePortfolioDialog";
@@ -28,8 +29,9 @@ import { useAccount } from "@/lib/account";
    to do (make a page, share one), a toolbar to find a page once there are
    more than a few, and the pages themselves as a grid or a list.
 
-   The app is black and white; each card's preview is the author's real page,
-   shown in greyscale until the card is hovered, when it comes up in colour.
+   The app is black and white; each card frames the author's real page in a
+   browser window, greyscale until the card is hovered, when it comes up in
+   colour and scrolls. The counts at the top are the filter.
 
    Only links navigate. A card's name, its preview and its body are not
    links: the address under the name opens the page, and every other action
@@ -185,30 +187,26 @@ export function PortfolioList() {
           )}
 
           {/* ── title row ───────────────────────────────────────── */}
-          <div className="flex flex-wrap items-end gap-x-6 gap-y-4">
+          <div className="flex flex-wrap items-end gap-x-6 gap-y-5">
             <div className="min-w-0">
+              <motion.p
+                initial={reduced ? false : { opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ duration: 0.5 }}
+                className="m-0 font-mono text-[12px] tracking-[0.02em]"
+                style={{ color: "var(--color-neutral-600)" }}
+              >
+                {greeting()}
+                {account.profile.name ? `, ${account.profile.name.split(" ")[0]}` : ""}
+              </motion.p>
               <motion.h1
                 initial={reduced ? false : { opacity: 0, y: 14, filter: "blur(6px)" }}
                 animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
                 transition={{ duration: 0.6, ease: EASE }}
-                className="m-0 text-[28px] leading-tight tracking-[-0.03em] sm:text-[34px]"
+                className="m-0 mt-2 text-[40px] leading-[0.95] tracking-[-0.045em] sm:text-[56px]"
               >
-                Portfolios
+                Your <span style={{ color: "var(--color-neutral-500)" }}>portfolios</span>
               </motion.h1>
-              <motion.p
-                initial={reduced ? false : { opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ duration: 0.5, delay: 0.15 }}
-                className="m-0 mt-1.5 text-[14px] text-muted"
-              >
-                {ready ? (
-                  <>
-                    {counts.all} {counts.all === 1 ? "page" : "pages"} · {live} live
-                  </>
-                ) : (
-                  "Loading…"
-                )}
-              </motion.p>
             </div>
             <motion.div
               initial={reduced ? false : { opacity: 0, y: 8 }}
@@ -242,18 +240,23 @@ export function PortfolioList() {
             </motion.div>
           </div>
 
+          {/* ── the counts, which are also the filter ───────────── */}
+          {portfolios.length > 0 && (
+            <FilterTiles counts={counts} value={filter} onChange={setFilter} ready={ready} />
+          )}
+
           {/* ── toolbar ─────────────────────────────────────────── */}
           {portfolios.length > 0 && (
             <motion.div
               initial={reduced ? false : { opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5, delay: 0.18, ease: EASE }}
-              className="mt-8 flex flex-wrap items-center gap-2"
+              transition={{ duration: 0.5, delay: 0.22, ease: EASE }}
+              className="mt-6 flex flex-wrap items-center gap-x-3 gap-y-2"
             >
-              <label className="relative flex min-w-0 flex-1 basis-[240px] items-center sm:max-w-[340px]">
+              <label className="relative flex min-w-0 flex-1 basis-[240px] items-center sm:max-w-[360px]">
                 <span className="sr-only">Search portfolios</span>
                 <span
-                  className="pointer-events-none absolute left-3"
+                  className="pointer-events-none absolute left-3.5"
                   style={{ color: "var(--color-neutral-600)" }}
                 >
                   <Icon d={ICON.search} size={15} />
@@ -272,17 +275,18 @@ export function PortfolioList() {
                   placeholder="Search by name or address"
                   className="input"
                   style={{
-                    paddingLeft: 34,
+                    paddingLeft: 38,
                     paddingRight: 36,
-                    minHeight: 36,
+                    minHeight: 40,
                     fontSize: 14,
+                    borderRadius: 999,
                     background: "var(--color-bg)",
                   }}
                 />
                 {!query && (
                   <kbd
                     aria-hidden
-                    className="pointer-events-none absolute right-2.5 rounded px-1.5 font-mono text-[11px]"
+                    className="pointer-events-none absolute right-3 rounded px-1.5 font-mono text-[11px]"
                     style={{
                       color: "var(--color-neutral-600)",
                       boxShadow: "inset 0 0 0 1px var(--color-divider)",
@@ -293,17 +297,11 @@ export function PortfolioList() {
                 )}
               </label>
 
-              <Segmented
-                label="Show"
-                id="filter"
-                value={filter}
-                onChange={setFilter}
-                options={[
-                  { id: "all", label: "All", count: counts.all },
-                  { id: "live", label: "Live", count: counts.live },
-                  { id: "draft", label: "Drafts", count: counts.draft },
-                ]}
-              />
+              <span className="hidden font-mono text-[12px] sm:inline" style={{ color: "var(--color-neutral-600)" }}>
+                {shown.length === portfolios.length
+                  ? `${shown.length} ${shown.length === 1 ? "page" : "pages"}`
+                  : `${shown.length} of ${portfolios.length}`}
+              </span>
 
               <div className="ml-auto">
                 <Segmented
@@ -337,6 +335,9 @@ export function PortfolioList() {
             ) : view === "grid" ? (
               <Grid
                 portfolios={shown}
+                // The newest page leads, twice the size — but only over the
+                // whole list, where "first" means something.
+                feature={!q && filter === "all" && shown.length >= 3}
                 showCreate={!q && filter === "all"}
                 onCreate={() => setCreating(true)}
                 actions={actions}
@@ -401,50 +402,133 @@ type Actions = {
   onUnpublish: (id: string) => void;
 };
 
+/* ── the counts ───────────────────────────────────────────────────────── */
+
+function greeting(): string {
+  const h = new Date().getHours();
+  return h < 5 ? "Working late" : h < 12 ? "Good morning" : h < 18 ? "Good afternoon" : "Good evening";
+}
+
+/**
+ * All, Live and Drafts as three tiles that are also the filter: the number
+ * you came to check and the way to narrow the grid are the same control.
+ * Each carries a meter of its share of the whole, so "2 of 7 live" reads at
+ * a glance without a chart.
+ */
+function FilterTiles({
+  counts,
+  value,
+  onChange,
+  ready,
+}: {
+  counts: Record<Filter, number>;
+  value: Filter;
+  onChange: (f: Filter) => void;
+  ready: boolean;
+}) {
+  const reduced = useReducedMotion();
+  const tiles: Array<{ id: Filter; label: string; note: string }> = [
+    { id: "all", label: "All pages", note: "Everything you have made" },
+    { id: "live", label: "Live", note: "Published and public" },
+    { id: "draft", label: "Drafts", note: "Only you can see these" },
+  ];
+  return (
+    <div role="group" aria-label="Show" className="mt-8 grid grid-cols-3 gap-2 sm:gap-3">
+      {tiles.map((t, i) => {
+        const on = value === t.id;
+        const share = counts.all ? counts[t.id] / counts.all : 0;
+        return (
+          <motion.button
+            key={t.id}
+            type="button"
+            aria-pressed={on}
+            onClick={() => onChange(t.id)}
+            initial={reduced ? false : { opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.12 + i * 0.05, ease: EASE }}
+            whileTap={reduced ? undefined : { scale: 0.98 }}
+            className="relative flex min-w-0 cursor-pointer flex-col items-start overflow-hidden rounded-2xl px-3.5 py-3 text-left transition-colors duration-300 sm:px-5 sm:py-4"
+            style={{
+              background: on ? "var(--color-ink)" : "var(--color-bg)",
+              color: on ? "var(--color-bg)" : "var(--color-ink)",
+              border: `1px solid ${on ? "var(--color-ink)" : "var(--color-divider)"}`,
+            }}
+          >
+            <span className="flex w-full items-center gap-2 text-[12.5px] font-medium">
+              {t.id === "live" && <span className="app-live-dot" aria-hidden />}
+              <span className="truncate">{t.label}</span>
+            </span>
+            <span className="mt-1.5 font-mono text-[28px] leading-none tracking-[-0.04em] tabular-nums sm:text-[36px]">
+              {ready ? counts[t.id] : "–"}
+            </span>
+            <span className="mt-2 hidden text-[12px] opacity-60 sm:block">{t.note}</span>
+            <span
+              aria-hidden
+              className="mt-3 h-[3px] w-full overflow-hidden rounded-full"
+              style={{ background: on ? "color-mix(in srgb, var(--color-bg) 22%, transparent)" : "var(--color-neutral-200)" }}
+            >
+              <motion.span
+                className="block h-full rounded-full"
+                style={{ background: "currentColor", transformOrigin: "0 50%" }}
+                initial={reduced ? false : { scaleX: 0 }}
+                animate={{ scaleX: share }}
+                transition={{ duration: 0.9, delay: 0.25 + i * 0.05, ease: EASE }}
+              />
+            </span>
+          </motion.button>
+        );
+      })}
+    </div>
+  );
+}
+
 /* ── grid ─────────────────────────────────────────────────────────────── */
 
 function Grid({
   portfolios,
+  feature,
   showCreate,
   onCreate,
   actions,
 }: {
   portfolios: Portfolio[];
+  feature: boolean;
   showCreate: boolean;
   onCreate: () => void;
   actions: Actions;
 }) {
   const reduced = useReducedMotion();
   return (
-    <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3" style={{ perspective: 1600 }}>
+    // `grid-flow-dense`: with a double-size first card the next two fill the
+    // column beside it instead of leaving a hole.
+    <div className="portfolio-grid grid grid-flow-dense grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
       <AnimatePresence mode="popLayout" initial={true}>
-        {portfolios.map((p, i) => (
-          <motion.div
-            key={p.id}
-            layout={!reduced}
-            // Each card swings up into place off its bottom edge, a beat
-            // behind the one before it.
-            initial={reduced ? { opacity: 0 } : { opacity: 0, y: 28, rotateX: -14 }}
-            animate={{ opacity: 1, y: 0, rotateX: 0 }}
-            exit={{ opacity: 0, scale: 0.96, transition: { duration: 0.15 } }}
-            transition={{ duration: 0.7, delay: Math.min(i, 8) * 0.06, ease: EASE }}
-            style={{ transformOrigin: "50% 100%" }}
-            className="flex"
-          >
-            <Card portfolio={p} actions={actions} />
-          </motion.div>
-        ))}
+        {portfolios.map((p, i) => {
+          const featured = feature && i === 0;
+          return (
+            <motion.div
+              key={p.id}
+              layout={!reduced}
+              initial={reduced ? { opacity: 0 } : { opacity: 0, y: 24, scale: 0.97 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.96, transition: { duration: 0.15 } }}
+              transition={{ duration: 0.7, delay: Math.min(i, 8) * 0.06, ease: EASE }}
+              className={`flex ${featured ? "sm:col-span-2 lg:row-span-2" : ""}`}
+            >
+              <Card portfolio={p} actions={actions} featured={featured} />
+            </motion.div>
+          );
+        })}
         {showCreate && (
           <motion.button
             key="create"
             layout={!reduced}
             type="button"
             onClick={onCreate}
-            initial={reduced ? { opacity: 0 } : { opacity: 0, y: 28, rotateX: -14 }}
-            animate={{ opacity: 1, y: 0, rotateX: 0 }}
+            initial={reduced ? { opacity: 0 } : { opacity: 0, y: 24, scale: 0.97 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
             transition={{ duration: 0.7, delay: Math.min(portfolios.length, 8) * 0.06, ease: EASE }}
-            whileHover={reduced ? undefined : { y: -4 }}
-            className="group flex min-h-[340px] cursor-pointer flex-col items-center justify-center gap-3 rounded-2xl text-center"
+            className="group relative flex min-h-[320px] cursor-pointer flex-col items-center justify-center gap-3 overflow-hidden rounded-[22px] text-center transition-colors duration-300 hover:bg-[var(--color-surface)]"
             style={{
               border: "1.5px dashed var(--color-neutral-400)",
               color: "var(--color-neutral-700)",
@@ -452,10 +536,10 @@ function Grid({
             }}
           >
             <span
-              className="grid h-12 w-12 place-items-center rounded-full transition-all duration-300 group-hover:rotate-90 group-hover:bg-[var(--color-ink)] group-hover:text-[var(--color-bg)]"
+              className="grid h-14 w-14 place-items-center rounded-2xl transition-all duration-500 group-hover:rotate-90 group-hover:bg-[var(--color-ink)] group-hover:text-[var(--color-bg)]"
               style={{ boxShadow: "inset 0 0 0 1px var(--color-divider)" }}
             >
-              <Glyph id="plus" size={20} />
+              <Glyph id="plus" size={22} />
             </span>
             <span className="text-[15px] font-medium" style={{ color: "var(--color-ink)" }}>
               New portfolio
@@ -470,134 +554,226 @@ function Grid({
   );
 }
 
-/** Live or draft, said so it reads across the room and without colour. */
-
 /**
- * A card that leans toward the pointer.
+ * A page, framed as the browser window it will open in.
  *
- * Springs, so it settles rather than snapping when the pointer leaves, and a
- * soft highlight that tracks the pointer across the surface. Mouse only and
- * never under reduced motion: a touch drag over a card is a scroll.
+ * The preview is the author's real page, greyscale at rest. Hovering brings
+ * it up in colour and slowly scrolls it down a screen, so a card shows more
+ * than its hero; a light follows the pointer round the card's edge; and a
+ * dock of the next things to do rises over the page. The dock is a shortcut
+ * only — everything in it is also in the footer or the menu, so a touch
+ * screen, which never hovers, loses nothing.
  */
-function Card({ portfolio: p, actions }: { portfolio: Portfolio; actions: Actions }) {
+function Card({
+  portfolio: p,
+  actions,
+  featured,
+}: {
+  portfolio: Portfolio;
+  actions: Actions;
+  featured: boolean;
+}) {
   const handle = useAccount().account.profile.handle;
   const reduced = useReducedMotion();
   const live = p.status === "live";
-  const rx = useSpring(0, { stiffness: 180, damping: 20 });
-  const ry = useSpring(0, { stiffness: 180, damping: 20 });
   const gx = useMotionValue(50);
-  const gy = useMotionValue(50);
-  const glare = useMotionTemplate`radial-gradient(420px circle at ${gx}% ${gy}%, color-mix(in srgb, var(--color-ink) 7%, transparent), transparent 60%)`;
+  const gy = useMotionValue(0);
+  const edge = useMotionTemplate`radial-gradient(280px circle at ${gx}% ${gy}%, color-mix(in srgb, var(--color-ink) 70%, transparent), transparent 70%)`;
   const [hot, setHot] = useState(false);
+  const address = live && handle ? displayUrl(liveUrl(handle, p.slug)) : live ? "no public address yet" : "draft · not public yet";
 
   return (
     <motion.article
       data-card=""
-      className="group relative flex w-full flex-col rounded-2xl"
-      style={{
-        rotateX: rx,
-        rotateY: ry,
-        transformPerspective: 1200,
-        border: "1px solid var(--color-divider)",
-        background: "var(--color-bg)",
-      }}
+      className="group relative flex w-full flex-col rounded-[22px] p-px"
+      style={{ background: "var(--color-divider)" }}
       animate={{
-        y: hot && !reduced ? -6 : 0,
-        boxShadow: hot
-          ? "0 30px 60px -28px #00000066, 0 0 0 1px color-mix(in srgb, var(--color-ink) 22%, transparent)"
-          : "0 1px 2px #0000000f",
+        y: hot && !reduced ? -4 : 0,
+        boxShadow: hot ? "0 28px 56px -30px #00000080" : "0 1px 2px #0000000f",
       }}
-      transition={{ duration: 0.3, ease: EASE }}
+      transition={{ duration: 0.35, ease: EASE }}
       onPointerEnter={() => setHot(true)}
       onPointerMove={(e) => {
-        if (reduced || e.pointerType !== "mouse") return;
+        if (e.pointerType !== "mouse") return;
         const box = e.currentTarget.getBoundingClientRect();
-        const px = (e.clientX - box.left) / box.width;
-        const py = (e.clientY - box.top) / box.height;
-        ry.set((px - 0.5) * 8);
-        rx.set((0.5 - py) * 8);
-        gx.set(px * 100);
-        gy.set(py * 100);
+        gx.set(((e.clientX - box.left) / box.width) * 100);
+        gy.set(((e.clientY - box.top) / box.height) * 100);
       }}
-      onPointerLeave={() => {
-        setHot(false);
-        rx.set(0);
-        ry.set(0);
-      }}
+      onPointerLeave={() => setHot(false)}
     >
-      {/* The page itself. Greyscale at rest, colour on hover: the app shows
-          no colour of its own until you are looking at your own work. */}
-      <div
-        className="relative aspect-[16/10] overflow-hidden rounded-t-2xl"
-        style={{ borderBottom: "1px solid var(--color-divider)", background: "var(--color-surface)" }}
-      >
-        <motion.div
-          className="absolute inset-0"
-          animate={{
-            filter: hot ? "grayscale(0) contrast(1)" : "grayscale(1) contrast(1.04)",
-            scale: hot && !reduced ? 1.035 : 1,
-          }}
-          transition={{ duration: 0.5, ease: EASE }}
-        >
-          <PagePreview p={p} handle={handle} />
-        </motion.div>
-        <div className="absolute top-3 left-3">
-          <StatusPill live={live} floating />
-        </div>
-      </div>
-
-      {/* The pointer's light on the card. */}
-      {!reduced && (
-        <motion.div
-          aria-hidden
-          className="pointer-events-none absolute inset-0 rounded-2xl"
-          style={{ background: glare, opacity: hot ? 1 : 0, transition: "opacity 300ms" }}
-        />
+      {/* The featured card's light keeps circling until the pointer arrives
+          and the pointer's own light takes over. */}
+      {featured && (
+        <div aria-hidden className="card-orbit" style={{ opacity: hot ? 0 : 1, transition: "opacity 400ms" }} />
       )}
 
-      <div className="relative flex flex-1 flex-col p-4 pt-3.5">
-        <div className="flex items-start gap-2">
-          <div className="min-w-0 flex-1">
-            <h2 data-card-title="" className="m-0 truncate text-[16px] leading-snug tracking-[-0.015em]">{p.name}</h2>
-            <PageLink p={p} handle={handle} />
+      {/* The light on the edge: a gradient under a 1px gap round the card. */}
+      <motion.div
+        aria-hidden
+        className="pointer-events-none absolute inset-0 rounded-[22px]"
+        style={{ background: edge, opacity: hot ? 1 : 0, transition: "opacity 400ms" }}
+      />
+
+      <div className="relative flex flex-1 flex-col rounded-[21px] p-2" style={{ background: "var(--color-bg)" }}>
+        {/* ── the window ── */}
+        <div
+          className="relative flex flex-col overflow-hidden rounded-[14px]"
+          style={{
+            border: "1px solid var(--color-divider)",
+            background: "var(--color-surface)",
+            flex: featured ? "1 1 auto" : undefined,
+          }}
+        >
+          <div
+            className="flex h-8 flex-none items-center gap-3 px-3"
+            style={{ borderBottom: "1px solid var(--color-divider)" }}
+          >
+            <span aria-hidden className="flex gap-1.5">
+              {[0, 1, 2].map((d) => (
+                <span key={d} className="h-2 w-2 rounded-full" style={{ background: "var(--color-neutral-300)" }} />
+              ))}
+            </span>
+            <span
+              className="mx-auto flex h-5 min-w-0 max-w-[75%] items-center gap-1.5 rounded-md px-2.5 font-mono text-[10.5px]"
+              style={{ background: "var(--color-bg)", color: "var(--color-neutral-700)" }}
+            >
+              {live && <span className="app-live-dot flex-none" aria-hidden />}
+              <span className="truncate">{address}</span>
+            </span>
+            <span aria-hidden className="w-[30px] flex-none" />
           </div>
-          <IconButton label={`Edit details of ${p.name}`} onClick={() => actions.onEdit(p)}>
-            <Icon d={ICON.pencil} size={15} />
-          </IconButton>
-          <CardMenu portfolio={p} actions={actions} />
+
+          <div
+            className={`relative overflow-hidden ${featured ? "aspect-[16/10] lg:aspect-auto lg:min-h-[300px] lg:flex-1" : "aspect-[16/10]"}`}
+          >
+            <motion.div
+              className="absolute inset-x-0 top-0 h-[200%]"
+              animate={{
+                y: hot && !reduced ? "-50%" : "0%",
+                filter: hot ? "grayscale(0) contrast(1)" : "grayscale(1) contrast(1.04)",
+              }}
+              transition={{
+                y: { duration: hot ? 3.6 : 0.9, ease: [0.45, 0, 0.2, 1] },
+                filter: { duration: 0.5, ease: EASE },
+              }}
+            >
+              {/* The pan moves one box height, so the page has to run to at
+                  least two: a featured card's box is taller than 16:10. */}
+              <PagePreview p={p} handle={handle} screens={featured ? 3 : 2} />
+            </motion.div>
+
+            {/* ── the dock ── */}
+            <div className="pointer-events-none absolute inset-x-0 bottom-3 flex justify-center opacity-0 transition-all duration-300 group-focus-within:pointer-events-auto group-focus-within:opacity-100 group-hover:pointer-events-auto group-hover:opacity-100 [@media(hover:none)]:hidden">
+              <div
+                className="flex translate-y-2 items-center gap-0.5 rounded-full p-1 transition-transform duration-300 group-focus-within:translate-y-0 group-hover:translate-y-0"
+                style={{
+                  background: "color-mix(in srgb, var(--color-bg) 82%, transparent)",
+                  backdropFilter: "blur(12px)",
+                  WebkitBackdropFilter: "blur(12px)",
+                  boxShadow: "0 8px 24px -8px #00000059, inset 0 0 0 1px var(--color-divider)",
+                }}
+              >
+                {live ? (
+                  <>
+                    <DockLink href={previewPath(p.id)} external icon={ICON.eye} label="Preview" />
+                    <DockButton onClick={() => actions.onShare(p.id)} icon={ICON.share} label="Share" />
+                    <DockLink href={`/stats?p=${p.id}`} icon={ICON.chart} label="Stats" />
+                  </>
+                ) : (
+                  <>
+                    <DockLink href={`/builder/${p.id}`} icon={ICON.grid} label="Builder" />
+                    <DockLink href={`/editor/${p.id}`} icon={ICON.pencil} label="Content" />
+                    <DockLink href={previewPath(p.id)} external icon={ICON.eye} label="Preview" />
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
         </div>
 
-        {p.summary && (
-          <p className="m-0 mt-2 line-clamp-2 text-[13px] leading-relaxed text-muted">{p.summary}</p>
-        )}
+        {/* ── the details ── */}
+        <div className="flex flex-col px-2 pt-3 pb-1">
+          <div className="flex items-start gap-2">
+            <div className="min-w-0 flex-1">
+              <h2
+                className={`m-0 truncate leading-snug tracking-[-0.02em] ${featured ? "text-[18px] sm:text-[20px]" : "text-[16px]"}`}
+              >
+                {p.name}
+              </h2>
+              <PageLink p={p} handle={handle} />
+            </div>
+            <IconButton label={`Edit details of ${p.name}`} onClick={() => actions.onEdit(p)}>
+              <Icon d={ICON.pencil} size={15} />
+            </IconButton>
+            <CardMenu portfolio={p} actions={actions} />
+          </div>
 
-        <div className="mt-auto flex items-center gap-2 pt-4">
-          <span className="min-w-0 flex-1 truncate text-[12px]" style={{ color: "var(--color-neutral-600)" }}>
-            {p.meta}
-          </span>
-          {live ? (
-            <a
-              href={previewPath(p.id)}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="btn btn-secondary"
-              style={{ minHeight: 32, padding: "0.35rem 0.75rem", fontSize: 13 }}
-            >
-              <Icon d={ICON.eye} size={14} />
-              Preview
-            </a>
-          ) : (
-            <Link
-              href={`/builder/${p.id}`}
-              className="btn btn-primary"
-              style={{ minHeight: 32, padding: "0.35rem 0.85rem", fontSize: 13 }}
-            >
-              Open builder
-            </Link>
+          {p.summary && (
+            <p className="m-0 mt-2 line-clamp-2 text-[13px] leading-relaxed text-muted">{p.summary}</p>
           )}
+
+          <div className="mt-3 flex items-center gap-2">
+            <StatusPill live={live} />
+            <span className="min-w-0 flex-1 truncate font-mono text-[11.5px]" style={{ color: "var(--color-neutral-600)" }}>
+              {p.meta}
+            </span>
+            {live ? (
+              <a
+                href={previewPath(p.id)}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="btn btn-secondary"
+                style={{ minHeight: 32, padding: "0.35rem 0.8rem", fontSize: 13, borderRadius: 999 }}
+              >
+                <Icon d={ICON.eye} size={14} />
+                Preview
+              </a>
+            ) : (
+              <Link
+                href={`/builder/${p.id}`}
+                className="btn btn-primary"
+                style={{ minHeight: 32, padding: "0.35rem 0.9rem", fontSize: 13, borderRadius: 999 }}
+              >
+                Open builder
+                <span aria-hidden className="transition-transform duration-300 group-hover:translate-x-0.5">
+                  →
+                </span>
+              </Link>
+            )}
+          </div>
         </div>
       </div>
     </motion.article>
+  );
+}
+
+const DOCK_ITEM =
+  "flex h-8 cursor-pointer items-center gap-1.5 rounded-full px-3 text-[12.5px] font-medium no-underline transition-colors hover:bg-[var(--color-ink)] hover:text-[var(--color-bg)]";
+
+function DockLink({ href, icon, label, external }: { href: string; icon: React.ReactNode; label: string; external?: boolean }) {
+  const content = (
+    <>
+      <Icon d={icon} size={13} />
+      {label}
+    </>
+  );
+  return external ? (
+    <a href={href} target="_blank" rel="noopener noreferrer" className={DOCK_ITEM} style={{ color: "var(--color-ink)" }}>
+      {content}
+    </a>
+  ) : (
+    <Link href={href} className={DOCK_ITEM} style={{ color: "var(--color-ink)" }}>
+      {content}
+    </Link>
+  );
+}
+
+function DockButton({ onClick, icon, label }: { onClick: () => void; icon: React.ReactNode; label: string }) {
+  return (
+    <button type="button" onClick={onClick} className={DOCK_ITEM} style={{ color: "var(--color-ink)" }}>
+      <Icon d={icon} size={13} />
+      {label}
+    </button>
   );
 }
 
@@ -690,11 +866,30 @@ function PageLink({ p, handle }: { p: Portfolio; handle: string }) {
 
 /* ── list ─────────────────────────────────────────────────────────────── */
 
+/**
+ * The rows, and a larger view of the page under the pointer that follows it
+ * down the list. The row's own thumbnail is too small to tell two pages
+ * apart; the floating one is big enough to, without opening anything. Mouse
+ * only — on touch there is no hover to follow — and never under reduced
+ * motion, where a panel chasing the pointer is exactly what was turned off.
+ */
 function List({ portfolios, actions }: { portfolios: Portfolio[]; actions: Actions }) {
   const handle = useAccount().account.profile.handle;
   const reduced = useReducedMotion();
+  const [peek, setPeek] = useState<Portfolio | null>(null);
+  const px = useSpring(0, { stiffness: 320, damping: 32 });
+  const py = useSpring(0, { stiffness: 320, damping: 32 });
+  const PEEK_W = 360;
   return (
     <div
+      onPointerMove={(e) => {
+        if (e.pointerType !== "mouse") return;
+        // Beside the pointer, flipped to its left near the window's edge.
+        const right = e.clientX + 28 + PEEK_W < window.innerWidth;
+        px.set(right ? e.clientX + 28 : e.clientX - 28 - PEEK_W);
+        py.set(Math.min(Math.max(e.clientY - PEEK_W * 0.3125, 12), window.innerHeight - PEEK_W * 0.625 - 12));
+      }}
+      onPointerLeave={() => setPeek(null)}
       className="overflow-visible rounded-2xl"
       style={{ border: "1px solid var(--color-divider)", background: "var(--color-bg)" }}
     >
@@ -723,6 +918,9 @@ function List({ portfolios, actions }: { portfolios: Portfolio[]; actions: Actio
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0 }}
                 transition={{ duration: 0.4, delay: Math.min(i, 10) * 0.03, ease: EASE }}
+                onPointerEnter={(e) => {
+                  if (e.pointerType === "mouse") setPeek(p);
+                }}
                 className="group grid grid-cols-[72px_minmax(0,1fr)_auto] items-center gap-x-4 gap-y-1.5 px-4 py-3 transition-colors hover:bg-[var(--color-surface)] md:grid-cols-[96px_minmax(0,1fr)_100px_200px]"
                 style={{ borderTop: i === 0 ? "none" : "1px solid var(--color-divider)" }}
               >
@@ -769,6 +967,48 @@ function List({ portfolios, actions }: { portfolios: Portfolio[]; actions: Actio
           })}
         </AnimatePresence>
       </ul>
+
+      {/* Portaled: a fixed panel inside a transformed ancestor is fixed to
+          that ancestor, not the window. */}
+      {!reduced &&
+        createPortal(
+          <AnimatePresence>
+            {peek && (
+              <motion.div
+                aria-hidden
+                className="pointer-events-none fixed top-0 left-0 z-40 [@media(hover:none)]:hidden"
+                style={{ x: px, y: py, width: PEEK_W }}
+                initial={{ opacity: 0, scale: 0.92 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.92, transition: { duration: 0.15 } }}
+                transition={{ duration: 0.25, ease: EASE }}
+              >
+                <div
+                  className="relative aspect-[16/10] overflow-hidden rounded-xl"
+                  style={{
+                    background: "var(--color-surface)",
+                    border: "1px solid var(--color-divider)",
+                    boxShadow: "0 30px 60px -24px #00000080",
+                  }}
+                >
+                  <AnimatePresence initial={false}>
+                    <motion.div
+                      key={peek.id}
+                      className="absolute inset-0"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      transition={{ duration: 0.2 }}
+                    >
+                      <PagePreview p={peek} handle={handle} />
+                    </motion.div>
+                  </AnimatePresence>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>,
+          document.body,
+        )}
     </div>
   );
 }
@@ -1117,11 +1357,14 @@ function Skeleton() {
       {[0, 1, 2].map((i) => (
         <div
           key={i}
-          className="overflow-hidden rounded-2xl"
+          className="rounded-[22px] p-2"
           style={{ border: "1px solid var(--color-divider)", background: "var(--color-bg)" }}
         >
-          <div className="aspect-[16/10] animate-pulse" style={{ background: "var(--color-neutral-200)" }} />
-          <div className="flex flex-col gap-2 p-4">
+          <div className="overflow-hidden rounded-[14px]" style={{ border: "1px solid var(--color-divider)" }}>
+            <div className="h-8" style={{ background: "var(--color-surface)" }} />
+            <div className="aspect-[16/10] animate-pulse" style={{ background: "var(--color-neutral-200)" }} />
+          </div>
+          <div className="flex flex-col gap-2 px-2 pt-3.5 pb-2">
             <div className="h-4 w-2/3 animate-pulse rounded" style={{ background: "var(--color-neutral-200)" }} />
             <div className="h-3 w-1/2 animate-pulse rounded" style={{ background: "var(--color-neutral-200)" }} />
           </div>

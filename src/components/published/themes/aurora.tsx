@@ -398,7 +398,7 @@ function Card({
             className="font-heading text-[22px] leading-[1.15] tracking-[-0.01em] hover:underline md:text-[24px]"
           />
           {section.description && (
-            <p className="text-muted m-0 text-[15px] leading-[1.6]">{section.description}</p>
+            <p className="whitespace-pre-line text-muted m-0 text-[15px] leading-[1.6]">{section.description}</p>
           )}
           <div className="mt-auto flex flex-col items-start gap-3 pt-1">
             <SectionAside p={p} section={section} />

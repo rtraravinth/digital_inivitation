@@ -457,7 +457,7 @@ function Entry({ p, section }: { p: Portfolio; section: Section }) {
           className="font-heading text-[22px] leading-[1.2] hover:underline md:text-[25px]"
         />
         {section.description && (
-          <p className="text-muted m-0 text-[15px] leading-[1.65]">{section.description}</p>
+          <p className="whitespace-pre-line text-muted m-0 text-[15px] leading-[1.65]">{section.description}</p>
         )}
         <SectionAside p={p} section={section} />
         <SectionLinks p={p} section={section} />

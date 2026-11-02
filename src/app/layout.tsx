@@ -21,6 +21,7 @@ import {
 } from "next/font/google";
 import { THEME_BOOT } from "@/lib/theme-boot";
 import "./globals.css";
+import "./resume.css";
 
 /**
  * The published page's two house faces, preloaded.

@@ -2,7 +2,7 @@
 
 import { useSyncExternalStore } from "react";
 import { ApiError, api, messageFor } from "./api";
-import { normalize, type Portfolio, type Section } from "./types";
+import { normalize, type Portfolio, type Resume, type Section } from "./types";
 
 export function newId(): string {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
@@ -255,6 +255,28 @@ function updatePortfolio(id: string, recipe: (p: Portfolio) => Portfolio) {
   );
 }
 
+/**
+ * The resume is its own write, sent whole. It does not go through
+ * `updatePortfolio` because that one unpublishes a live page around its
+ * edits — and the resume is not on the page, so the API lets it change
+ * while the page stays live.
+ */
+function updateResume(id: string, recipe: (r: Resume) => Resume) {
+  setState(mapPortfolio(id, (p) => ({ ...p, resume: recipe(p.resume) })));
+
+  schedule(`resume:${id}`, () =>
+    persist(async () => {
+      const current = state.find((p) => p.id === id);
+      if (!current) return;
+      const saved = normalize(await api.put<Portfolio>(`/portfolios/${id}/resume`, current.resume));
+      // Only the server's timestamps and meta are news; the resume itself is
+      // what was sent, and a newer local edit may already be waiting.
+      state = state.map((p) => (p.id === id ? { ...p, meta: saved.meta } : p));
+      notify();
+    }),
+  );
+}
+
 function coreChanged(before: Portfolio, after: Portfolio): boolean {
   return (
     before.name !== after.name ||
@@ -287,6 +309,7 @@ function sectionPayload(section: Section) {
     links: section.links,
     quote: section.quote,
     hidden: section.hidden,
+    onResume: section.onResume,
     ...assetFields(section.image, "imageAssetId", "clearImage"),
     ...assetFields(section.file, "fileAssetId", "clearFile"),
   };
@@ -424,6 +447,7 @@ export function usePortfolios() {
     createPortfolioAsync,
     updatePortfolio,
     updateSection,
+    updateResume,
     addSection,
     addSectionAsync,
     toggleSectionHidden,

@@ -130,7 +130,7 @@ export function SectionDetail({ p, section }: { p: Portfolio; section: Section }
               {filed} · {medium} · {credit}
             </div>
             {section.description && (
-              <p className="m-0 max-w-[62ch] text-[16px] leading-[1.65] text-muted">
+              <p className="m-0 max-w-[62ch] whitespace-pre-line text-[16px] leading-[1.65] text-muted">
                 {section.description}
               </p>
             )}

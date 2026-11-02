@@ -47,6 +47,7 @@ class SectionOut(CamelModel):
     links: list[LinkItem]
     quote: Quote | None
     hidden: bool
+    on_resume: bool
     image: AssetOut | None
     file: AssetOut | None
 
@@ -71,6 +72,7 @@ class SectionPatch(StrictCamelModel):
     # Explicitly nullable: null clears the quote, absent leaves it alone.
     quote: Quote | None = None
     hidden: bool | None = None
+    on_resume: bool | None = None
     image_asset_id: uuid.UUID | None = None
     file_asset_id: uuid.UUID | None = None
     clear_image: bool = False

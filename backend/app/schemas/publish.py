@@ -14,6 +14,7 @@ from datetime import datetime
 from app.models.enums import FontId, Ground, ThemeId
 from app.schemas.common import CamelModel
 from app.schemas.portfolio import HeaderOut, Layout
+from app.schemas.resume import PublicResume
 from app.schemas.section import SectionOut
 
 
@@ -30,6 +31,9 @@ class PublicPortfolioOut(CamelModel):
     layout: Layout
     header: HeaderOut
     sections: list[SectionOut]
+    #: Only the structured blocks switched on for the page - never the
+    #: contact details, the template or a block kept to the resume.
+    resume: PublicResume
     published_at: datetime | None
 
     #: From the owner's privacy switches, so the page does not have to fetch

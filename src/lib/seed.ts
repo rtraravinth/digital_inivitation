@@ -2,11 +2,12 @@ import {
   normalize,
   type Portfolio,
   type PortfolioHeader,
+  type Resume,
   type Section,
 } from "./types";
 
 /** Optional fields fall back to the defaults in normalize(). */
-type Opt = "image" | "file" | "quote" | "hidden";
+type Opt = "image" | "file" | "quote" | "hidden" | "onResume";
 type SeedSection = Omit<Section, Opt> & Partial<Pick<Section, Opt>>;
 
 type HeaderOpt = "portrait" | "numbers" | "dates";
@@ -15,11 +16,13 @@ type SeedHeader = Omit<PortfolioHeader, HeaderOpt> &
 
 type SeedPortfolio = Omit<
   Portfolio,
-  "theme" | "accent" | "ground" | "groundHex" | "font" | "bodyFont" | "layout" | "sections" | "header"
+  "theme" | "accent" | "ground" | "groundHex" | "font" | "bodyFont" | "layout" | "resume" | "sections" | "header"
 > &
   Partial<
     Pick<Portfolio, "theme" | "accent" | "ground" | "groundHex" | "font" | "bodyFont" | "layout">
   > & {
+    /** Only the full page carries one; normalize() gives the rest the defaults. */
+    resume?: Partial<Resume>;
     sections: SeedSection[];
     header: SeedHeader;
   };
@@ -69,6 +72,105 @@ const RAW: SeedPortfolio[] = [
         { id: "h2", label: "LinkedIn", url: "/in/rohanmehta", icon: "briefcase" },
         { id: "h3", label: "Newsletter", url: "slowcompounding.in", icon: "globe" },
       ],
+    },
+    // The full page is also the full resume: the roles behind the page's
+    // sections, with the dates and results a page has no fields for.
+    resume: {
+      // The page already tells the businesses as sections, so the roles stay
+      // on the resume; the facts a page has no other home for go on both.
+      pageBlocks: ["education", "skills", "certifications", "languages"],
+      email: "rohan@northwell.in",
+      phone: "+91 98450 12345",
+      location: "Bengaluru, India",
+      website: "slowcompounding.in",
+      experience: [
+        {
+          id: "x1",
+          role: "Founder & CEO",
+          company: "Northwell Kitchens",
+          location: "Bengaluru",
+          start: "Jan 2019",
+          end: "",
+          current: true,
+          bullets: [
+            "Built a cloud-kitchen company to eleven brands across four facilities and 42 people",
+            "Reached profitability in 2022 by cutting food cost from 38% to 29% of revenue",
+            "Spun out the supply arm as Meridian Supply Co. in 2023",
+          ],
+        },
+        {
+          id: "x2",
+          role: "Co-founder",
+          company: "Meridian Supply Co.",
+          location: "Bengaluru",
+          start: "Apr 2023",
+          end: "",
+          current: true,
+          bullets: [
+            "Cold-chain logistics for small food businesses that cannot run their own fleet",
+            "Signed 30 restaurant clients in the first year with no sales team",
+          ],
+        },
+        {
+          id: "x3",
+          role: "Investment Adviser (SEBI RIA)",
+          company: "Independent practice",
+          location: "Bengaluru",
+          start: "2020",
+          end: "",
+          current: true,
+          bullets: [
+            "Fee-only adviser to sixty households; no commissions and no product sales",
+            "Write The Slow Compounding, a fortnightly letter with 14,200 subscribers",
+          ],
+        },
+        {
+          id: "x4",
+          role: "Associate, Consumer",
+          company: "Halcyon Capital",
+          location: "Mumbai",
+          start: "Jul 2015",
+          end: "Dec 2018",
+          current: false,
+          bullets: [
+            "Diligence on 20+ consumer and food-service deals; led two seed investments",
+          ],
+        },
+      ],
+      education: [
+        {
+          id: "e1",
+          degree: "MBA, Finance",
+          school: "Indian School of Business",
+          location: "Hyderabad",
+          start: "2014",
+          end: "2015",
+          detail: "",
+        },
+        {
+          id: "e2",
+          degree: "B.Com (Honours)",
+          school: "Shri Ram College of Commerce",
+          location: "Delhi",
+          start: "2009",
+          end: "2012",
+          detail: "",
+        },
+      ],
+      skills: [
+        { id: "k1", name: "Operations", items: ["Unit economics", "Supply chain", "Hiring", "P&L ownership"] },
+        { id: "k2", name: "Finance", items: ["Financial planning", "Portfolio construction", "Tax"] },
+      ],
+      certifications: [
+        { id: "c1", name: "SEBI Registered Investment Adviser", issuer: "SEBI", date: "2020", url: "" },
+        { id: "c2", name: "Certified Financial Planner", issuer: "FPSB India", date: "2019", url: "" },
+      ],
+      languages: [
+        { id: "l1", name: "English", level: "Fluent" },
+        { id: "l2", name: "Hindi", level: "Native" },
+        { id: "l3", name: "Kannada", level: "Conversational" },
+      ],
+      awards: [],
     },
     sections: [
       {

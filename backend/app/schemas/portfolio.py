@@ -24,6 +24,7 @@ from app.models.enums import (
 from app.schemas.account import LinkItem
 from app.schemas.asset import AssetOut
 from app.schemas.common import CamelModel, StrictCamelModel
+from app.schemas.resume import Resume
 from app.schemas.section import DateEntry, SectionOut, Stat
 
 #: Lowercase, digits and hyphens, in one or more "/"-separated segments; each
@@ -102,6 +103,8 @@ class PortfolioOut(CamelModel):
     font: FontId
     body_font: FontId
     layout: Layout
+    #: The owner's own document. Deliberately absent from PublicPortfolioOut.
+    resume: Resume
     header: HeaderOut
     sections: list[SectionOut]
     published_at: datetime | None

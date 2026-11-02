@@ -18,6 +18,7 @@ from app.schemas.portfolio import (
     SlugAvailableOut,
     SlugField,
 )
+from app.schemas.resume import Resume
 from app.services.portfolio import PortfolioService
 
 router = APIRouter(
@@ -95,6 +96,23 @@ async def update_header(
 ) -> PortfolioOut:
     service = PortfolioService(session)
     return service.to_out(await service.update_header(portfolio, payload))
+
+
+@router.put(
+    "/{portfolio_id}/resume",
+    response_model=PortfolioOut,
+    summary="Replace the resume",
+    description=(
+        "The resume's facts and its template, sent whole. Allowed while the "
+        "portfolio is live: the freeze protects the published page, and the "
+        "resume is never on it."
+    ),
+)
+async def update_resume(
+    payload: Resume, portfolio: OwnedPortfolio, session: SessionDep
+) -> PortfolioOut:
+    service = PortfolioService(session)
+    return service.to_out(await service.update_resume(portfolio, payload))
 
 
 @router.post("/{portfolio_id}/publish", response_model=PortfolioOut, summary="Publish")

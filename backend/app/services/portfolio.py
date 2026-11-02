@@ -22,6 +22,7 @@ from app.schemas.portfolio import (
     PortfolioPatch,
     PortfolioSummaryOut,
 )
+from app.schemas.resume import RESUME_ONLY_FIELDS, Resume, resume_from_stored
 from app.schemas.section import SectionOut
 from app.services.asset import AssetService
 
@@ -43,6 +44,7 @@ def section_out(section: Section, *, public: bool = False) -> SectionOut:
         links=list(section.links or []),
         quote=section.quote,
         hidden=section.hidden,
+        on_resume=section.on_resume,
         image=asset_out(section.image, public=public),
         file=asset_out(section.file, public=public),
     )
@@ -110,6 +112,7 @@ class PortfolioService:
             font=portfolio.font,
             body_font=portfolio.body_font,
             layout=Layout.model_validate(portfolio.layout),
+            resume=resume_from_stored(portfolio.resume),
             header=header_out(portfolio.header),
             sections=[section_out(section) for section in portfolio.sections],
             published_at=portfolio.published_at,
@@ -236,6 +239,9 @@ class PortfolioService:
             # page showed.
             portfolio.header.numbers = list(source.header.numbers or [])
             portfolio.header.dates = list(source.header.dates or [])
+            # A copy of a role is usually the start of a neighbouring role,
+            # and the work history is the slowest part of a resume to type.
+            portfolio.resume = resume_from_stored(source.resume).model_dump(by_alias=True)
 
             # New rows with new ids: a copy that shared ids would not be a copy.
             return [
@@ -247,6 +253,7 @@ class PortfolioService:
                     links=list(section.links or []),
                     quote=section.quote,
                     hidden=section.hidden,
+                    on_resume=section.on_resume,
                     image_asset_id=section.image_asset_id,
                     file_asset_id=section.file_asset_id,
                 )
@@ -273,6 +280,28 @@ class PortfolioService:
         if patch.layout is not None:
             portfolio.layout = patch.layout.model_dump(by_alias=True)
 
+        await self._touch(portfolio)
+        return portfolio
+
+    async def update_resume(self, portfolio: Portfolio, resume: Resume) -> Portfolio:
+        """Replace the resume whole.
+
+        Whole rather than patched: it is one document the editor holds in
+        full, and merging nested lists would gain nothing.
+
+        A live page is frozen, and the resume's structured blocks can be on
+        it, so while live only what never reaches the page may change - the
+        template and style, which blocks print, the contact details.
+        """
+        if portfolio.status == "live":
+            before = resume_from_stored(portfolio.resume).model_dump(exclude=RESUME_ONLY_FIELDS)
+            after = resume.model_dump(exclude=RESUME_ONLY_FIELDS)
+            if before != after:
+                raise Conflict(
+                    "Unpublish this page before you change what it shows.",
+                    code="portfolio_published",
+                )
+        portfolio.resume = resume.model_dump(by_alias=True)
         await self._touch(portfolio)
         return portfolio
 

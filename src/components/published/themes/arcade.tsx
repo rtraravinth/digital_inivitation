@@ -406,7 +406,7 @@ function Card({ p, section }: { p: Portfolio; section: Section }) {
               className="font-heading text-[21px] leading-[1.15] tracking-[0.01em] uppercase hover:underline"
             />
             {section.description && (
-              <p className="text-muted m-0 text-[15px] leading-[1.6]">{section.description}</p>
+              <p className="whitespace-pre-line text-muted m-0 text-[15px] leading-[1.6]">{section.description}</p>
             )}
             <SectionAside p={p} section={section} />
             <SectionLinks p={p} section={section} />

@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { useEffect } from "react";
 import { recordView } from "@/lib/analytics";
 import type { PublishedPrivacy } from "@/lib/published";
+import { withPageBlocks } from "@/lib/resume";
 import type { Portfolio } from "@/lib/types";
 import {
   PrivacyProvider,
@@ -23,7 +24,7 @@ import {
 export function PublishedPage({
   handle,
   slug,
-  portfolio,
+  portfolio: raw,
   privacy,
 }: {
   handle: string;
@@ -31,6 +32,9 @@ export function PublishedPage({
   portfolio: Portfolio;
   privacy: PublishedPrivacy;
 }) {
+  // The structured blocks on the page are sections too, so ?section= can
+  // open one of them like any other.
+  const portfolio = withPageBlocks(raw);
   const params = useSearchParams();
   const sectionId = params.get("section");
 

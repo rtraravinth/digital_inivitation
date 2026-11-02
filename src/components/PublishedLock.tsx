@@ -139,6 +139,20 @@ export function PublishedLock({ portfolio }: { portfolio: Portfolio }) {
                     Views and clicks
                   </Link>
                 </div>
+
+                {/* The resume's look never reaches the page, so the freeze leaves it open. */}
+                <div
+                  className="mt-5 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl px-3.5 py-3 text-[13px]"
+                  style={{ background: "var(--color-surface)", border: "1px solid var(--color-divider)" }}
+                >
+                  <span className="min-w-0 flex-1">Resume templates and style stay open while the page is live.</span>
+                  <a href={`/resume/${portfolio.id}?print=1`} target="_blank" rel="noopener noreferrer" className="font-medium underline underline-offset-2" style={{ color: "var(--color-ink)" }}>
+                    Resume PDF
+                  </a>
+                  <Link href={`/builder/${portfolio.id}?mode=resume`} className="font-medium underline underline-offset-2" style={{ color: "var(--color-ink)" }}>
+                    Resume templates
+                  </Link>
+                </div>
               </div>
             </TiltPanel>
           </motion.div>

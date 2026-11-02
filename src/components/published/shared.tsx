@@ -587,7 +587,7 @@ export function PlateCaption({
         {filed} · {medium} · {credit}
       </div>
       {section.description && (
-        <p className="m-0 text-[14px] leading-[1.55] text-muted">{section.description}</p>
+        <p className="whitespace-pre-line m-0 text-[14px] leading-[1.55] text-muted">{section.description}</p>
       )}
       {children}
     </figcaption>

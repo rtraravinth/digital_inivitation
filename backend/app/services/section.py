@@ -61,7 +61,7 @@ class SectionService:
         section = await self.get(portfolio, section_id)
         provided = patch.model_fields_set
 
-        for field in ("title", "description", "tab", "hidden"):
+        for field in ("title", "description", "tab", "hidden", "on_resume"):
             value = getattr(patch, field)
             if value is not None:
                 setattr(section, field, value)

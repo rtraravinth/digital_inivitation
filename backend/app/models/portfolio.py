@@ -116,6 +116,12 @@ class Portfolio(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     layout: Mapped[dict[str, Any]] = mapped_column(
         JSONB, nullable=False, default=default_layout
     )
+    # The resume this portfolio downloads as - its facts and its template.
+    # Never part of the published page: it carries an email and a phone
+    # number. ``{}`` validates to the defaults; see app/schemas/resume.py.
+    resume: Mapped[dict[str, Any]] = mapped_column(
+        JSONB, nullable=False, default=dict, server_default="{}"
+    )
 
     published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
@@ -184,6 +190,11 @@ class Section(UUIDPrimaryKeyMixin, TimestampMixin, Base):
 
     # Hidden sections stay in the document and drop off the published page.
     hidden: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    # Whether the section prints on the resume, under its tab as the heading.
+    # Separate from `hidden`: a section can be on one look and not the other.
+    on_resume: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=True, server_default="true"
+    )
 
     image_asset_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("assets.id", ondelete="SET NULL"), nullable=True

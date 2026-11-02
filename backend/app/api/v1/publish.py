@@ -32,6 +32,7 @@ from app.schemas.publish import (
     RecordClickRequest,
     RecordViewRequest,
 )
+from app.schemas.resume import public_resume
 from app.services.analytics import AnalyticsService
 from app.services.portfolio import header_out, section_out
 
@@ -114,6 +115,7 @@ async def read_published(
             for section in portfolio.sections
             if not section.hidden
         ],
+        resume=public_resume(portfolio.resume),
         published_at=portfolio.published_at,
         noindex=not indexable,
         badge=badge,

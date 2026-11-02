@@ -1,5 +1,6 @@
 "use client";
 
+import { withPageBlocks } from "@/lib/resume";
 import type { Portfolio } from "@/lib/types";
 import { Arcade } from "./themes/arcade";
 import { Aurora } from "./themes/aurora";
@@ -11,7 +12,13 @@ export * from "./shared";
 export { SectionDetail } from "./section-detail";
 export { Arcade, Aurora, Journey, Meridian, Stage };
 
-export function PublishedBody({ p }: { p: Portfolio }) {
+/**
+ * Every theme, the builder canvas, the card previews and /print come through
+ * here, so this is where the structured blocks switched on for the page join
+ * the sections — once, for all five themes.
+ */
+export function PublishedBody({ p: raw }: { p: Portfolio }) {
+  const p = withPageBlocks(raw);
   switch (p.theme) {
     case "meridian":
       return <Meridian p={p} />;

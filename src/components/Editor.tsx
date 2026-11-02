@@ -8,24 +8,30 @@ import { PortfolioExtras, PortraitField, SectionExtras } from "./SectionExtras";
 import { PublishedLock } from "./PublishedLock";
 import { TabField } from "./TabField";
 import { TagEditor } from "./TagEditor";
-import { ICON, Icon, IconButton, StatusPill, TiltPanel } from "./ui";
+import { ResumeBlockCard, ResumeContactCard } from "./resume/ResumeContent";
+import { ICON, Icon, IconButton, LookToggles, StatusPill, TiltPanel } from "./ui";
 import { Glyph } from "@/lib/glyphs";
 import { LinkIcon, iconFor } from "@/lib/icons";
+import { BLOCK_LABEL, blockHasContent, resumePrintPath } from "@/lib/resume";
 import { usePortfolios } from "@/lib/store";
 import {
+  PAGE_BLOCKS,
   assetSrc,
   previewPath,
   type LinkItem,
   type Portfolio,
+  type PageBlock,
   type PortfolioHeader,
   type Section,
 } from "@/lib/types";
 
 /* ── the editor ───────────────────────────────────────────────────────────
-   Artboards 4b and 4d as one responsive screen, rebuilt like the rest of
-   the app: the page is a column of cards — the header, then each section —
-   that read like the page and open in place to edit. An outline beside
-   them on a desk jumps to any card. Every change saves as you type.
+   One content list for both looks. The header (the top of the page and of
+   the resume), the resume-only contact details, the structured blocks —
+   Experience, Education, Skills and the rest — and then the page's own
+   sections. Every card carries Page and Resume switches, so nothing is
+   typed twice and each piece shows where its author says. An outline
+   beside them on a desk jumps to any card. Every change saves as you type.
    ──────────────────────────────────────────────────────────────────────── */
 
 const HEADER = "header";
@@ -81,12 +87,15 @@ export function Editor({ id }: { id: string }) {
   }
 
   // A live page is frozen — the API refuses every write to it — so this
-  // screen steps aside for Preview and Unpublish.
+  // screen steps aside for Preview and Unpublish. The structured blocks can
+  // be on the page, so they are frozen with it.
   if (portfolio.status === "live") {
     return <PublishedLock portfolio={portfolio} />;
   }
 
   const p: Portfolio = portfolio;
+  // The structured blocks, in the order the author arranged them.
+  const blocks = p.resume.order.filter((b): b is PageBlock => (PAGE_BLOCKS as string[]).includes(b));
   // Hidden sections count: their tab is still one the author is using.
   const pageTabs = [...new Set(p.sections.map((s) => s.tab.trim()).filter(Boolean))];
   const hidden = p.sections.filter((s) => s.hidden).length;
@@ -129,6 +138,16 @@ export function Editor({ id }: { id: string }) {
             <Link href={`/builder/${p.id}`} className="btn btn-secondary hidden md:inline-flex" style={{ marginTop: 0, minHeight: 34 }}>
               Builder
             </Link>
+            <a
+              href={resumePrintPath(p.id)}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="btn btn-secondary hidden sm:inline-flex"
+              style={{ marginTop: 0, minHeight: 34 }}
+            >
+              <Icon d={<path d="M12 4v11m0 0-4-4m4 4 4-4M5 20h14" />} size={14} />
+              Resume PDF
+            </a>
             <a
               href={previewPath(p.id)}
               target="_blank"
@@ -190,8 +209,9 @@ export function Editor({ id }: { id: string }) {
                 transition={{ duration: 0.5, delay: 0.15 }}
                 className="m-0 mt-1.5 max-w-[62ch] text-[14px] text-muted"
               >
-                The words on your page. Open a card to edit it — every change saves as you
-                type. The look lives in the{" "}
+                Everything on your page and your resume, written once. Each card says where it
+                shows — <strong style={{ color: "var(--color-ink)" }}>Page</strong>,{" "}
+                <strong style={{ color: "var(--color-ink)" }}>Resume</strong> or both. The look of each lives in the{" "}
                 <Link href={`/builder/${p.id}`} className="underline underline-offset-2" style={{ color: "var(--color-ink)" }}>
                   builder
                 </Link>
@@ -199,8 +219,8 @@ export function Editor({ id }: { id: string }) {
               </motion.p>
             </div>
             <span className="ml-auto font-mono text-[12px]" style={{ color: "var(--color-neutral-600)" }}>
-              1 header · {p.sections.length} {p.sections.length === 1 ? "section" : "sections"}
-              {hidden > 0 && ` · ${hidden} hidden`}
+              1 header · {blocks.length} blocks · {p.sections.length} {p.sections.length === 1 ? "section" : "sections"}
+              {hidden > 0 && ` · ${hidden} off the page`}
             </span>
           </div>
 
@@ -218,14 +238,26 @@ export function Editor({ id }: { id: string }) {
                   sub="Header"
                   onPick={() => setOpen(HEADER)}
                 />
+                <OutlineItem on={open === "r-contact"} number="—" title="Contact details" sub="Resume only" onPick={() => setOpen("r-contact")} />
+                {blocks.map((b) => (
+                  <OutlineItem
+                    key={b}
+                    on={open === `r-${b}`}
+                    number="—"
+                    title={BLOCK_LABEL[b]}
+                    sub={lookLabel(p.resume.pageBlocks.includes(b), !p.resume.hidden.includes(b), blockHasContent(p, b))}
+                    dim={!blockHasContent(p, b)}
+                    onPick={() => setOpen(`r-${b}`)}
+                  />
+                ))}
                 {p.sections.map((s, i) => (
                   <OutlineItem
                     key={s.id}
                     on={open === s.id}
                     number={nn(i)}
                     title={s.title || "Untitled section"}
-                    sub={s.hidden ? `${s.tab} · hidden` : s.tab}
-                    dim={s.hidden}
+                    sub={`${s.tab} · ${lookLabel(!s.hidden, s.onResume, true)}`}
+                    dim={s.hidden && !s.onResume}
                     onPick={() => setOpen(s.id)}
                   />
                 ))}
@@ -245,6 +277,18 @@ export function Editor({ id }: { id: string }) {
                 onClose={() => setOpen(null)}
                 onChange={setHeader}
               />
+
+              <ResumeContactCard p={p} />
+              {blocks.map((b) => (
+                <ResumeBlockCard key={b} p={p} block={b} />
+              ))}
+
+              <div className="mt-4 flex items-baseline gap-3 px-1">
+                <h2 className="m-0 text-[16px] tracking-[-0.01em]">Your sections</h2>
+                <span className="text-[12.5px] text-muted">
+                  Anything else — a project, a cause, a role told your way. Each files under a section title.
+                </span>
+              </div>
 
               <AnimatePresence initial={true}>
                 {p.sections.map((s, i) => (
@@ -269,6 +313,7 @@ export function Editor({ id }: { id: string }) {
                       onChange={(recipe) => updateSection(p.id, s.id, recipe)}
                       onMove={(delta) => moveSection(p.id, s.id, delta)}
                       onToggleHidden={() => toggleSectionHidden(p.id, s.id)}
+                      onToggleResume={() => updateSection(p.id, s.id, (x) => ({ ...x, onResume: !x.onResume }))}
                       onDelete={() => {
                         deleteSection(p.id, s.id);
                         setOpen(null);
@@ -316,6 +361,15 @@ export function Editor({ id }: { id: string }) {
       </div>
     </>
   );
+}
+
+/** "Page and resume", "Page only", … — what an outline row says about a piece. */
+function lookLabel(page: boolean, resume: boolean, filled: boolean): string {
+  if (!filled) return "Empty";
+  if (page && resume) return "Page and resume";
+  if (page) return "Page only";
+  if (resume) return "Resume only";
+  return "Off both";
 }
 
 /* ── outline ──────────────────────────────────────────────────────────── */
@@ -474,13 +528,16 @@ function HeaderCard({
       id={HEADER}
       open={open}
       onOpen={onOpen}
-      label="Header — the top of your page"
+      label="Header — the top of your page and your resume"
       tools={
-        open ? (
-          <button type="button" className="btn btn-primary" style={{ marginTop: 0, minHeight: 32, fontSize: 13 }} onClick={onClose}>
-            Done
-          </button>
-        ) : undefined
+        <span className="flex items-center gap-1">
+          <LookToggles name="the header" page resume />
+          {open && (
+            <button type="button" className="btn btn-primary ml-1" style={{ marginTop: 0, minHeight: 32, fontSize: 13 }} onClick={onClose}>
+              Done
+            </button>
+          )}
+        </span>
       }
       preview={
         <div className="flex items-start gap-4">
@@ -526,7 +583,7 @@ function HeaderCard({
           />
         </div>
         <div className="field">
-          <label htmlFor="h-current">What you do now</label>
+          <label htmlFor="h-current">What you do now — your resume headline too</label>
           <input
             id="h-current"
             className="input"
@@ -536,7 +593,7 @@ function HeaderCard({
           />
         </div>
         <div className="field">
-          <label htmlFor="h-desc">About you</label>
+          <label htmlFor="h-desc">About you — your resume summary too</label>
           <textarea
             id="h-desc"
             className="input"
@@ -589,6 +646,7 @@ function SectionCard({
   onChange,
   onMove,
   onToggleHidden,
+  onToggleResume,
   onDelete,
 }: {
   section: Section;
@@ -602,6 +660,7 @@ function SectionCard({
   onChange: (recipe: (s: Section) => Section) => void;
   onMove: (delta: -1 | 1) => void;
   onToggleHidden: () => void;
+  onToggleResume: () => void;
   onDelete: () => void;
 }) {
   const [confirming, setConfirming] = useState(false);
@@ -612,20 +671,16 @@ function SectionCard({
       id={s.id}
       open={open}
       onOpen={onOpen}
-      dim={s.hidden}
+      dim={s.hidden && !s.onResume}
       label={
         <span className="flex items-center gap-2">
           <span className="font-mono">{number}</span>
-          <span>Section</span>
-          {s.hidden && (
-            <span className="rounded-full px-2 py-0.5 text-[11px]" style={{ boxShadow: "inset 0 0 0 1px var(--color-divider)" }}>
-              Hidden from the page
-            </span>
-          )}
+          <span className="truncate">{s.tab}</span>
         </span>
       }
       tools={
-        <span className="flex items-center">
+        <span className="flex flex-wrap items-center justify-end gap-1">
+          <LookToggles name={s.title || "this section"} page={!s.hidden} resume={s.onResume} onPage={onToggleHidden} onResume={onToggleResume} />
           <IconButton label="Move up" onClick={() => !first && onMove(-1)}>
             <span style={{ opacity: first ? 0.3 : 1 }}>
               <Glyph id="up" size={15} />
@@ -635,20 +690,6 @@ function SectionCard({
             <span style={{ opacity: last ? 0.3 : 1 }}>
               <Glyph id="down" size={15} />
             </span>
-          </IconButton>
-          <IconButton label={s.hidden ? "Show on the page" : "Hide from the page"} onClick={onToggleHidden}>
-            <Icon
-              d={
-                s.hidden ? (
-                  <>
-                    <path d="M3 3l18 18M10.6 5.1A10 10 0 0 1 12 5c6.4 0 10 7 10 7a17 17 0 0 1-3.2 4M6.6 6.6C3.8 8.4 2 12 2 12s3.6 7 10 7a9.7 9.7 0 0 0 4.4-1" />
-                  </>
-                ) : (
-                  ICON.eye
-                )
-              }
-              size={15}
-            />
           </IconButton>
           {open && (
             <button type="button" className="btn btn-primary ml-1" style={{ marginTop: 0, minHeight: 32, fontSize: 13 }} onClick={onClose}>
@@ -660,7 +701,7 @@ function SectionCard({
       preview={
         <>
           <div className="text-[19px] leading-snug font-semibold tracking-[-0.015em]">
-            {s.title || <Placeholder>Section title</Placeholder>}
+            {s.title || <Placeholder>Title</Placeholder>}
           </div>
           <p className="m-0 mt-1.5 line-clamp-3 max-w-[64ch] text-[14px] leading-relaxed text-muted">
             {s.description || <Placeholder>What it is, in a few sentences</Placeholder>}
@@ -678,13 +719,22 @@ function SectionCard({
       }
     >
       <div className="flex flex-col gap-4">
+        {/* The section title comes first: it is the group this entry files
+            under — a tab on the page, a heading on the resume. */}
+        <div className="field">
+          <label htmlFor={`tab-${s.id}`}>Section title</label>
+          <TabField id={`tab-${s.id}`} value={s.tab} options={tabOptions} onChange={(tab) => onChange((x) => ({ ...x, tab }))} />
+          <p className="m-0 mt-1.5 text-[12px] text-muted">
+            Groups this entry — a tab on your page, a heading on your resume. Pick one you already use, or name a new one.
+          </p>
+        </div>
         <div className="field">
           <label htmlFor={`title-${s.id}`}>Title</label>
           <input
             id={`title-${s.id}`}
             className="input"
             style={{ fontWeight: 600, fontSize: 18, minHeight: 46 }}
-            placeholder="Section title"
+            placeholder="e.g. Northwell Kitchens"
             value={s.title}
             onChange={(e) => onChange((x) => ({ ...x, title: e.target.value }))}
           />
@@ -699,13 +749,6 @@ function SectionCard({
             value={s.description}
             onChange={(e) => onChange((x) => ({ ...x, description: e.target.value }))}
           />
-        </div>
-        <div className="field">
-          <label htmlFor={`tab-${s.id}`}>Tab</label>
-          <TabField id={`tab-${s.id}`} value={s.tab} options={tabOptions} onChange={(tab) => onChange((x) => ({ ...x, tab }))} />
-          <p className="m-0 mt-1.5 text-[12px] text-muted">
-            Visitors reach this section through its tab. Pick one you already use, or name a new one.
-          </p>
         </div>
       </div>
 

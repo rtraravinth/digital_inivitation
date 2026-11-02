@@ -381,7 +381,7 @@ function Poster({ p, section, number }: { p: Portfolio; section: Section; number
         </div>
       </Tilt>
       {section.description && (
-        <p className="text-muted m-0 line-clamp-3 text-[14px] leading-[1.6]">{section.description}</p>
+        <p className="whitespace-pre-line text-muted m-0 line-clamp-3 text-[14px] leading-[1.6]">{section.description}</p>
       )}
       <div className="flex flex-col items-start gap-3">
         <SectionAside p={p} section={section} />

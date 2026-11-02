@@ -30,6 +30,7 @@ from app.models.enums import (
 )
 from app.models.portfolio import default_layout
 from app.schemas.asset import asset_out
+from app.schemas.resume import resume_from_stored
 from app.schemas.transfer import ImportResultOut
 from app.services.asset import AssetService
 
@@ -67,6 +68,7 @@ class TransferService:
             "font": portfolio.font,
             "bodyFont": portfolio.body_font,
             "layout": dict(portfolio.layout or default_layout()),
+            "resume": resume_from_stored(portfolio.resume).model_dump(by_alias=True),
             "header": {
                 "name": header.name,
                 "current": header.current,
@@ -86,6 +88,7 @@ class TransferService:
                     "links": list(section.links or []),
                     "quote": section.quote,
                     "hidden": section.hidden,
+                    "onResume": section.on_resume,
                     "image": _asset_dict(section.image),
                     "file": _asset_dict(section.file),
                 }
@@ -160,6 +163,9 @@ class TransferService:
             font=_one_of(raw.get("font"), FONTS, "archivo"),
             body_font=_one_of(raw.get("bodyFont"), FONTS, "archivo"),
             layout={**default_layout(), **(raw.get("layout") or {})},
+            # An export from before resumes existed has none; an invalid one
+            # lands on the defaults rather than failing the whole import.
+            resume=resume_from_stored(raw.get("resume")).model_dump(by_alias=True),
         )
 
         portfolio.header = PortfolioHeader(
@@ -182,6 +188,7 @@ class TransferService:
                 links=list(section.get("links") or []),
                 quote=section.get("quote"),
                 hidden=bool(section.get("hidden")),
+                on_resume=bool(section.get("onResume", True)),
                 image_asset_id=await self._restore_asset(user, section.get("image")),
                 file_asset_id=await self._restore_asset(user, section.get("file")),
             )

@@ -337,7 +337,7 @@ function StackCard({
             className="font-heading text-[26px] leading-[1.15] hover:underline md:text-[34px]"
           />
           {section.description && (
-            <p className="text-muted m-0 text-[16px] leading-[1.7]">{section.description}</p>
+            <p className="whitespace-pre-line text-muted m-0 text-[16px] leading-[1.7]">{section.description}</p>
           )}
           <SectionAside p={p} section={section} />
           <SectionLinks p={p} section={section} />

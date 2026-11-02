@@ -6,6 +6,7 @@ import { useSearchParams } from "next/navigation";
 import { useAccount } from "@/lib/account";
 import { usePortfolios } from "@/lib/store";
 import type { PublishedPrivacy } from "@/lib/published";
+import { withPageBlocks } from "@/lib/resume";
 import type { Portfolio } from "@/lib/types";
 import { ICON, Icon, PageState, StatusPill } from "../ui";
 import {
@@ -62,13 +63,13 @@ export function DraftPreview({ id }: { id: string }) {
   // rather than styled away, and the header's links are gone when contact
   // details are hidden. A preview that showed more than a visitor gets would
   // be worse than no preview.
-  const shown: Portfolio = {
+  const shown: Portfolio = withPageBlocks({
     ...portfolio,
     header: privacy.showContact
       ? portfolio.header
       : { ...portfolio.header, links: [] },
     sections: portfolio.sections.filter((s) => !s.hidden),
-  };
+  });
 
   // Hidden sections are already gone from `shown`, so a link to one cannot
   // be followed here either — the same answer the published page gives.

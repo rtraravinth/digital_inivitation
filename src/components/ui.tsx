@@ -562,3 +562,78 @@ export function PageState({
     </>
   );
 }
+
+/* ── where a piece of content shows ──────────────────────────────────────── */
+
+/**
+ * Two switches, Page and Resume, on every card in the content list — one
+ * set of content, and each piece says which of the two looks it is part of.
+ * Pills rather than checkboxes so the state reads at a glance down the list.
+ */
+export function LookToggles({
+  page,
+  resume,
+  onPage,
+  onResume,
+  name,
+}: {
+  page: boolean | null;
+  resume: boolean | null;
+  /** Omitted when the piece cannot leave that look (a resume-only card). */
+  onPage?: () => void;
+  onResume?: () => void;
+  /** What the pills are about, for their accessible names. */
+  name: string;
+}) {
+  return (
+    <span role="group" aria-label={`Where ${name} shows`} className="flex flex-none items-center gap-1">
+      {page !== null && <LookPill on={page} label="Page" name={name} onToggle={onPage} />}
+      {resume !== null && <LookPill on={resume} label="Resume" name={name} onToggle={onResume} />}
+    </span>
+  );
+}
+
+function LookPill({ on, label, name, onToggle }: { on: boolean; label: string; name: string; onToggle?: () => void }) {
+  const look = (
+    <>
+      <span aria-hidden className="grid h-3.5 w-3.5 place-items-center">
+        {on ? (
+          <Icon d={ICON.check} size={12} />
+        ) : (
+          <span className="h-1.5 w-1.5 rounded-full" style={{ background: "currentColor", opacity: 0.6 }} />
+        )}
+      </span>
+      {label}
+    </>
+  );
+  const className =
+    "inline-flex h-7 items-center gap-1 rounded-full pr-2.5 pl-2 text-[12px] font-medium whitespace-nowrap transition-colors";
+  const style: CSSProperties = on
+    ? { background: "var(--color-ink)", color: "var(--color-bg)" }
+    : { boxShadow: "inset 0 0 0 1px var(--color-divider)", color: "var(--color-neutral-600)" };
+
+  if (!onToggle) {
+    return (
+      <span className={className} style={style} title={`${name}: ${label.toLowerCase()} only`}>
+        {look}
+      </span>
+    );
+  }
+  return (
+    <button
+      type="button"
+      aria-pressed={on}
+      aria-label={`${on ? "Remove" : "Show"} ${name} ${on ? "from" : "on"} the ${label.toLowerCase()}`}
+      title={on ? `On the ${label.toLowerCase()} — click to leave it off` : `Off the ${label.toLowerCase()} — click to add it`}
+      onClick={(e) => {
+        // Cards open on a click anywhere; a switch must not open one.
+        e.stopPropagation();
+        onToggle();
+      }}
+      className={`${className} cursor-pointer hover:opacity-85`}
+      style={style}
+    >
+      {look}
+    </button>
+  );
+}

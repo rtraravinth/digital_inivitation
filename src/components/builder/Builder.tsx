@@ -2,6 +2,7 @@
 
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 import { Canvas, DEVICES, type Device } from "./Canvas";
 import {
@@ -14,6 +15,7 @@ import {
 } from "./controls";
 import { tabs } from "../published/themes";
 import { PublishedLock } from "../PublishedLock";
+import { ResumeStudio } from "../resume/ResumeStudio";
 import { ICON, Icon, IconButton, Segmented, StatusPill } from "../ui";
 import { Glyph } from "@/lib/glyphs";
 import { usePortfolios } from "@/lib/store";
@@ -64,6 +66,24 @@ export function Builder({ id }: { id: string }) {
   const [tab, setTab] = useState<InspectorTab>("look");
   const [sheet, setSheet] = useState<SheetTab>("look");
   const [replay, setReplay] = useState(0);
+  const router = useRouter();
+  // One portfolio, two looks: the page it publishes and the resume it
+  // downloads. In the address so the editor and the print page link back.
+  const mode: "page" | "resume" = useSearchParams().get("mode") === "resume" ? "resume" : "page";
+  const modeSwitch = (
+    <span className="flex-none">
+      <Segmented
+        label="What to style"
+        id="builder-mode"
+        value={mode}
+        onChange={(next) => router.replace(`/builder/${id}${next === "resume" ? "?mode=resume" : ""}`, { scroll: false })}
+        options={[
+          { id: "page", label: "Page" },
+          { id: "resume", label: "Resume" },
+        ]}
+      />
+    </span>
+  );
 
   const portfolio = getPortfolio(id);
 
@@ -79,6 +99,12 @@ export function Builder({ id }: { id: string }) {
         )}
       </div>
     );
+  }
+
+  // The resume is not on the published page, so it stays open while the
+  // page is live.
+  if (mode === "resume") {
+    return <ResumeStudio p={portfolio} modeSwitch={modeSwitch} storageError={storageError} />;
   }
 
   // A live page is frozen — the API refuses every write to it — so this
@@ -143,10 +169,11 @@ export function Builder({ id }: { id: string }) {
             <span className="hidden sm:inline">Portfolios</span>
           </Link>
           <span className="hidden h-5 w-px sm:block" style={{ background: "var(--color-divider)" }} />
-          <span className="min-w-0 truncate text-[14.5px] font-semibold tracking-[-0.01em]">{p.name}</span>
-          <span className="hidden sm:inline-flex">
+          <span className="hidden min-w-0 truncate text-[14.5px] font-semibold tracking-[-0.01em] md:inline">{p.name}</span>
+          <span className="hidden xl:inline-flex">
             <StatusPill live={false} />
           </span>
+          {modeSwitch}
           <span className="ml-auto flex flex-none items-center gap-2">
             <Link href={`/editor/${p.id}`} className="btn btn-secondary hidden md:inline-flex" style={{ marginTop: 0, minHeight: 34 }}>
               Edit text

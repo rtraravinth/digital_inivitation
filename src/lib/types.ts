@@ -73,6 +73,9 @@ export type Section = {
   quote: Quote | null;
   /** Hidden sections stay in the document and off the published page. */
   hidden: boolean;
+  /** Prints on the resume, under its tab as the heading. Independent of
+   *  `hidden`: a section can be on the page, the resume, or both. */
+  onResume: boolean;
 };
 
 /**
@@ -561,6 +564,8 @@ export type Portfolio = {
   font: FontId;
   bodyFont: FontId;
   layout: Layout;
+  /** The document this portfolio downloads as. Never on the published page. */
+  resume: Resume;
   header: PortfolioHeader;
   sections: Section[];
 };
@@ -611,6 +616,7 @@ export function normalize(p: Portfolio): Portfolio {
       photo: layout.photo ?? "colour",
       motion: layout.motion ?? "full",
     },
+    resume: normalizeResume(p.resume),
     header: {
       ...emptyHeader(),
       ...(p.header ?? {}),
@@ -625,6 +631,7 @@ export function normalize(p: Portfolio): Portfolio {
       // unreachable with a blank one, so it lands on the default.
       tab: s.tab?.trim() || DEFAULT_TAB,
       hidden: s.hidden ?? false,
+      onResume: s.onResume ?? true,
     })),
   };
 }
@@ -661,6 +668,7 @@ export function emptySection(id: string): Section {
     file: null,
     quote: null,
     hidden: false,
+    onResume: true,
   };
 }
 
@@ -897,3 +905,230 @@ export const NEEDS_SERVER = {
   domain: "Serving your own domain needs DNS and a host.",
   email: "Sending mail needs a mail service.",
 } as const;
+
+/* ── the resume ───────────────────────────────────────────────────────────
+   One content list, two looks. The header is the resume's top — its name,
+   current line and About are the resume's name, headline and summary — and
+   the page's own sections print under their tabs. What lives here are the
+   facts a page section has no fields for — a role's company and dates, a
+   school, a list of skills — structured, so a later ATS check can read them
+   without parsing prose. Each structured block can also go on the page
+   (`pageBlocks`). Mirrors backend/app/schemas/resume.py.
+   ──────────────────────────────────────────────────────────────────────── */
+
+/** Every template, in catalogue order. `lib/resume.ts` describes each one. */
+export const RESUME_TEMPLATE_IDS = [
+  "classic",
+  "ivy",
+  "timeline",
+  "compact",
+  "sidebar",
+  "modern",
+  "executive",
+  "scholar",
+  "minimal",
+  "swiss",
+  "banner",
+  "slate",
+  "vivid",
+  "engineer",
+  "elegant",
+  "bold",
+  "contemporary",
+  "corporate",
+  "startup",
+  "columns",
+  "simple",
+  "graduate",
+  "senior",
+  "portrait",
+  "chronicle",
+  "pathway",
+  "nordic",
+  "editorial",
+  "ledger",
+  "monogram",
+  "cobalt",
+  "harbor",
+] as const;
+export type ResumeTemplateId = (typeof RESUME_TEMPLATE_IDS)[number];
+export type Paper = "a4" | "letter";
+export type ResumeSize = "small" | "medium" | "large";
+export type ResumeSpacing = "compact" | "standard" | "airy";
+/** `auto` follows the template; anything else overrides its columns. */
+export const RESUME_COLUMNS = ["auto", "one", "left", "right", "half"] as const;
+export type ResumeColumns = (typeof RESUME_COLUMNS)[number];
+/** Decoration behind the text. `lib/resume-backdrops.ts` draws each one. */
+export const RESUME_BACKDROP_IDS = [
+  "none",
+  "dots",
+  "grid",
+  "diagonal",
+  "hexagons",
+  "topography",
+  "waves",
+  "triangles",
+  "plus",
+  "edge",
+  "cream",
+  "wash",
+  "rainbow",
+  "arcs",
+  "circles",
+  "lines",
+] as const;
+export type ResumeBackdrop = (typeof RESUME_BACKDROP_IDS)[number];
+export type ResumeBlock =
+  | "summary"
+  | "experience"
+  | "education"
+  | "projects"
+  | "skills"
+  | "certifications"
+  | "languages"
+  | "awards";
+
+/** The structured blocks — the ones with a Page switch of their own. */
+export type PageBlock = "experience" | "education" | "skills" | "certifications" | "languages" | "awards";
+export const PAGE_BLOCKS: PageBlock[] = ["experience", "education", "skills", "certifications", "languages", "awards"];
+
+export const RESUME_BLOCKS: ResumeBlock[] = [
+  "summary",
+  "experience",
+  "education",
+  "projects",
+  "skills",
+  "certifications",
+  "languages",
+  "awards",
+];
+
+export type ExperienceItem = {
+  id: string;
+  role: string;
+  company: string;
+  location: string;
+  start: string;
+  end: string;
+  current: boolean;
+  bullets: string[];
+};
+export type EducationItem = {
+  id: string;
+  degree: string;
+  school: string;
+  location: string;
+  start: string;
+  end: string;
+  detail: string;
+};
+export type SkillGroup = { id: string; name: string; items: string[] };
+export type Certification = { id: string; name: string; issuer: string; date: string; url: string };
+export type Language = { id: string; name: string; level: string };
+export type Award = { id: string; title: string; issuer: string; date: string; detail: string };
+
+export type ResumeStyle = {
+  template: ResumeTemplateId;
+  paper: Paper;
+  accent: string;
+  headingFont: FontId;
+  font: FontId;
+  size: ResumeSize;
+  spacing: ResumeSpacing;
+  photo: boolean;
+  columns: ResumeColumns;
+  backdrop: ResumeBackdrop;
+};
+
+export type Resume = {
+  /** Resume-only: printed on the resume, never sent to a visitor. */
+  email: string;
+  phone: string;
+  location: string;
+  website: string;
+  experience: ExperienceItem[];
+  education: EducationItem[];
+  skills: SkillGroup[];
+  certifications: Certification[];
+  languages: Language[];
+  awards: Award[];
+  /** Block order on the sheet, and of the structured blocks on the page. */
+  order: ResumeBlock[];
+  /** Blocks left off the resume. */
+  hidden: ResumeBlock[];
+  /** Structured blocks shown on the published page too. */
+  pageBlocks: PageBlock[];
+  style: ResumeStyle;
+};
+
+export function defaultResumeStyle(): ResumeStyle {
+  return {
+    template: "classic",
+    paper: "a4",
+    accent: "#1d3f8a",
+    headingFont: "inter",
+    font: "inter",
+    size: "medium",
+    spacing: "standard",
+    photo: false,
+    columns: "auto",
+    backdrop: "none",
+  };
+}
+
+export function defaultResume(): Resume {
+  return {
+    email: "",
+    phone: "",
+    location: "",
+    website: "",
+    experience: [],
+    education: [],
+    skills: [],
+    certifications: [],
+    languages: [],
+    awards: [],
+    order: [...RESUME_BLOCKS],
+    hidden: [],
+    pageBlocks: [...PAGE_BLOCKS],
+    style: defaultResumeStyle(),
+  };
+}
+
+/** Backfills a resume from any build, and keeps every block in the order once. */
+export function normalizeResume(raw: Partial<Resume> | null | undefined): Resume {
+  const base = defaultResume();
+  // `headline` and `summary` moved to the header; a stale copy is dropped.
+  const { headline: _h, summary: _s, ...rest } = (raw ?? {}) as Partial<Resume> & { headline?: string; summary?: string };
+  void _h;
+  void _s;
+  const r = { ...base, ...rest };
+  const known = new Set<string>(RESUME_BLOCKS);
+  const order = [...new Set((r.order ?? []).filter((b) => known.has(b)))] as ResumeBlock[];
+  for (const b of RESUME_BLOCKS) if (!order.includes(b)) order.push(b);
+  return {
+    ...r,
+    experience: (r.experience ?? []).map((e) => ({ ...e, bullets: e.bullets ?? [], current: !!e.current })),
+    education: r.education ?? [],
+    skills: (r.skills ?? []).map((g) => ({ ...g, items: g.items ?? [] })),
+    certifications: r.certifications ?? [],
+    languages: r.languages ?? [],
+    awards: r.awards ?? [],
+    order,
+    hidden: (r.hidden ?? []).filter((b) => known.has(b)) as ResumeBlock[],
+    pageBlocks: [...new Set((r.pageBlocks ?? PAGE_BLOCKS).filter((b) => PAGE_BLOCKS.includes(b)))],
+    style: normalizeResumeStyle({ ...base.style, ...(r.style ?? {}) }),
+  };
+}
+
+/** A template, layout or background this build no longer has falls back to the default rather than unstyled. */
+function normalizeResumeStyle(style: ResumeStyle): ResumeStyle {
+  const known = <T extends string>(list: readonly T[], v: string, fallback: T): T =>
+    (list as readonly string[]).includes(v) ? (v as T) : fallback;
+  return {
+    ...style,
+    template: known(RESUME_TEMPLATE_IDS, style.template, "classic"),
+    columns: known(RESUME_COLUMNS, style.columns, "auto"),
+    backdrop: known(RESUME_BACKDROP_IDS, style.backdrop, "none"),
+  };
+}

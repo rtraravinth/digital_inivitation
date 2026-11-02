@@ -28,7 +28,7 @@ because the connection never arrives. Pass flags through when you need them:
 ```
 npm run build
 npm run lint
-cd backend && .venv/bin/python -m pytest    # 281 tests (.venv/Scripts on Windows)
+cd backend && .venv/bin/python -m pytest    # 307 tests (.venv/Scripts on Windows)
 ```
 
 `NEXT_PUBLIC_API_URL` points the frontend at the API; see
@@ -110,6 +110,12 @@ your browser keeps hitting the stale server on 3000. Kill it (`taskkill //F
   page break between so the browser's own **Save as PDF** can export them.
   That is what "Download all pages as PDF" on `/account` opens; generating a
   PDF in-process would mean a library, and the themes already print correctly.
+- `src/components/resume/` — the resume, a portfolio's second look; see "The
+  resume" below. `ResumeDocument.tsx` draws all six templates from one markup,
+  `src/app/resume.css` gives each its look, `ResumeSheet.tsx` is the scaled
+  preview, `ResumeContent.tsx` the editor's Resume view, `ResumeStudio.tsx`
+  the builder's Resume side and `ResumePrint.tsx` the `/resume/[id]` page
+  that Download PDF opens. `src/lib/resume.ts` holds what they share.
 - `src/components/account/panels.tsx` + `Account.tsx` — artboards 5a and 5b.
 - `src/components/published/themes.tsx` — the published page in five motion
   themes: Aurora (the default), Meridian, Stage, Arcade, Journey, one file
@@ -185,6 +191,112 @@ professions to a theme, accent, picked ground and type pairing;
 `applyProfession()` writes those fields and nothing remembers which
 profession was picked. The Colour panel's palettes and the Type panel's
 pairings are read off the same list, so adding a profession extends all three.
+
+## The resume
+
+**One content list, two looks: the page it publishes and the resume it
+downloads.** Nothing is typed twice. Edit text is a single list — the
+header, the resume-only contact details, the structured blocks (Experience,
+Education, Skills, Certifications, Languages, Awards, always listed), then
+the page's own sections — and every card carries **Page** and **Resume**
+switches (`LookToggles` in `ui.tsx`). There used to be a separate Resume
+view of the editor; two places to type one person's history is exactly what
+this replaced, so do not bring it back. The builder still has a **Page /
+Resume** switch (`/builder/<id>?mode=resume`), because the two *looks* are
+styled separately.
+
+- **The header is the resume's top.** Its name, current line and About are
+  the resume's name, headline and summary; there is no resume-only copy.
+  Migration `d2f7b8c41a90` moved any old `headline`/`summary` into the
+  header and `resume_from_stored()` ignores the stale keys.
+- **The facts a page section has no fields for are structured, not prose.**
+  `p.resume` holds roles (company, dates, `current`, bullets), education,
+  skill groups, certifications, languages and awards, plus the template and
+  its style. Structured so a later ATS check can read a role and its dates
+  without parsing text — keep it that way.
+- **Switches.** A structured block is on the page when it is in
+  `resume.pageBlocks` and on the resume unless it is in `resume.hidden`. A
+  section is on the page unless `hidden` and on the resume while
+  `onResume` (a column, `sections.on_resume`). On the resume, sections print
+  grouped under their **Section title** — the field that used to be labelled
+  "Tab", now first in the card — via `sectionGroups()`.
+- **Structured blocks reach the page as sections.** `withPageBlocks()` in
+  `lib/resume.ts` turns each entry of a page-enabled block into a synthetic
+  section (id `resume-…`, tab = the block's name) ahead of the page's own
+  sections. It runs in `PublishedBody` and wherever `?section=` is looked
+  up, never in the editor; it is idempotent. The themes therefore know
+  nothing about roles or degrees, and section descriptions are
+  `whitespace-pre-line` so a role's bullet points keep their lines.
+- **It is one JSONB column, `portfolios.resume`, sent whole** with `PUT
+  /portfolios/{id}/resume`, validated by `app/schemas/resume.py`. `{}` is a
+  valid resume, and `resume_from_stored()` turns anything that no longer
+  validates into the defaults rather than failing the portfolio read.
+- **Only page-enabled blocks ever leave the account.** `PublicPortfolioOut`
+  carries `public_resume()` — the blocks in `pageBlocks` and their order,
+  nothing else: no email, phone, location, website or style.
+  `tests/test_resume.py` pins that.
+- **A live page freezes what can reach it.** `PUT /resume` takes
+  `OwnedPortfolio` so the builder can restyle a live page's resume, but
+  while live it answers 409 `portfolio_published` to any change outside
+  `RESUME_ONLY_FIELDS` (style, `hidden`, the contact details). The editor
+  renders `PublishedLock` for a live portfolio as before, and the builder's
+  block rail cannot reorder while live (the order is the page's too).
+  `updateResume` is its own debounced write, not part of `updatePortfolio`.
+- **Thirty-two templates, one markup — and a template is a row, not a
+  stylesheet.** `RESUME_TEMPLATES` in `lib/resume.ts` gives each one a part
+  per slot: layout (`one` / `left` / `right`), aside, header, heading, entry,
+  skills, contact. `ResumeDocument` writes the parts as `data-*` attributes
+  and `resume.css` styles each part once, plus a short "finishing touches"
+  list keyed off `data-template`. A new template is usually a new row. Its id
+  goes in `RESUME_TEMPLATE_IDS` (`types.ts`) **and** the backend's
+  `ResumeTemplate` Literal. `test_the_template_list_matches_the_frontend`
+  fails if the two drift. Two-column layouts put Skills, Certifications,
+  Languages and Awards in the narrow column (`SIDE_BLOCKS`). Every template
+  sets real text in reading order, name first, because that is what an ATS
+  reads. Never render a resume as an image or a canvas. Organisation-first
+  entries and the date gutters are markup every template shares (`Entry`
+  writes the dates twice), so no template moves a node.
+- **A solid column is the paper's background, not the column's.** Under
+  `aside: "solid"` the sheet becomes the grid (`.r-columns` is
+  `display: contents`) so the column can run past the header. The colour is
+  `paperGround()`, a horizontal gradient set on the sheet, on the print
+  margin cells and on the printed page's `html`. Painted on the column
+  instead, it stops where its text does — on page 2, partway down. The
+  `band` header reaches the paper's top edge with negative margins of
+  `--r-my` / `--r-mx`.
+- **Columns and Background are style, not template.** `style.columns`
+  (`auto` follows the template) is laid over the template's parts by
+  `sheetParts()`, which everything that draws a sheet reads instead of
+  `templateOf()`. Picking a template resets it to `auto`, and the picker's
+  thumbnails ignore it. `style.backdrop` is decoration in
+  `lib/resume-backdrops.ts`: CSS background layers of SVG drawn in the
+  accent, never an element, so the PDF's text layer is unchanged. On screen
+  the sheet paints them; in print `resume.css` clears the sheet and
+  `/resume/[id]` paints the same layers on `html`. That is the only
+  surface that reaches every page's edges, and it puts a corner graphic flush
+  with the paper's top. Layers that fill the page repeat: on a printed page,
+  `100%` is one page tall.
+- **`resume.css` is unlayered on purpose**, so it beats `globals.css`'s heading
+  and link rules, and it is imported in `layout.tsx`. The sheet is paper:
+  white with near-black ink in either app theme, sized in mm and pt so the
+  preview and the PDF agree.
+- **The PDF is the browser's own Save as PDF**, from `/resume/[id]`, which
+  writes the `@page` size and margin per resume, names the document after the
+  person (the PDF's default file name) and, with `?print=1`, opens the print
+  dialog once fonts and the photo have loaded. **The `@page` margin is 0**:
+  the browser prints its own header and footer (date, title, address, page
+  number) in that margin, and with none it has nowhere to put them. Each
+  page's top and bottom room comes from empty cells in a table's `thead` and
+  `tfoot`, which repeat on every printed page, so the sheet drops its own
+  vertical padding in print. Entries are `break-inside: avoid`.
+- **The preview's page breaks are close, not exact.** `ResumeSheet` is one
+  continuous sheet with a dashed line wherever a page's room runs out; the
+  printer moves an entry that will not fit whole, so a real break can land a
+  little earlier. The page count is what matters for keeping a resume to one.
+- **Testing the PDF:** this machine's Edge refuses to print over CDP
+  ("Printing is not available") in both headless modes. Headless Chrome
+  (`%LOCALAPPDATA%/Google/Chrome`) prints; sign in and move with
+  `window.next.router.push` so the in-memory access token survives.
 
 ## Motion
 
@@ -442,6 +554,10 @@ claim to be the live page.
 
 ## Known gaps
 
+- **No ATS score yet.** It is meant to be a feature of its own. The resume is
+  stored structured so one can read it; do not ship a score that is not a
+  real analysis — the same rule as the analytics.
+
 - **Artboard 3b — the block manager, at `/blocks/[id]` — is deliberately not
   built.** It listed the sections with reorder, hide and delete buttons, a
   click count each, a copy-address bar and a typed "+ Add block" picker.
@@ -469,6 +585,6 @@ claim to be the live page.
 - **Slugs are global.** Two accounts cannot both hold `rohan`, because the
   address is `facet.page/<slug>` with nothing in front of it. The create
   dialog surfaces the 409 as a message.
-- **The frontend has no test runner.** The backend has 281 pytest tests;
+- **The frontend has no test runner.** The backend has 307 pytest tests;
   changes here are checked with `npm run lint`, `npm run build` and by
   actually opening the app.

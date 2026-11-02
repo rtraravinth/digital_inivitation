@@ -857,6 +857,22 @@ function CardMenu({ portfolio: p, actions }: { portfolio: Portfolio; actions: Ac
               Views and clicks
             </Link>
             <div className="my-1 h-px" style={{ background: "var(--color-divider)" }} />
+            {/* The resume is not on the page, so these stay open while it is live. */}
+            <Link role="menuitem" href={`/builder/${p.id}?mode=resume`} className={item} style={{ color: "var(--color-ink)" }} onClick={close}>
+              Resume templates
+            </Link>
+            <a
+              role="menuitem"
+              href={`/resume/${p.id}?print=1`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className={item}
+              style={{ color: "var(--color-ink)" }}
+              onClick={close}
+            >
+              Download resume (PDF)
+            </a>
+            <div className="my-1 h-px" style={{ background: "var(--color-divider)" }} />
             <button
               role="menuitem"
               type="button"

@@ -48,3 +48,7 @@ next-env.d.ts
 
 # design-tool working directory: local config, review screenshots, surface notes
 /.impeccable/
+
+# graphify knowledge graph output
+graphify-out/
+.claude/

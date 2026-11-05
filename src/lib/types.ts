@@ -550,6 +550,8 @@ export type Portfolio = {
   status: PortfolioStatus;
   summary: string;
   meta: string;
+  /** When the server last saved it, ISO 8601. Absent on seed and stored-locally data. */
+  updatedAt?: string;
   theme: ThemeId;
   accent: string;
   ground: Ground;

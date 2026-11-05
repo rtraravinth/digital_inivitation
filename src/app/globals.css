@@ -789,7 +789,7 @@
     transition: opacity 400ms var(--ease-out);
   }
   @media (hover: hover) {
-    .portfolio-grid:has([data-card]:hover) [data-card]:not(:hover) {
+    .portfolio-grid:has([data-card]:hover) [data-card]:not(:hover):not(:has([data-menu-open])) {
       opacity: 0.45;
     }
   }

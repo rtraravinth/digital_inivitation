@@ -271,7 +271,7 @@ function updateResume(id: string, recipe: (r: Resume) => Resume) {
       const saved = normalize(await api.put<Portfolio>(`/portfolios/${id}/resume`, current.resume));
       // Only the server's timestamps and meta are news; the resume itself is
       // what was sent, and a newer local edit may already be waiting.
-      state = state.map((p) => (p.id === id ? { ...p, meta: saved.meta } : p));
+      state = state.map((p) => (p.id === id ? { ...p, meta: saved.meta, updatedAt: saved.updatedAt } : p));
       notify();
     }),
   );

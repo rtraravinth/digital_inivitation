@@ -10,7 +10,7 @@ import {
 } from "motion/react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
 import { AppHeader } from "./AppHeader";
 import { ICON, Icon, IconButton, Modal, NoHandleNotice, Segmented, StatusPill } from "./ui";
@@ -214,13 +214,15 @@ export function PortfolioList() {
               transition={{ duration: 0.5, delay: 0.1, ease: EASE }}
               className="ml-auto flex items-center gap-2"
             >
-              {portfolios.length > 0 && (
+              {/* A draft has no public address, so there is nothing to share
+                  until something is live. */}
+              {live > 0 && (
                 <button
                   type="button"
                   className="btn btn-secondary"
                   style={{ background: "var(--color-bg)" }}
                   onClick={() =>
-                    setSharing(portfolios.find((p) => p.status === "live")?.id ?? portfolios[0].id)
+                    setSharing(portfolios.find((p) => p.status === "live")!.id)
                   }
                 >
                   <Icon d={ICON.share} size={15} />
@@ -579,6 +581,7 @@ function Card({
   const gx = useMotionValue(50);
   const gy = useMotionValue(0);
   const edge = useMotionTemplate`radial-gradient(280px circle at ${gx}% ${gy}%, color-mix(in srgb, var(--color-ink) 70%, transparent), transparent 70%)`;
+  const now = useNow();
   const [hot, setHot] = useState(false);
   const address = live && handle ? displayUrl(liveUrl(handle, p.slug)) : live ? "no public address yet" : "draft · not public yet";
 
@@ -702,20 +705,27 @@ function Card({
               </h2>
               <PageLink p={p} handle={handle} />
             </div>
-            <IconButton label={`Edit details of ${p.name}`} onClick={() => actions.onEdit(p)}>
-              <Icon d={ICON.pencil} size={15} />
-            </IconButton>
+            {live && (
+              <IconButton label={`Share ${p.name}`} onClick={() => actions.onShare(p.id)}>
+                <Icon d={ICON.share} size={15} />
+              </IconButton>
+            )}
+            {!live && (
+              <IconButton label={`Edit details of ${p.name}`} onClick={() => actions.onEdit(p)}>
+                <Icon d={ICON.pencil} size={15} />
+              </IconButton>
+            )}
             <CardMenu portfolio={p} actions={actions} />
           </div>
-
-          {p.summary && (
-            <p className="m-0 mt-2 line-clamp-2 text-[13px] leading-relaxed text-muted">{p.summary}</p>
-          )}
 
           <div className="mt-3 flex items-center gap-2">
             <StatusPill live={live} />
             <span className="min-w-0 flex-1 truncate font-mono text-[11.5px]" style={{ color: "var(--color-neutral-600)" }}>
-              {p.meta}
+              {p.updatedAt && (
+                <time dateTime={p.updatedAt} title={`Updated ${UPDATED.format(new Date(p.updatedAt))}`}>
+                  {ago(p.updatedAt, now)}
+                </time>
+              )}
             </span>
             {live ? (
               <a
@@ -745,6 +755,56 @@ function Card({
       </div>
     </motion.article>
   );
+}
+
+/* A clock every card reads, ticking once a minute so "just now" moves on
+   while the page stays open. An external store, because the React Compiler
+   lint refuses `Date.now()` during render. */
+let clock = Date.now();
+const clockListeners = new Set<() => void>();
+let clockTimer: number | undefined;
+function subscribeClock(listener: () => void) {
+  clockListeners.add(listener);
+  clockTimer ??= window.setInterval(() => {
+    clock = Date.now();
+    clockListeners.forEach((l) => l());
+  }, 60_000);
+  return () => {
+    clockListeners.delete(listener);
+    if (clockListeners.size === 0) {
+      window.clearInterval(clockTimer);
+      clockTimer = undefined;
+    }
+  };
+}
+function useNow(): number {
+  return useSyncExternalStore(subscribeClock, () => clock, () => clock);
+}
+
+/** The full date and time, for the tooltip over the relative one. */
+const UPDATED = new Intl.DateTimeFormat(undefined, {
+  day: "numeric",
+  month: "short",
+  year: "numeric",
+  hour: "numeric",
+  minute: "2-digit",
+});
+
+/**
+ * "2 days ago" — the same steps as `relative_time()` in the backend's
+ * portfolio service, plus years. Worked out here from `updatedAt` rather
+ * than read off `meta`, which also carries the section count.
+ */
+function ago(iso: string, now: number): string {
+  const seconds = (now - new Date(iso).getTime()) / 1000;
+  const n = (count: number, unit: string) => `${count} ${unit}${count === 1 ? "" : "s"} ago`;
+  if (seconds < 90) return "just now";
+  if (seconds < 3600) return n(Math.floor(seconds / 60), "minute");
+  if (seconds < 86_400) return n(Math.floor(seconds / 3600), "hour");
+  const days = Math.floor(seconds / 86_400);
+  if (days < 30) return n(days, "day");
+  if (days < 365) return n(Math.floor(days / 30), "month");
+  return n(Math.floor(days / 365), "year");
 }
 
 const DOCK_ITEM =
@@ -938,9 +998,16 @@ function List({ portfolios, actions }: { portfolios: Portfolio[]; actions: Actio
                   <StatusPill live={live} />
                 </span>
                 <div className="flex items-center justify-end gap-0.5">
-                  <IconButton label={`Edit details of ${p.name}`} onClick={() => actions.onEdit(p)}>
-                    <Icon d={ICON.pencil} size={15} />
-                  </IconButton>
+                  {live && (
+                    <IconButton label={`Share ${p.name}`} onClick={() => actions.onShare(p.id)}>
+                      <Icon d={ICON.share} size={15} />
+                    </IconButton>
+                  )}
+                  {!live && (
+                    <IconButton label={`Edit details of ${p.name}`} onClick={() => actions.onEdit(p)}>
+                      <Icon d={ICON.pencil} size={15} />
+                    </IconButton>
+                  )}
                   {live ? (
                     <a
                       href={previewPath(p.id)}
@@ -1015,120 +1082,153 @@ function List({ portfolios, actions }: { portfolios: Portfolio[]; actions: Actio
 
 /* ── the actions menu ─────────────────────────────────────────────────── */
 
+/** Where an open menu sits, in window coordinates. */
+type MenuSpot = { right: number; top?: number; bottom?: number };
+
+const MENU_ROOM = 280;
+
+/**
+ * The ••• menu.
+ *
+ * Portaled to the body and placed against the window, not the card: every
+ * card is animated, so each is its own stacking context, and a menu drawn
+ * inside one was painted under the next card in the grid however high its
+ * z-index. It opens upward when there is no room below, and closes on
+ * scroll or resize rather than drifting away from its button.
+ */
 function CardMenu({ portfolio: p, actions }: { portfolio: Portfolio; actions: Actions }) {
-  const [open, setOpen] = useState(false);
+  const [spot, setSpot] = useState<MenuSpot | null>(null);
   const ref = useRef<HTMLDivElement>(null);
+  const menu = useRef<HTMLDivElement>(null);
   const live = p.status === "live";
+  const open = spot !== null;
+
+  function toggle() {
+    if (open || !ref.current) {
+      setSpot(null);
+      return;
+    }
+    const r = ref.current.getBoundingClientRect();
+    const right = window.innerWidth - r.right;
+    const up = r.bottom + MENU_ROOM > window.innerHeight && r.top > MENU_ROOM;
+    setSpot(up ? { right, bottom: window.innerHeight - r.top + 6 } : { right, top: r.bottom + 6 });
+  }
 
   useEffect(() => {
     if (!open) return;
     function onDown(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+      const t = e.target as Node;
+      if (ref.current?.contains(t) || menu.current?.contains(t)) return;
+      setSpot(null);
     }
     function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape") setOpen(false);
+      if (e.key === "Escape") setSpot(null);
     }
+    const shut = () => setSpot(null);
     document.addEventListener("mousedown", onDown);
     document.addEventListener("keydown", onKey);
+    window.addEventListener("scroll", shut, { passive: true });
+    window.addEventListener("resize", shut);
     return () => {
       document.removeEventListener("mousedown", onDown);
       document.removeEventListener("keydown", onKey);
+      window.removeEventListener("scroll", shut);
+      window.removeEventListener("resize", shut);
     };
   }, [open]);
 
   const item =
     "flex w-full cursor-pointer items-center gap-2.5 rounded-md px-2.5 py-2 text-left text-[13.5px] no-underline transition-colors hover:bg-[var(--color-neutral-200)]";
-  const close = () => setOpen(false);
+  const close = () => setSpot(null);
   const run = (fn: () => void) => () => {
     close();
     fn();
   };
 
   return (
-    <div ref={ref} className="relative flex-none">
-      <IconButton label={`More actions for ${p.name}`} onClick={() => setOpen((v) => !v)}>
+    <div ref={ref} className="relative flex-none" data-menu-open={open ? "" : undefined}>
+      <IconButton label={`More actions for ${p.name}`} onClick={toggle}>
         <Icon d={ICON.more} size={18} />
       </IconButton>
-      <AnimatePresence>
-        {open && (
-          <motion.div
-            role="menu"
-            initial={{ opacity: 0, scale: 0.95, y: -4 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.95, y: -4, transition: { duration: 0.1 } }}
-            transition={{ duration: 0.16, ease: EASE }}
-            className="absolute top-9 right-0 z-30 w-[220px] origin-top-right rounded-xl p-1"
-            style={{
-              background: "var(--color-bg)",
-              border: "1px solid var(--color-divider)",
-              boxShadow: "var(--shadow-lg)",
-            }}
-          >
-            {/* A live page is frozen — the API refuses every edit — so the
-                editing entries and delete only appear on a draft. */}
-            {!live && (
-              <>
-                <Link role="menuitem" href={`/builder/${p.id}`} className={item} style={{ color: "var(--color-ink)" }} onClick={close}>
-                  Open builder
+      {createPortal(
+        <AnimatePresence>
+          {spot && (
+            <motion.div
+              ref={menu}
+              role="menu"
+              initial={{ opacity: 0, scale: 0.95, y: spot.top !== undefined ? -4 : 4 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, transition: { duration: 0.1 } }}
+              transition={{ duration: 0.16, ease: EASE }}
+              className={`fixed z-50 w-[220px] rounded-xl p-1 ${spot.top !== undefined ? "origin-top-right" : "origin-bottom-right"}`}
+              style={{
+                top: spot.top,
+                bottom: spot.bottom,
+                right: spot.right,
+                background: "var(--color-bg)",
+                border: "1px solid var(--color-divider)",
+                boxShadow: "var(--shadow-lg)",
+              }}
+            >
+              {/* A live page is frozen — the API refuses every edit — so its
+                  menu is only what you do with a published page: look at it,
+                  share it, see how it is doing, or take it down to change it.
+                  Editing and delete are for drafts. The resume lives in the
+                  builder's Resume side, not here. */}
+              {!live && (
+                <>
+                  <Link role="menuitem" href={`/builder/${p.id}`} className={item} style={{ color: "var(--color-ink)" }} onClick={close}>
+                    Open builder
+                  </Link>
+                  <Link role="menuitem" href={`/editor/${p.id}`} className={item} style={{ color: "var(--color-ink)" }} onClick={close}>
+                    Edit content
+                  </Link>
+                  <button role="menuitem" type="button" className={item} onClick={run(() => actions.onEdit(p))}>
+                    Edit details…
+                  </button>
+                </>
+              )}
+              <a
+                role="menuitem"
+                href={previewPath(p.id)}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={item}
+                style={{ color: "var(--color-ink)" }}
+                onClick={close}
+              >
+                Preview
+              </a>
+              {live && (
+                <button role="menuitem" type="button" className={item} onClick={run(() => actions.onShare(p.id))}>
+                  Share…
+                </button>
+              )}
+              {/* A draft has no visitors, so nothing to count yet. */}
+              {live && (
+                <Link role="menuitem" href={`/stats?p=${p.id}`} className={item} style={{ color: "var(--color-ink)" }} onClick={close}>
+                  Views and clicks
                 </Link>
-                <Link role="menuitem" href={`/editor/${p.id}`} className={item} style={{ color: "var(--color-ink)" }} onClick={close}>
-                  Edit content
-                </Link>
-              </>
-            )}
-            <button role="menuitem" type="button" className={item} onClick={run(() => actions.onEdit(p))}>
-              Edit details…
-            </button>
-            <a
-              role="menuitem"
-              href={previewPath(p.id)}
-              target="_blank"
-              rel="noopener noreferrer"
-              className={item}
-              style={{ color: "var(--color-ink)" }}
-              onClick={close}
-            >
-              Preview
-            </a>
-            <button role="menuitem" type="button" className={item} onClick={run(() => actions.onShare(p.id))}>
-              Share…
-            </button>
-            <Link role="menuitem" href={`/stats?p=${p.id}`} className={item} style={{ color: "var(--color-ink)" }} onClick={close}>
-              Views and clicks
-            </Link>
-            <div className="my-1 h-px" style={{ background: "var(--color-divider)" }} />
-            {/* The resume is not on the page, so these stay open while it is live. */}
-            <Link role="menuitem" href={`/builder/${p.id}?mode=resume`} className={item} style={{ color: "var(--color-ink)" }} onClick={close}>
-              Resume templates
-            </Link>
-            <a
-              role="menuitem"
-              href={`/resume/${p.id}?print=1`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className={item}
-              style={{ color: "var(--color-ink)" }}
-              onClick={close}
-            >
-              Download resume (PDF)
-            </a>
-            <div className="my-1 h-px" style={{ background: "var(--color-divider)" }} />
-            <button
-              role="menuitem"
-              type="button"
-              className={item}
-              onClick={run(() => (live ? actions.onUnpublish(p.id) : actions.onPublish(p.id)))}
-            >
-              {live ? "Unpublish" : "Publish"}
-            </button>
-            {!live && (
-              <button role="menuitem" type="button" className={`${item} font-medium`} onClick={run(() => actions.onDelete(p))}>
-                Delete…
+              )}
+              <div className="my-1 h-px" style={{ background: "var(--color-divider)" }} />
+              <button
+                role="menuitem"
+                type="button"
+                className={item}
+                onClick={run(() => (live ? actions.onUnpublish(p.id) : actions.onPublish(p.id)))}
+              >
+                {live ? "Unpublish" : "Publish"}
               </button>
-            )}
-          </motion.div>
-        )}
-      </AnimatePresence>
+              {!live && (
+                <button role="menuitem" type="button" className={`${item} font-medium`} onClick={run(() => actions.onDelete(p))}>
+                  Delete…
+                </button>
+              )}
+            </motion.div>
+          )}
+        </AnimatePresence>,
+        document.body,
+      )}
     </div>
   );
 }

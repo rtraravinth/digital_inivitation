@@ -4,7 +4,7 @@ import { AnimatePresence, motion } from "motion/react";
 import Link from "next/link";
 import { useState } from "react";
 import { QrCode } from "./QrCode";
-import { ICON, Icon, Modal, StatusPill } from "./ui";
+import { ICON, Icon, Modal } from "./ui";
 import { useAccount } from "@/lib/account";
 import { LinkIcon, iconFor } from "@/lib/icons";
 import { displayUrl, liveUrl } from "@/lib/slug";
@@ -13,6 +13,9 @@ import type { Portfolio } from "@/lib/types";
 /**
  * Sharing one page: its address, a code a phone can scan, and the places
  * people actually paste it. Rendered inside an `<AnimatePresence>`.
+ *
+ * Only live pages are offered: a draft's address answers 404 until it is
+ * published, so there is nothing to send.
  *
  * Every link here is the page's real address — the route that serves it.
  * It used to be built from the facet.page vanity domain, which serves
@@ -32,14 +35,12 @@ export function ShareDialog({
   const [note, setNote] = useState("");
   const [copied, setCopied] = useState(false);
 
-  // Live pages first: they are the ones a link can open.
-  const ordered = [...portfolios].sort((a, b) => Number(b.status === "live") - Number(a.status === "live"));
-  const p = portfolios.find((x) => x.id === id) ?? ordered[0];
+  const shareable = portfolios.filter((x) => x.status === "live");
+  const p = shareable.find((x) => x.id === id) ?? shareable[0];
   if (!p) return null;
 
-  const live = p.status === "live";
   const url = handle ? liveUrl(handle, p.slug) : "";
-  const canShare = live && !!url;
+  const canShare = !!url;
   const signature = `${p.header.name || p.name}\n${p.header.current}\n${url}`;
   const nativeShare = typeof navigator !== "undefined" && typeof navigator.share === "function";
 
@@ -98,14 +99,13 @@ export function ShareDialog({
   return (
     <Modal title="Share your page" description="Send people straight to it." onClose={onClose} width={520}>
       <div className="flex flex-col gap-4">
-        {portfolios.length > 1 && (
+        {shareable.length > 1 && (
           <div className="field">
             <label htmlFor="share-page">Page</label>
             <select id="share-page" className="input" value={p.id} onChange={(e) => setId(e.target.value)}>
-              {ordered.map((x) => (
+              {shareable.map((x) => (
                 <option key={x.id} value={x.id}>
                   {x.name}
-                  {x.status === "live" ? "" : " — draft"}
                 </option>
               ))}
             </select>
@@ -118,14 +118,6 @@ export function ShareDialog({
             <Link href="/account" className="font-medium underline underline-offset-2" style={{ color: "var(--color-ink)" }}>
               Choose a handle
             </Link>
-          </Notice>
-        ) : !live ? (
-          <Notice>
-            <span className="mb-1 flex items-center gap-2">
-              <StatusPill live={false} />
-            </span>
-            This page isn’t published, so its link won’t open for anyone yet. Publish it from its
-            card on Portfolios, then share it.
           </Notice>
         ) : null}
 

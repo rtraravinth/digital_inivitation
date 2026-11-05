@@ -239,7 +239,7 @@ async def test_patch_accepts_every_theme(auth_client, portfolio, theme):
     assert response.json()["theme"] == theme
 
 
-@pytest.mark.parametrize("theme", ["arcade", "journey"])
+@pytest.mark.parametrize("theme", ["arcade", "journey", "bio"])
 async def test_patch_accepts_new_themes(auth_client, portfolio, theme):
     """The motion-theme set: these two have no catalogue predecessor."""
     response = await auth_client.patch(

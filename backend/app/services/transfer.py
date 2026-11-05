@@ -12,11 +12,12 @@ import binascii
 import re
 from typing import Any
 
+from pydantic import TypeAdapter, ValidationError
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.errors import AppError, ValidationFailed
-from app.models import Asset, Portfolio, PortfolioHeader, Section, User
+from app.models import Asset, Portfolio, PortfolioHeader, Section, SectionImage, User
 from app.models.enums import (
     DEFAULT_ACCENT,
     DEFAULT_TAB,
@@ -24,12 +25,16 @@ from app.models.enums import (
     FONTS,
     GROUNDS,
     LEGACY_THEMES,
+    SECTION_BLOCKS_MAX,
+    SECTION_IMAGES_MAX,
     STATUSES,
     TAB_MAX_LENGTH,
     THEMES,
 )
 from app.models.portfolio import default_layout
 from app.schemas.asset import asset_out
+from app.schemas.blocks import Block
+from app.schemas.portfolio import Footer
 from app.schemas.resume import resume_from_stored
 from app.schemas.transfer import ImportResultOut
 from app.services.asset import AssetService
@@ -79,6 +84,7 @@ class TransferService:
                 "dates": list(header.dates or []),
                 "portrait": _asset_dict(header.portrait),
             },
+            "footer": dict(portfolio.footer or {}),
             "sections": [
                 {
                     "id": str(section.id),
@@ -89,8 +95,9 @@ class TransferService:
                     "quote": section.quote,
                     "hidden": section.hidden,
                     "onResume": section.on_resume,
-                    "image": _asset_dict(section.image),
+                    "images": [_asset_dict(image.asset) for image in section.images],
                     "file": _asset_dict(section.file),
+                    "blocks": list(section.blocks or []),
                 }
                 for section in portfolio.sections
             ],
@@ -166,6 +173,7 @@ class TransferService:
             # An export from before resumes existed has none; an invalid one
             # lands on the defaults rather than failing the whole import.
             resume=resume_from_stored(raw.get("resume")).model_dump(by_alias=True),
+            footer=_footer_of(raw.get("footer")),
         )
 
         portfolio.header = PortfolioHeader(
@@ -189,8 +197,12 @@ class TransferService:
                 quote=section.get("quote"),
                 hidden=bool(section.get("hidden")),
                 on_resume=bool(section.get("onResume", True)),
-                image_asset_id=await self._restore_asset(user, section.get("image")),
                 file_asset_id=await self._restore_asset(user, section.get("file")),
+                blocks=_blocks_of(section),
+                images=[
+                    SectionImage(asset_id=asset_id, position=position)
+                    for position, asset_id in enumerate(await self._restore_images(user, section))
+                ],
             )
             for index, section in enumerate(sections_raw)
         ]
@@ -198,6 +210,19 @@ class TransferService:
         self.session.add(portfolio)
         await self.session.flush()
         return portfolio
+
+    async def _restore_images(self, user: User, section: dict[str, Any]) -> list:
+        """A section's pictures, from ``images`` or an older export's single
+        ``image``. Unreadable ones drop out; repeats are kept once."""
+        raw = section.get("images")
+        if not isinstance(raw, list):
+            raw = [section.get("image")]
+        restored = []
+        for item in raw:
+            asset_id = await self._restore_asset(user, item)
+            if asset_id is not None and asset_id not in restored:
+                restored.append(asset_id)
+        return restored[:SECTION_IMAGES_MAX]
 
     async def _restore_asset(self, user: User, raw: Any):
         """Reattach an asset from an export.
@@ -262,6 +287,28 @@ class _MemoryUpload:
         chunk = self._data[self._offset : end]
         self._offset = end
         return chunk
+
+
+_BLOCK = TypeAdapter(Block)
+
+
+def _blocks_of(section: dict[str, Any]) -> list[dict[str, Any]]:
+    """The components that validate. One malformed component is dropped
+    rather than failing the import of everything around it."""
+    kept = []
+    for raw in section.get("blocks") or []:
+        try:
+            kept.append(_BLOCK.validate_python(raw).model_dump(by_alias=True))
+        except ValidationError:
+            continue
+    return kept[:SECTION_BLOCKS_MAX]
+
+
+def _footer_of(raw: Any) -> dict[str, Any]:
+    try:
+        return Footer.model_validate(raw or {}).model_dump(by_alias=True)
+    except ValidationError:
+        return {}
 
 
 def _tab_of(section: dict[str, Any]) -> str:

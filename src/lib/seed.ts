@@ -7,7 +7,7 @@ import {
 } from "./types";
 
 /** Optional fields fall back to the defaults in normalize(). */
-type Opt = "image" | "file" | "quote" | "hidden" | "onResume";
+type Opt = "images" | "file" | "quote" | "blocks" | "hidden" | "onResume";
 type SeedSection = Omit<Section, Opt> & Partial<Pick<Section, Opt>>;
 
 type HeaderOpt = "portrait" | "numbers" | "dates";
@@ -16,10 +16,10 @@ type SeedHeader = Omit<PortfolioHeader, HeaderOpt> &
 
 type SeedPortfolio = Omit<
   Portfolio,
-  "theme" | "accent" | "ground" | "groundHex" | "font" | "bodyFont" | "layout" | "resume" | "sections" | "header"
+  "theme" | "accent" | "ground" | "groundHex" | "font" | "bodyFont" | "layout" | "resume" | "sections" | "header" | "footer"
 > &
   Partial<
-    Pick<Portfolio, "theme" | "accent" | "ground" | "groundHex" | "font" | "bodyFont" | "layout">
+    Pick<Portfolio, "theme" | "accent" | "ground" | "groundHex" | "font" | "bodyFont" | "layout" | "footer">
   > & {
     /** Only the full page carries one; normalize() gives the rest the defaults. */
     resume?: Partial<Resume>;
@@ -183,6 +183,19 @@ const RAW: SeedPortfolio[] = [
           { id: "s1l1", label: "Company", url: "northwell.in", icon: "globe" },
           { id: "s1l2", label: "Press", url: "northwell.in/press", icon: "document" },
         ],
+        blocks: [
+          {
+            id: "s1b1",
+            type: "timeline",
+            title: "How it grew",
+            items: [
+              { id: "s1t1", date: "2019", title: "One kitchen, two brands", text: "A rented facility in HSR Layout and a biryani menu we still run." },
+              { id: "s1t2", date: "2021", title: "Four facilities", text: "Expanded across the city during the delivery boom, without outside money." },
+              { id: "s1t3", date: "2022", title: "Profitable", text: "Every brand pays for itself; the weakest two were closed rather than subsidised." },
+              { id: "s1t4", date: "2024", title: "Eleven brands", text: "Forty-two people on payroll and a training kitchen of our own." },
+            ],
+          },
+        ],
       },
       {
         id: "s2",
@@ -208,6 +221,18 @@ const RAW: SeedPortfolio[] = [
           text: "The only letter about money my parents actually finish.",
           attribution: "A subscriber, unprompted",
         },
+        blocks: [
+          {
+            id: "s3b2",
+            type: "stats",
+            title: "",
+            items: [
+              { id: "s3n1", value: "82", label: "Issues" },
+              { id: "s3n2", value: "14,200", label: "Subscribers" },
+              { id: "s3n3", value: "61%", label: "Open rate" },
+            ],
+          },
+        ],
       },
       {
         id: "s4",
@@ -223,6 +248,38 @@ const RAW: SeedPortfolio[] = [
             icon: "document",
           },
           { id: "s4l2", label: "Book an intro call", url: "cal.com/rohanmehta" },
+        ],
+        blocks: [
+          {
+            id: "s4b1",
+            type: "services",
+            title: "What I offer",
+            items: [
+              { id: "s4v1", title: "Financial plan", text: "A written plan for your household: goals, insurance, investments and tax, reviewed with you in two sessions.", price: "₹45,000 one-time" },
+              { id: "s4v2", title: "Ongoing advice", text: "Quarterly reviews, rebalancing calls and a WhatsApp line for the questions in between.", price: "₹90,000 a year" },
+              { id: "s4v3", title: "Second opinion", text: "One session on a portfolio or a policy you already hold, with a written note after.", price: "₹8,000" },
+            ],
+          },
+          {
+            id: "s4b2",
+            type: "tabs",
+            title: "How it works",
+            items: [
+              { id: "s4a1", label: "First call", text: "Thirty minutes, free. We talk about where you are and whether I am the right adviser. Often I am not, and I will say so." },
+              { id: "s4a2", label: "The plan", text: "Two working sessions and a written plan within three weeks. Every recommendation says what it costs you and why." },
+              { id: "s4a3", label: "After", text: "You implement on your own platforms; I never hold your money. Reviews every quarter, more often in a bad year." },
+            ],
+          },
+          {
+            id: "s4b3",
+            type: "faq",
+            title: "Questions families ask",
+            items: [
+              { id: "s4f1", question: "Do you earn commissions?", answer: "No. I am fee-only: the fee is the whole of what I earn, so no product I suggest pays me anything." },
+              { id: "s4f2", question: "Do you work outside Bengaluru?", answer: "Yes. Most sessions are on video; about a third of the families I advise live in other cities." },
+              { id: "s4f3", question: "Is there a minimum portfolio size?", answer: "No minimum. The plan is about the household, not the size of the portfolio." },
+            ],
+          },
         ],
       },
       {
@@ -250,7 +307,39 @@ const RAW: SeedPortfolio[] = [
           { id: "s6l1", label: "Trust", url: "sanjeevanitrust.org", icon: "globe" },
         ],
       },
+      {
+        id: "s7",
+        title: "Work with me",
+        description:
+          "Advisory enquiries, speaking at your company or a conversation about the businesses. I read everything and answer within two working days.",
+        tab: "Contact",
+        links: [],
+        onResume: false,
+        blocks: [
+          {
+            id: "s7b1",
+            type: "contact",
+            title: "Get in touch",
+            text: "Write a line about what you need and I will come back with a time.",
+            email: "rohan@slowcompounding.in",
+            phone: "+91 98450 12345",
+            location: "Indiranagar, Bengaluru",
+            ctaLabel: "Book an intro call",
+            ctaUrl: "cal.com/rohanmehta",
+            form: true,
+          },
+        ],
+      },
     ],
+    footer: {
+      headline: "Let’s talk about your money, or your kitchen.",
+      text: "Four new advisory families a year, and a standing coffee for anyone building a food business in Bengaluru.",
+      ctaLabel: "Email Rohan",
+      ctaUrl: "mailto:rohan@slowcompounding.in",
+      links: [{ id: "f1", label: "The letter", url: "slowcompounding.in", icon: "globe" }],
+      note: "© 2026 Rohan Mehta · Bengaluru",
+      showHeaderLinks: true,
+    },
   },
   {
     id: "investors",

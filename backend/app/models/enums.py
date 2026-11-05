@@ -10,8 +10,8 @@ from __future__ import annotations
 
 from typing import Final, Literal
 
-ThemeId = Literal["aurora", "meridian", "stage", "arcade", "journey"]
-THEMES: Final[tuple[str, ...]] = ("aurora", "meridian", "stage", "arcade", "journey")
+ThemeId = Literal["aurora", "meridian", "stage", "arcade", "journey", "bio"]
+THEMES: Final[tuple[str, ...]] = ("aurora", "meridian", "stage", "arcade", "journey", "bio")
 
 #: The theme a new portfolio opens on, and the fallback for an unknown one.
 DEFAULT_THEME: Final[str] = "aurora"
@@ -129,3 +129,21 @@ TAB_MAX_LENGTH: Final[int] = 60
 def sql_in(values: tuple[str, ...]) -> str:
     """Render a tuple as a SQL IN list for a CheckConstraint."""
     return ", ".join(f"'{value}'" for value in values)
+
+
+#: The components a section can carry under its own four fields. Each one is a
+#: shape a visitor recognises from public portfolio pages — a timeline, a wall
+#: of client names, quotes from people the author worked with. Mirrors
+#: BLOCK_TYPES in src/lib/types.ts.
+BlockType = Literal[
+    "timeline", "testimonials", "clients", "tabs", "stats", "services", "faq", "contact",
+]
+BLOCK_TYPES: Final[tuple[str, ...]] = (
+    "timeline", "testimonials", "clients", "tabs", "stats", "services", "faq", "contact",
+)
+
+#: How many images one section may carry, and how many components. Generous
+#: for a portfolio entry; there to stop a runaway client, not to ration anyone.
+SECTION_IMAGES_MAX: Final[int] = 12
+SECTION_BLOCKS_MAX: Final[int] = 12
+BLOCK_ITEMS_MAX: Final[int] = 40

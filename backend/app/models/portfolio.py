@@ -122,6 +122,13 @@ class Portfolio(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     resume: Mapped[dict[str, Any]] = mapped_column(
         JSONB, nullable=False, default=dict, server_default="{}"
     )
+    # The page's closing band: a call to action, a line of text, its own
+    # links and a small print line. ``{}`` validates to the defaults, so a
+    # portfolio that never opened the footer card still gets one built from
+    # the header. See app/schemas/portfolio.py.
+    footer: Mapped[dict[str, Any]] = mapped_column(
+        JSONB, nullable=False, default=dict, server_default="{}"
+    )
 
     published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
@@ -187,6 +194,13 @@ class Section(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     tab: Mapped[str] = mapped_column(String(60), nullable=False, default=DEFAULT_TAB)
     links: Mapped[list[dict[str, Any]]] = mapped_column(JSONB, nullable=False, default=list)
     quote: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
+    #: Components under the four fields — a timeline, testimonials, a client
+    #: wall. Validated as a discriminated union in app/schemas/blocks.py; JSONB
+    #: because they are always read with their section and never queried.
+    #: None of them references an upload, so asset release never looks here.
+    blocks: Mapped[list[dict[str, Any]]] = mapped_column(
+        JSONB, nullable=False, default=list, server_default="[]"
+    )
 
     # Hidden sections stay in the document and drop off the published page.
     hidden: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
@@ -196,13 +210,41 @@ class Section(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         Boolean, nullable=False, default=True, server_default="true"
     )
 
-    image_asset_id: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("assets.id", ondelete="SET NULL"), nullable=True
-    )
     file_asset_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("assets.id", ondelete="SET NULL"), nullable=True
     )
 
     portfolio: Mapped[Portfolio] = relationship(back_populates="sections")
-    image: Mapped[Asset | None] = relationship(foreign_keys=[image_asset_id], lazy="selectin")
     file: Mapped[Asset | None] = relationship(foreign_keys=[file_asset_id], lazy="selectin")
+    #: The section's pictures, in order. A table rather than a JSONB list of
+    #: ids: every upload reference is a foreign key, so asset release and the
+    #: public asset route keep asking one kind of question.
+    images: Mapped[list[SectionImage]] = relationship(
+        back_populates="section",
+        cascade="all, delete-orphan",
+        order_by="SectionImage.position",
+        lazy="selectin",
+    )
+
+
+class SectionImage(UUIDPrimaryKeyMixin, Base):
+    """One picture on a section, at a position."""
+
+    __tablename__ = "section_images"
+    __table_args__ = (
+        CheckConstraint("position >= 0", name="position_is_not_negative"),
+        UniqueConstraint("section_id", "position", name="uq_section_images_section_id_position"),
+    )
+
+    section_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("sections.id", ondelete="CASCADE"),
+        nullable=False, index=True,
+    )
+    asset_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("assets.id", ondelete="CASCADE"),
+        nullable=False, index=True,
+    )
+    position: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+
+    section: Mapped[Section] = relationship(back_populates="images")
+    asset: Mapped[Asset] = relationship(lazy="selectin")

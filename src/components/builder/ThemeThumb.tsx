@@ -84,6 +84,14 @@ export function ThemeThumb({
           <span className="thumb-ring fx-loop" />
         </>
       )}
+      {theme === "bio" && (
+        <>
+          <span className="thumb-bio-face" />
+          {[0, 1, 2, 3].map((i) => (
+            <span key={i} className="thumb-bio-link" style={{ top: `${46 + i * 13}%`, opacity: 1 - i * 0.15 }} />
+          ))}
+        </>
+      )}
     </span>
   );
 }

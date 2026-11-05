@@ -227,6 +227,7 @@ function updatePortfolio(id: string, recipe: (p: Portfolio) => Portfolio) {
             font: after.font,
             bodyFont: after.bodyFont,
             layout: after.layout,
+            footer: after.footer,
           }),
         );
       }
@@ -288,7 +289,8 @@ function coreChanged(before: Portfolio, after: Portfolio): boolean {
     before.groundHex !== after.groundHex ||
     before.font !== after.font ||
     before.bodyFont !== after.bodyFont ||
-    JSON.stringify(before.layout) !== JSON.stringify(after.layout)
+    JSON.stringify(before.layout) !== JSON.stringify(after.layout) ||
+    JSON.stringify(before.footer) !== JSON.stringify(after.footer)
   );
 }
 
@@ -310,8 +312,10 @@ function sectionPayload(section: Section) {
     quote: section.quote,
     hidden: section.hidden,
     onResume: section.onResume,
-    ...assetFields(section.image, "imageAssetId", "clearImage"),
+    // Uploads without an id are still on their way up and are not sent.
+    imageAssetIds: section.images.flatMap((a) => (a.id ? [a.id] : [])),
     ...assetFields(section.file, "fileAssetId", "clearFile"),
+    blocks: section.blocks,
   };
 }
 

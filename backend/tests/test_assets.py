@@ -141,10 +141,10 @@ async def test_attaching_an_asset_to_a_section_returns_it_nested(auth_client, po
 
     response = await auth_client.patch(
         f"/api/v1/portfolios/{portfolio['id']}/sections/{section_id}",
-        json={"imageAssetId": asset["id"]},
+        json={"imageAssetIds": [asset["id"]]},
     )
     assert response.status_code == 200
-    image = response.json()["image"]
+    image = response.json()["images"][0]
     # Not the whole URL: its signature is minted per response, so two
     # serialisations a second apart carry different tokens for one asset.
     assert image["id"] == asset["id"]
@@ -152,9 +152,9 @@ async def test_attaching_an_asset_to_a_section_returns_it_nested(auth_client, po
 
     cleared = await auth_client.patch(
         f"/api/v1/portfolios/{portfolio['id']}/sections/{section_id}",
-        json={"clearImage": True},
+        json={"imageAssetIds": []},
     )
-    assert cleared.json()["image"] is None
+    assert cleared.json()["images"] == []
 
 
 async def test_attaching_a_portrait_to_the_header(auth_client, portfolio):
@@ -174,7 +174,7 @@ async def test_attaching_another_users_asset_is_404(auth_client, other_auth_clie
 
     response = await auth_client.patch(
         f"/api/v1/portfolios/{portfolio['id']}/sections/{section_id}",
-        json={"imageAssetId": theirs["id"]},
+        json={"imageAssetIds": [theirs["id"]]},
     )
     assert response.status_code == 404
     assert response.json()["error"]["code"] == "asset_not_found"

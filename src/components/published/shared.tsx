@@ -531,7 +531,7 @@ export function Plate({
  * collapsing the line, so two plates' captions stay comparable down a column.
  */
 export function captionCredit(section: Section): [string, string, string] {
-  const medium = section.image
+  const medium = section.images?.[0]
     ? "Reproduction"
     : section.file
       ? "Document"

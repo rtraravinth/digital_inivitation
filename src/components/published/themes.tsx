@@ -4,13 +4,14 @@ import { withPageBlocks } from "@/lib/resume";
 import type { Portfolio } from "@/lib/types";
 import { Arcade } from "./themes/arcade";
 import { Aurora } from "./themes/aurora";
+import { Bio } from "./themes/bio";
 import { Journey } from "./themes/journey";
 import { Meridian } from "./themes/meridian";
 import { Stage } from "./themes/stage";
 
 export * from "./shared";
 export { SectionDetail } from "./section-detail";
-export { Arcade, Aurora, Journey, Meridian, Stage };
+export { Arcade, Aurora, Bio, Journey, Meridian, Stage };
 
 /**
  * Every theme, the builder canvas, the card previews and /print come through
@@ -28,6 +29,8 @@ export function PublishedBody({ p: raw }: { p: Portfolio }) {
       return <Arcade p={p} />;
     case "journey":
       return <Journey p={p} />;
+    case "bio":
+      return <Bio p={p} />;
     default:
       return <Aurora p={p} />;
   }

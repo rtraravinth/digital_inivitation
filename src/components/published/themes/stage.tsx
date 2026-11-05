@@ -30,6 +30,7 @@ import {
   headline,
   visibleSections,
 } from "../shared";
+import { FeatureBand, FooterBody, footerHeadline, footerNote, splitFeatures } from "../components";
 
 /* ── Stage ────────────────────────────────────────────────────────────────
    For people who perform. The portrait is a billboard that fills the first
@@ -148,17 +149,17 @@ export function Stage({ p }: { p: Portfolio }) {
         <Reveal kind="up">
           <Words
             as="h2"
-            text="Get in touch"
-            className="m-0 mb-10"
-            style={{ ...headline("clamp(48px, 9vw, 140px)"), lineHeight: 0.9, letterSpacing: "-0.04em" }}
+            text={footerHeadline(p, "Get in touch")}
+            className="m-0 mb-10 max-w-[16ch]"
+            style={{ ...headline(p.footer.headline ? "clamp(40px, 6.4vw, 104px)" : "clamp(48px, 9vw, 140px)"), lineHeight: 0.92, letterSpacing: "-0.04em" }}
           />
-          <HeaderLinks p={p} />
+          <FooterBody p={p} />
         </Reveal>
         <div
           className="mt-16 flex flex-wrap items-center justify-between gap-4 pt-6"
           style={{ borderTop: "1px solid var(--color-divider)" }}
         >
-          <span className="text-muted text-[13px]">© {p.header.name}</span>
+          <span className="text-muted text-[13px]">{footerNote(p)}</span>
           <a
             href="#top"
             onClick={toTop}
@@ -270,6 +271,8 @@ function Rail({
   all: Section[];
 }) {
   const trackId = `${id}-track`;
+  // Posters for the plain entries; a feature runs as a band under the rail.
+  const { cards, features } = splitFeatures(sections);
 
   // Steps the rail by most of its own width, inside its own document, and
   // never the page: the rail is the only thing that scrolls sideways.
@@ -290,7 +293,7 @@ function Rail({
       <div className="mb-6 flex items-end gap-4 px-5 md:px-12">
         <Words as="h2" text={title} className="m-0" style={{ ...headline("clamp(30px, 4vw, 52px)"), lineHeight: 1 }} />
         <span className="text-muted mb-1.5 text-[13px]">{sections.length}</span>
-        {sections.length > 1 && (
+        {cards.length > 1 && (
           <div className="ml-auto hidden gap-2 md:flex">
             <button
               type="button"
@@ -313,12 +316,13 @@ function Rail({
           </div>
         )}
       </div>
+      {cards.length > 0 && (
       <div
         id={trackId}
         className="fx-rail flex snap-x snap-mandatory gap-4 overflow-x-auto px-5 pt-2 pb-6 md:gap-6 md:px-12"
         style={{ scrollPaddingInline: 20 }}
       >
-        {sections.map((s, i) => (
+        {cards.map((s, i) => (
           <Reveal
             key={s.id}
             kind="flip"
@@ -329,6 +333,12 @@ function Rail({
           </Reveal>
         ))}
       </div>
+      )}
+      {features.map((s) => (
+        <Reveal key={s.id} kind="up" className="px-5 pt-8 md:px-12 md:pt-12">
+          <FeatureBand p={p} section={s} className="fc-card p-6 md:p-12" />
+        </Reveal>
+      ))}
     </section>
   );
 }
@@ -344,8 +354,8 @@ function Poster({ p, section, number }: { p: Portfolio; section: Section; number
             boxShadow: "0 30px 60px -30px color-mix(in srgb, #000 80%, transparent)",
           }}
         >
-          {section.image ? (
-            <Photo asset={section.image} className="absolute inset-0 h-full w-full object-cover" />
+          {section.images[0] ? (
+            <Photo asset={section.images[0]} className="absolute inset-0 h-full w-full object-cover" />
           ) : (
             <div
               aria-hidden

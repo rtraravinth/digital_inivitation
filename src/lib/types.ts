@@ -42,6 +42,123 @@ export function assetSrc(asset: Asset | null | undefined): string | undefined {
 
 export type Quote = { text: string; attribution: string };
 
+/* ── components ───────────────────────────────────────────────────────────
+   What a section can carry under its title, description, links and
+   pictures: the shapes a visitor recognises from public portfolio pages.
+   Mirrors app/schemas/blocks.py. None of them holds an upload — a
+   testimonial shows initials and a client is a wordmark — so every upload
+   reference stays a section picture, a file or the portrait.
+   ──────────────────────────────────────────────────────────────────────── */
+
+export type TimelineItem = { id: string; date: string; title: string; text: string };
+export type TestimonialItem = { id: string; quote: string; name: string; role: string };
+export type ClientItem = { id: string; name: string; url: string };
+export type TabItem = { id: string; label: string; text: string };
+export type StatItem = { id: string; value: string; label: string };
+export type ServiceItem = { id: string; title: string; text: string; price: string };
+export type FaqItem = { id: string; question: string; answer: string };
+
+type BlockBase = { id: string; title: string };
+export type TimelineBlock = BlockBase & { type: "timeline"; items: TimelineItem[] };
+export type TestimonialsBlock = BlockBase & { type: "testimonials"; items: TestimonialItem[] };
+export type ClientsBlock = BlockBase & { type: "clients"; items: ClientItem[] };
+export type TabsBlock = BlockBase & { type: "tabs"; items: TabItem[] };
+export type StatsBlock = BlockBase & { type: "stats"; items: StatItem[] };
+export type ServicesBlock = BlockBase & { type: "services"; items: ServiceItem[] };
+export type FaqBlock = BlockBase & { type: "faq"; items: FaqItem[] };
+/** The visitor's form composes an email in their own mail app — this build
+ *  has no mail service, so nothing is sent or stored by the server. */
+export type ContactBlock = BlockBase & {
+  type: "contact";
+  text: string;
+  email: string;
+  phone: string;
+  location: string;
+  ctaLabel: string;
+  ctaUrl: string;
+  form: boolean;
+};
+
+export type Block =
+  | TimelineBlock
+  | TestimonialsBlock
+  | ClientsBlock
+  | TabsBlock
+  | StatsBlock
+  | ServicesBlock
+  | FaqBlock
+  | ContactBlock;
+export type BlockType = Block["type"];
+
+/** Every component, in the order the "Add a component" menu offers them. */
+export const BLOCK_TYPES: Array<{ id: BlockType; name: string; desc: string }> = [
+  { id: "timeline", name: "Timeline", desc: "Milestones in order — a career, a project, a year." },
+  { id: "testimonials", name: "Testimonials", desc: "What clients and colleagues say about you." },
+  { id: "clients", name: "Clients", desc: "A wall of the names you have worked with." },
+  { id: "tabs", name: "Tabs", desc: "A few short panels a visitor switches between." },
+  { id: "stats", name: "Numbers", desc: "Two to four figures that make the point." },
+  { id: "services", name: "Services", desc: "What you offer, with a price if you like." },
+  { id: "faq", name: "Questions", desc: "The questions people ask before they reach out." },
+  { id: "contact", name: "Contact", desc: "Email, phone, a booking link and a message form." },
+];
+
+/** Mirrors SECTION_IMAGES_MAX / SECTION_BLOCKS_MAX on the API. */
+export const SECTION_IMAGES_MAX = 12;
+export const SECTION_BLOCKS_MAX = 12;
+
+/** A fresh component of a type, with one empty item so the form has a row. */
+export function emptyBlock(type: BlockType, id: string, itemId: string): Block {
+  const base = { id, title: "" };
+  switch (type) {
+    case "timeline":
+      return { ...base, type, items: [{ id: itemId, date: "", title: "", text: "" }] };
+    case "testimonials":
+      return { ...base, type, items: [{ id: itemId, quote: "", name: "", role: "" }] };
+    case "clients":
+      return { ...base, type, items: [{ id: itemId, name: "", url: "" }] };
+    case "tabs":
+      return { ...base, type, items: [{ id: itemId, label: "", text: "" }] };
+    case "stats":
+      return { ...base, type, items: [{ id: itemId, value: "", label: "" }] };
+    case "services":
+      return { ...base, type, items: [{ id: itemId, title: "", text: "", price: "" }] };
+    case "faq":
+      return { ...base, type, items: [{ id: itemId, question: "", answer: "" }] };
+    case "contact":
+      return { ...base, type, text: "", email: "", phone: "", location: "", ctaLabel: "", ctaUrl: "", form: true };
+  }
+}
+
+/** Whether a component has anything a visitor would see. Empty ones stay in
+ *  the editor and off the page, the same as an empty section field. */
+export function componentHasContent(b: Block): boolean {
+  if (b.type === "contact") return Boolean(b.email || b.phone || b.location || b.ctaUrl || b.text);
+  const items = b.items as Array<Record<string, string>>;
+  return items.some((item) => Object.entries(item).some(([k, v]) => k !== "id" && typeof v === "string" && v.trim()));
+}
+
+/* ── the footer ───────────────────────────────────────────────────────── */
+
+/**
+ * The page's closing band. Every field is optional: an empty footer falls
+ * back to the header's name and links, so a page whose author never opened
+ * the footer card still ends properly. Mirrors `Footer` in
+ * app/schemas/portfolio.py.
+ */
+export type Footer = {
+  headline: string;
+  text: string;
+  ctaLabel: string;
+  ctaUrl: string;
+  links: LinkItem[];
+  note: string;
+  showHeaderLinks: boolean;
+};
+
+export function emptyFooter(): Footer {
+  return { headline: "", text: "", ctaLabel: "", ctaUrl: "", links: [], note: "", showHeaderLinks: true };
+}
+
 /**
  * What a section files under when the page has no tabs yet. Mirrors
  * DEFAULT_TAB in backend/app/models/enums.py.
@@ -52,8 +169,9 @@ export const DEFAULT_TAB = "Work";
 export const TAB_MAX_LENGTH = 60;
 
 /**
- * Every section is the same four fields — title, description, tab, links —
- * so there is nothing to learn twice. Everything below that is opt-in.
+ * Every section is the same fields — title, description, tab, links and its
+ * pictures — so there is nothing to learn twice. Components and the rest
+ * below that are opt-in.
  *
  * `tab` is the exception: a visitor reaches a section through its tab and
  * nowhere else, so it is required and never blank. One tab per section, and
@@ -68,9 +186,12 @@ export type Section = {
   description: string;
   tab: string;
   links: LinkItem[];
-  image: Asset | null;
+  /** In order; the first is the cover a theme leads with. */
+  images: Asset[];
   file: Asset | null;
   quote: Quote | null;
+  /** Timeline, testimonials, clients, tabs… under the section's own fields. */
+  blocks: Block[];
   /** Hidden sections stay in the document and off the published page. */
   hidden: boolean;
   /** Prints on the resume, under its tab as the heading. Independent of
@@ -106,7 +227,7 @@ export type PortfolioStatus = "live" | "draft" | "empty";
  * Stage's showreel rails, Arcade's perspective grid, Journey's stacking
  * cards. Mirrors THEMES in backend/app/models/enums.py.
  */
-export type ThemeId = "aurora" | "meridian" | "stage" | "arcade" | "journey";
+export type ThemeId = "aurora" | "meridian" | "stage" | "arcade" | "journey" | "bio";
 
 export type Ground = "light" | "dark" | "paper";
 export type FontId =
@@ -196,6 +317,14 @@ export const THEMES: Array<{
     long: "A friendly page told as a story: each piece of work is a card that stacks on the last as you scroll. For impact, study and growth.",
     depth: "Tags ring the portrait in a slow 3D orbit; cards stack and settle back as you read.",
     professions: ["student", "social"],
+  },
+  {
+    id: "bio",
+    name: "Bio",
+    desc: "One page of links, nothing else",
+    long: "Your photo, your name and a stack of link buttons — the page people already know from bio links. Sections, numbers and the timeline stay off it, whatever you have filled in.",
+    depth: "Buttons lift under the pointer; the photo sits in a soft halo of your accent.",
+    professions: [],
   },
 ];
 
@@ -569,6 +698,7 @@ export type Portfolio = {
   /** The document this portfolio downloads as. Never on the published page. */
   resume: Resume;
   header: PortfolioHeader;
+  footer: Footer;
   sections: Section[];
 };
 
@@ -625,16 +755,26 @@ export function normalize(p: Portfolio): Portfolio {
       numbers: p.header?.numbers ?? [],
       dates: p.header?.dates ?? [],
     },
-    sections: (p.sections ?? []).map((s) => ({
+    footer: { ...emptyFooter(), ...(p.footer ?? {}), links: p.footer?.links ?? [] },
+    sections: (p.sections ?? []).map((s) => sectionOf(s)),
+  };
+}
+
+/** One section from any build: a single `image` from before pictures were a
+ *  list becomes the first picture. */
+function sectionOf(raw: Section & { image?: Asset | null }): Section {
+  const { image, ...s } = raw;
+  return {
       ...emptySection(s.id),
       ...s,
+      images: s.images ?? (image ? [image] : []),
+      blocks: s.blocks ?? [],
       links: s.links ?? [],
       // A section written before tabs existed carries none. It would be
       // unreachable with a blank one, so it lands on the default.
       tab: s.tab?.trim() || DEFAULT_TAB,
       hidden: s.hidden ?? false,
       onResume: s.onResume ?? true,
-    })),
   };
 }
 
@@ -666,9 +806,10 @@ export function emptySection(id: string): Section {
     description: "",
     tab: DEFAULT_TAB,
     links: [],
-    image: null,
+    images: [],
     file: null,
     quote: null,
+    blocks: [],
     hidden: false,
     onResume: true,
   };

@@ -31,6 +31,7 @@ import {
   tabs,
   useTabFilter,
 } from "../shared";
+import { FeatureBand, FooterBody, footerHeadline, footerNote, splitFeatures } from "../components";
 
 /* ── Meridian ─────────────────────────────────────────────────────────────
    For the people a visitor has to trust before anything else: a doctor, an
@@ -136,12 +137,13 @@ export function Meridian({ p }: { p: Portfolio }) {
                   <div key={c.tab}>
                     <ChapterHead index={ci} title={c.tab} count={c.sections.length} />
                     <div className={`grid gap-5 ${gridCols(p)}`}>
-                      {c.sections.map((s, i) => (
+                      {splitFeatures(c.sections).cards.map((s, i) => (
                         <Reveal key={s.id} kind="flip" delay={Math.min(i, 6) * 70}>
                           <Entry p={p} section={s} />
                         </Reveal>
                       ))}
                     </div>
+                    <Bands p={p} sections={splitFeatures(c.sections).features} afterCards={splitFeatures(c.sections).cards.length > 0} />
                   </div>
                 ))}
               </div>
@@ -157,13 +159,14 @@ export function Meridian({ p }: { p: Portfolio }) {
                 <div className="min-w-0">
                   <div className={`grid gap-5 ${gridCols(p)}`} style={{ perspective: 1400 }}>
                     <AnimatePresence mode="popLayout" initial={false}>
-                      {shown.map((s, i) => (
+                      {splitFeatures(shown).cards.map((s, i) => (
                         <Turn key={s.id} index={i}>
                           <Entry p={p} section={s} />
                         </Turn>
                       ))}
                     </AnimatePresence>
                   </div>
+                  <Bands p={p} sections={splitFeatures(shown).features} afterCards={splitFeatures(shown).cards.length > 0} key={tab} />
                 </div>
               </div>
             )}
@@ -206,11 +209,14 @@ export function Meridian({ p }: { p: Portfolio }) {
             <span className="mono-label" style={{ color: "var(--color-mark)" }}>
               Contact
             </span>
-            <h2 className="mt-3 mb-0" style={{ ...headline("clamp(30px, 4vw, 48px)"), lineHeight: 1.05 }}>
-              {p.header.name}
+            <h2 className="mt-3 mb-0 max-w-[22ch]" style={{ ...headline("clamp(30px, 4vw, 48px)"), lineHeight: 1.05 }}>
+              {footerHeadline(p, p.header.name)}
             </h2>
-            {p.header.current && <p className="text-muted mt-2 mb-6 text-[16px]">{p.header.current}</p>}
-            <HeaderLinks p={p} />
+            {!p.footer.headline && p.header.current && <p className="text-muted mt-2 mb-0 text-[16px]">{p.header.current}</p>}
+            <div className="mt-6">
+              <FooterBody p={p} />
+            </div>
+            <p className="text-muted m-0 mt-10 text-[13px]">{footerNote(p)}</p>
           </Reveal>
           <a
             href="#top"
@@ -434,7 +440,7 @@ function Entry({ p, section }: { p: Portfolio; section: Section }) {
   return (
     <article
       className={`flex h-full flex-col gap-5 rounded-[22px] p-5 md:p-6 ${
-        section.image ? "sm:grid sm:grid-cols-[180px_minmax(0,1fr)] sm:items-start" : ""
+        section.images[0] ? "sm:grid sm:grid-cols-[180px_minmax(0,1fr)] sm:items-start" : ""
       }`}
       style={{
         background: "color-mix(in srgb, var(--color-ink) 3%, var(--color-bg))",
@@ -442,9 +448,9 @@ function Entry({ p, section }: { p: Portfolio; section: Section }) {
         boxShadow: "0 1px 2px color-mix(in srgb, #000 6%, transparent)",
       }}
     >
-      {section.image && (
+      {section.images[0] && (
         <div className="aspect-[4/3] overflow-hidden rounded-[14px] sm:aspect-square">
-          <Photo asset={section.image} className="h-full w-full object-cover" />
+          <Photo asset={section.images[0]} className="h-full w-full object-cover" />
         </div>
       )}
       <div className="flex min-w-0 flex-col items-start gap-3">
@@ -463,5 +469,29 @@ function Entry({ p, section }: { p: Portfolio; section: Section }) {
         <SectionLinks p={p} section={section} />
       </div>
     </article>
+  );
+}
+
+/** Feature sections, each a band of its own under the cards. */
+function Bands({ p, sections, afterCards }: { p: Portfolio; sections: Section[]; afterCards: boolean }) {
+  if (sections.length === 0) return null;
+  return (
+    // Ruled off from the cards above; the first band of a tab with no cards
+    // starts straight under the tab row, with no rule and no gap of its own.
+    <div className={`flex flex-col gap-20 md:gap-28 ${afterCards ? "mt-16 md:mt-20" : ""}`}>
+      {sections.map((s, i) => {
+        const ruled = afterCards || i > 0;
+        return (
+          <Reveal key={s.id} kind="up">
+            <FeatureBand
+              p={p}
+              section={s}
+              className={ruled ? "pt-12 md:pt-16" : ""}
+              style={ruled ? { borderTop: "1px solid var(--color-divider)" } : undefined}
+            />
+          </Reveal>
+        );
+      })}
+    </div>
   );
 }

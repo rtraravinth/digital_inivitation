@@ -26,6 +26,7 @@ import {
   chaptersOf,
   headline,
 } from "../shared";
+import { FeatureBand, FooterBody, footerHeadline, footerNote, splitFeatures } from "../components";
 
 /* ── Journey ──────────────────────────────────────────────────────────────
    A warm page told as a story. The tags ring the portrait in a slow 3D
@@ -114,7 +115,22 @@ export function Journey({ p }: { p: Portfolio }) {
                 style={{ ...headline("clamp(36px, 5.6vw, 68px)"), lineHeight: 1 }}
               />
             </div>
-            <Stack p={p} sections={c.sections} />
+            {splitFeatures(c.sections).cards.length > 0 && <Stack p={p} sections={splitFeatures(c.sections).cards} />}
+            {/* Bands sit after the stack: a timeline or a form has no place
+                in a card that pins and shrinks under the next one. */}
+            {splitFeatures(c.sections).features.map((s) => (
+              <Reveal key={s.id} kind="up" className="mt-6 md:mt-8">
+                <FeatureBand
+                  p={p}
+                  section={s}
+                  className="rounded-[30px] p-7 md:p-12"
+                  style={{
+                    background: "color-mix(in srgb, var(--color-accent) 6%, var(--color-bg))",
+                    border: "1px solid color-mix(in srgb, var(--color-accent) 18%, transparent)",
+                  }}
+                />
+              </Reveal>
+            ))}
           </div>
         </section>
       ))}
@@ -129,15 +145,16 @@ export function Journey({ p }: { p: Portfolio }) {
         >
           <Words
             as="h2"
-            text="Let's connect"
+            text={footerHeadline(p, "Let's connect")}
             accentLast
-            className="m-0 mb-8"
+            className="mx-auto mb-8 max-w-[20ch]"
             style={{ ...headline("clamp(36px, 6vw, 76px)"), lineHeight: 1 }}
           />
           <div className="flex justify-center">
-            <HeaderLinks p={p} />
+            <FooterBody p={p} center />
           </div>
         </Reveal>
+        <p className="text-muted m-0 mt-8 text-center text-[13px]">{footerNote(p)}</p>
         <a
           href="#top"
           onClick={toTop}
@@ -343,9 +360,9 @@ function StackCard({
           <SectionLinks p={p} section={section} />
         </div>
         <div className="relative min-h-[220px] p-3 md:p-4">
-          {section.image ? (
+          {section.images[0] ? (
             <div className="h-full overflow-hidden rounded-[22px]">
-              <Photo asset={section.image} className="h-full min-h-[220px] w-full object-cover" />
+              <Photo asset={section.images[0]} className="h-full min-h-[220px] w-full object-cover" />
             </div>
           ) : (
             <div

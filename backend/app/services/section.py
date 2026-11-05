@@ -10,9 +10,10 @@ import uuid
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.core.errors import NotFound, ValidationFailed
-from app.models import Asset, Portfolio, Section
+from app.models import Asset, Portfolio, Section, SectionImage
 from app.models.enums import DEFAULT_TAB
 from app.schemas.section import SectionOrder, SectionPatch
 from app.services.asset import AssetService
@@ -66,7 +67,7 @@ class SectionService:
             if value is not None:
                 setattr(section, field, value)
 
-        for field in ("links",):
+        for field in ("links", "blocks"):
             value = getattr(patch, field)
             if value is not None:
                 setattr(section, field, _dump_list(value))
@@ -76,16 +77,52 @@ class SectionService:
         if "quote" in provided:
             section.quote = patch.quote.model_dump(by_alias=True) if patch.quote else None
 
-        await self._apply_attachment(
-            section, portfolio, "image_asset_id", patch.image_asset_id, patch.clear_image
-        )
+        if patch.image_asset_ids is not None:
+            await self._apply_images(section, portfolio, patch.image_asset_ids)
         await self._apply_attachment(
             section, portfolio, "file_asset_id", patch.file_asset_id, patch.clear_file
         )
 
         await self.session.flush()
         await self.session.refresh(section)
+        await self.session.refresh(section, ["images"])
         return section
+
+    async def _apply_images(
+        self, section: Section, portfolio: Portfolio, asset_ids: list[uuid.UUID]
+    ) -> None:
+        """Replace the section's pictures with ``asset_ids``, in that order.
+
+        A repeated id is kept once, at its first position. Every id must be
+        the caller's own upload; any picture that drops out of the list is
+        released, so it does not outlive the last place it was shown.
+        """
+        wanted = list(dict.fromkeys(asset_ids))
+        if wanted:
+            owned = set(
+                await self.session.scalars(
+                    select(Asset.id).where(
+                        Asset.id.in_(wanted), Asset.user_id == portfolio.user_id
+                    )
+                )
+            )
+            if len(owned) != len(wanted):
+                raise NotFound("That upload does not exist.", code="asset_not_found")
+
+        dropped = [image.asset_id for image in section.images if image.asset_id not in wanted]
+        # Clear first and flush, so the new positions never collide with the
+        # old rows under the (section, position) unique constraint.
+        section.images.clear()
+        await self.session.flush()
+        section.images.extend(
+            SectionImage(asset_id=asset_id, position=index)
+            for index, asset_id in enumerate(wanted)
+        )
+        await self.session.flush()
+
+        assets = AssetService(self.session)
+        for asset_id in dropped:
+            await assets.release(asset_id)
 
     async def _apply_attachment(
         self,
@@ -183,6 +220,22 @@ class SectionService:
                 section.position = offset
         await self.session.flush()
         await self.session.refresh(portfolio)
+        await reload_sections(self.session, portfolio)
+
+
+async def reload_sections(session: AsyncSession, portfolio: Portfolio) -> None:
+    """Load every section's pictures afresh.
+
+    ``refresh(portfolio)`` repopulates the sections themselves but resets the
+    collections hanging off sections it already held, and an unloaded
+    collection read later would be IO outside the event loop's reach.
+    """
+    await session.execute(
+        select(Section)
+        .where(Section.portfolio_id == portfolio.id)
+        .options(selectinload(Section.images).selectinload(SectionImage.asset))
+        .execution_options(populate_existing=True)
+    )
 
 
 def _dump_list(values: list) -> list:

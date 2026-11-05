@@ -16,9 +16,10 @@ import uuid
 
 from pydantic import Field, field_validator
 
-from app.models.enums import TAB_MAX_LENGTH
+from app.models.enums import SECTION_BLOCKS_MAX, SECTION_IMAGES_MAX, TAB_MAX_LENGTH
 from app.schemas.account import LinkItem
 from app.schemas.asset import AssetOut
+from app.schemas.blocks import Block
 from app.schemas.common import CamelModel, StrictCamelModel
 
 
@@ -48,8 +49,9 @@ class SectionOut(CamelModel):
     quote: Quote | None
     hidden: bool
     on_resume: bool
-    image: AssetOut | None
+    images: list[AssetOut]
     file: AssetOut | None
+    blocks: list[Block]
 
 
 class SectionCreate(StrictCamelModel):
@@ -73,10 +75,13 @@ class SectionPatch(StrictCamelModel):
     quote: Quote | None = None
     hidden: bool | None = None
     on_resume: bool | None = None
-    image_asset_id: uuid.UUID | None = None
+    #: The whole ordered list of pictures. Absent leaves them alone; an
+    #: empty list clears them. Ids dropped from the list are released.
+    image_asset_ids: list[uuid.UUID] | None = Field(default=None, max_length=SECTION_IMAGES_MAX)
     file_asset_id: uuid.UUID | None = None
-    clear_image: bool = False
     clear_file: bool = False
+    #: The whole ordered list of components, sent whole like ``links``.
+    blocks: list[Block] | None = Field(default=None, max_length=SECTION_BLOCKS_MAX)
 
     @field_validator("tab")
     @classmethod

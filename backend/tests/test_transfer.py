@@ -135,7 +135,7 @@ async def test_a_legacy_export_with_a_data_uri_becomes_a_real_asset(auth_client)
     )
     full = (await auth_client.get(f"/api/v1/portfolios/{imported['id']}")).json()
 
-    image = full["sections"][0]["image"]
+    image = full["sections"][0]["images"][0]
     assert image is not None
     assert image["url"].startswith("/api/v1/assets/")
     # The data URI is gone: it is a real file now.
@@ -328,7 +328,7 @@ async def test_a_corrupt_data_uri_does_not_fail_the_import(auth_client):
     full = (await auth_client.get(f"/api/v1/portfolios/{imported['id']}")).json()
     # The section survives; only the attachment is dropped.
     assert full["sections"][0]["title"] == "With an image"
-    assert full["sections"][0]["image"] is None
+    assert full["sections"][0]["images"] == []
 
 
 async def test_import_rejects_a_payload_that_is_not_a_portfolio_list(auth_client):

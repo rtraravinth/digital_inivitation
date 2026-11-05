@@ -13,7 +13,7 @@ from datetime import datetime
 
 from app.models.enums import FontId, Ground, ThemeId
 from app.schemas.common import CamelModel
-from app.schemas.portfolio import HeaderOut, Layout
+from app.schemas.portfolio import Footer, HeaderOut, Layout
 from app.schemas.resume import PublicResume
 from app.schemas.section import SectionOut
 
@@ -30,6 +30,8 @@ class PublicPortfolioOut(CamelModel):
     body_font: FontId
     layout: Layout
     header: HeaderOut
+    #: With contact hidden, its links and call to action are already gone.
+    footer: Footer
     sections: list[SectionOut]
     #: Only the structured blocks switched on for the page - never the
     #: contact details, the template or a block kept to the resume.

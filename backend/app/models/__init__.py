@@ -15,7 +15,7 @@ from app.models.account import (
 from app.models.analytics import LinkClick, PageView
 from app.models.asset import Asset
 from app.models.auth_session import AuthSession
-from app.models.portfolio import Portfolio, PortfolioHeader, Section, default_layout
+from app.models.portfolio import Portfolio, PortfolioHeader, Section, SectionImage, default_layout
 from app.models.user import User
 
 __all__ = [
@@ -30,6 +30,7 @@ __all__ = [
     "PortfolioHeader",
     "RecoveryCode",
     "Section",
+    "SectionImage",
     "User",
     "default_layout",
     "default_notifications",

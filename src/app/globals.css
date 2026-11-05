@@ -968,12 +968,243 @@
   [data-fx-root="aurora"],
   [data-fx-root="meridian"],
   [data-fx-root="stage"],
-  [data-fx-root="journey"] {
+  [data-fx-root="journey"],
+  [data-fx-root="bio"] {
     --fx-pill: 999px;
   }
   .fx-root .btn,
   .fx-root .tag {
     border-radius: var(--fx-pill, 0px);
+  }
+
+  /* — section components (published/components.tsx) —
+     One set of renderers for five themes. Each theme sets its corner and its
+     card surface here; every colour still comes from `groundStyle()`. */
+  .fx-root {
+    --fc-radius: 16px;
+    --fc-surface: color-mix(in srgb, var(--color-ink) 4%, var(--color-bg));
+    --fc-line: var(--color-divider);
+  }
+  [data-fx-root="aurora"] {
+    --fc-radius: 22px;
+    --fc-surface: color-mix(in srgb, var(--color-ink) 6%, transparent);
+    --fc-line: color-mix(in srgb, var(--color-ink) 12%, transparent);
+  }
+  [data-fx-root="meridian"] {
+    --fc-radius: 20px;
+    --fc-surface: color-mix(in srgb, var(--color-ink) 3%, var(--color-bg));
+  }
+  [data-fx-root="stage"] {
+    --fc-radius: 10px;
+    --fc-surface: color-mix(in srgb, var(--color-ink) 6%, var(--color-bg));
+  }
+  [data-fx-root="arcade"] {
+    --fc-radius: 2px;
+    --fc-surface: color-mix(in srgb, var(--color-accent) 7%, var(--color-bg));
+    --fc-line: color-mix(in srgb, var(--color-accent) 38%, transparent);
+  }
+  [data-fx-root="journey"] {
+    --fc-radius: 24px;
+    --fc-surface: color-mix(in srgb, var(--color-accent) 5%, var(--color-bg));
+  }
+
+  .fc-card {
+    background: var(--fc-surface);
+    border: 1px solid var(--fc-line);
+    border-radius: var(--fc-radius);
+  }
+  [data-fx-root="aurora"] .fc-card {
+    backdrop-filter: blur(14px) saturate(140%);
+    -webkit-backdrop-filter: blur(14px) saturate(140%);
+  }
+  [data-fx-root="arcade"] .fc-card {
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-accent) 18%, transparent),
+      0 12px 40px -24px var(--color-accent);
+  }
+
+  .fc-title-link {
+    color: inherit;
+    text-decoration: none;
+    background: linear-gradient(currentColor, currentColor) 0 100% / 0 1px no-repeat;
+    transition: background-size 260ms var(--ease-out);
+  }
+  .fc-title-link:hover,
+  .fc-title-link:focus-visible {
+    background-size: 100% 1px;
+  }
+
+  /* A frame that holds its photograph still while the photograph eases 2%. */
+  .fc-frame {
+    overflow: hidden;
+    border-radius: var(--fc-radius);
+    background: var(--fc-surface);
+    box-shadow: 0 0 0 1px var(--fc-line);
+  }
+  .fc-photo {
+    transition: transform 700ms var(--ease-out);
+  }
+  .fc-frame:hover .fc-photo {
+    transform: scale(1.025);
+  }
+
+  /* Timeline: a hairline rail with a dot per milestone. */
+  .fc-timeline-item {
+    position: relative;
+  }
+  .fc-timeline-dot {
+    position: relative;
+    justify-self: center;
+    width: 1px;
+    background: var(--fc-line);
+  }
+  .fc-timeline-item:last-child .fc-timeline-dot {
+    background: linear-gradient(var(--fc-line), transparent);
+  }
+  .fc-timeline-dot::before {
+    content: "";
+    position: absolute;
+    top: 0.45rem;
+    left: 50%;
+    width: 11px;
+    height: 11px;
+    translate: -50% 0;
+    border-radius: 999px;
+    background: var(--color-bg);
+    box-shadow: inset 0 0 0 2px var(--color-mark);
+    transition: background 200ms var(--ease-out);
+  }
+  [data-fx-root="arcade"] .fc-timeline-dot::before {
+    border-radius: 1px;
+    rotate: 45deg;
+    box-shadow: inset 0 0 0 2px var(--color-mark), 0 0 12px var(--color-mark);
+  }
+  .fc-timeline-item:hover .fc-timeline-dot::before {
+    background: var(--color-mark);
+  }
+
+  /* Client wall: per-cell rules, so a part-filled last row shows no holes. */
+  .fc-wall {
+    border-top: 1px solid var(--fc-line);
+    border-left: 1px solid var(--fc-line);
+  }
+  .fc-wall-cell {
+    border-right: 1px solid var(--fc-line);
+    border-bottom: 1px solid var(--fc-line);
+  }
+  .fc-wall-name {
+    color: color-mix(in srgb, var(--color-ink) 72%, transparent);
+    transition: color 200ms var(--ease-out), background 200ms var(--ease-out);
+  }
+  a.fc-wall-name:hover,
+  a.fc-wall-name:focus-visible {
+    color: var(--color-ink);
+    background: var(--fc-surface);
+  }
+  a.fc-wall-name svg {
+    color: var(--color-mark);
+    opacity: 0;
+    translate: -4px 4px;
+    transition: opacity 200ms var(--ease-out), translate 260ms var(--ease-out);
+  }
+  a.fc-wall-name:hover svg,
+  a.fc-wall-name:focus-visible svg {
+    opacity: 1;
+    translate: 0 0;
+  }
+
+  .fc-tabs {
+    border-bottom: 1px solid var(--fc-line);
+    scrollbar-width: none;
+  }
+  .fc-faq-q {
+    transition: color 180ms var(--ease-out);
+  }
+  .fc-faq-q:hover {
+    color: var(--color-mark);
+  }
+  .fc-row {
+    transition: background 200ms var(--ease-out);
+  }
+
+  /* — Bio: the link-in-bio page — */
+  .bio-link {
+    color: var(--color-ink);
+    background: color-mix(in srgb, var(--color-ink) 5%, var(--color-bg));
+    box-shadow:
+      inset 0 0 0 1px color-mix(in srgb, var(--color-ink) 12%, transparent),
+      0 1px 2px color-mix(in srgb, #000 10%, transparent);
+    transition:
+      translate 220ms var(--ease-out),
+      background 220ms var(--ease-out),
+      box-shadow 220ms var(--ease-out);
+  }
+  .bio-link:hover,
+  .bio-link:focus-visible {
+    translate: 0 -2px;
+    background: color-mix(in srgb, var(--color-accent) 12%, var(--color-bg));
+    box-shadow:
+      inset 0 0 0 1px color-mix(in srgb, var(--color-accent) 45%, transparent),
+      0 10px 24px -14px color-mix(in srgb, var(--color-accent) 70%, transparent);
+  }
+  .bio-link:active {
+    translate: 0 0;
+  }
+  .bio-link-icon {
+    color: var(--color-mark);
+    background: color-mix(in srgb, var(--color-ink) 6%, transparent);
+  }
+  .bio-link-arrow {
+    opacity: 0;
+    translate: -4px 4px;
+    transition:
+      opacity 200ms var(--ease-out),
+      translate 240ms var(--ease-out);
+  }
+  .bio-link:hover .bio-link-arrow,
+  .bio-link:focus-visible .bio-link-arrow {
+    opacity: 0.8;
+    translate: 0 0;
+  }
+  .bio-link-primary {
+    color: var(--color-accent-ink);
+    background: var(--color-accent);
+    box-shadow: 0 10px 24px -14px var(--color-accent);
+  }
+  .bio-link-primary .bio-link-icon {
+    color: inherit;
+    background: color-mix(in srgb, var(--color-accent-ink) 14%, transparent);
+  }
+  .bio-link-primary:hover,
+  .bio-link-primary:focus-visible {
+    background: color-mix(in srgb, var(--color-accent) 88%, var(--color-ink));
+    box-shadow: 0 14px 28px -14px var(--color-accent);
+  }
+  .bio-social {
+    color: var(--color-ink);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-ink) 16%, transparent);
+    transition:
+      color 180ms var(--ease-out),
+      background 180ms var(--ease-out),
+      translate 220ms var(--ease-out);
+  }
+  .bio-social:hover,
+  .bio-social:focus-visible {
+    color: var(--color-mark);
+    background: color-mix(in srgb, var(--color-accent) 12%, transparent);
+    translate: 0 -2px;
+  }
+  [data-motion="off"] .bio-link,
+  [data-motion="off"] .bio-social {
+    transition: none;
+    translate: none;
+  }
+
+  [data-motion="off"] .fc-photo,
+  [data-motion="off"] .fc-title-link {
+    transition: none;
+  }
+  [data-motion="off"] .fc-frame:hover .fc-photo {
+    transform: none;
   }
 
   /* — reveal: one entrance per block, staggered by --fx-delay — */
@@ -1429,6 +1660,28 @@
   .thumb[data-thumb="journey"] {
     background: #fbf6ef;
   }
+  .thumb[data-thumb="bio"] {
+    background: linear-gradient(180deg, color-mix(in srgb, var(--thumb-accent) 28%, #f6f5f3), #f6f5f3 60%);
+  }
+  .thumb-bio-face {
+    left: 50%;
+    top: 12%;
+    width: 18%;
+    aspect-ratio: 1;
+    border-radius: 999px;
+    translate: -50% 0;
+    background: var(--thumb-accent);
+    box-shadow: 0 0 0 3px #f6f5f3, 0 0 0 5px color-mix(in srgb, var(--thumb-accent) 35%, transparent);
+  }
+  .thumb-bio-link {
+    left: 50%;
+    width: 58%;
+    height: 9%;
+    border-radius: 999px;
+    translate: -50% 0;
+    background: #ffffff;
+    border: 1px solid color-mix(in srgb, var(--thumb-accent) 30%, transparent);
+  }
   .thumb-card {
     left: 50%;
     width: 64%;
@@ -1575,6 +1828,13 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .fc-photo,
+  .fc-title-link {
+    transition: none;
+  }
+  .fc-frame:hover .fc-photo {
+    transform: none;
+  }
   .reveal,
   .reveal.in {
     opacity: 1;

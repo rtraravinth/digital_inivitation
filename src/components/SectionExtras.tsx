@@ -216,8 +216,9 @@ export function PortfolioExtras({
 }
 
 /**
- * The three extras that belong to one section: an image, a file, a quote.
- * Numbers and the timeline are the page's — see `PortfolioExtras`.
+ * The two extras that belong to one section: a file and a pull quote.
+ * Pictures have their own field and the rest are components; numbers and
+ * the page-wide timeline are the header's — see `PortfolioExtras`.
  */
 export function SectionExtras({
   section,
@@ -230,20 +231,11 @@ export function SectionExtras({
 
   return (
     <div className="border-divider border-t pt-3">
-      <div className="mono-label mb-2">Add to this section (optional)</div>
+      <div className="mono-label mb-2">Attach (optional)</div>
 
       <div className="mb-3 flex flex-wrap gap-2">
         <UploadButton
-          label={section.image ? "Replace image" : "Image"}
-          accept="image/*"
-          onError={setError}
-          onPick={async (file) => {
-            const image = await readImageAsset(file);
-            onChange((s) => ({ ...s, image }));
-          }}
-        />
-        <UploadButton
-          label={section.file ? "Replace file" : "File"}
+          label={section.file ? "Replace file" : "A file to download"}
           accept=".pdf,.doc,.docx,.txt,.csv,.md"
           onError={setError}
           onPick={async (file) => {
@@ -257,7 +249,7 @@ export function SectionExtras({
           disabled={Boolean(section.quote)}
           onClick={() => onChange((s) => ({ ...s, quote: { text: "", attribution: "" } }))}
         >
-          Quote
+          A pull quote
         </button>
       </div>
 
@@ -269,17 +261,6 @@ export function SectionExtras({
         >
           {error}
         </p>
-      )}
-
-      {section.image && (
-        <div className="field mb-3">
-          <label>Image — shown at the top of the section card</label>
-          <AssetChip
-            asset={section.image}
-            preview
-            onRemove={() => onChange((s) => ({ ...s, image: null }))}
-          />
-        </div>
       )}
 
       {section.file && (

@@ -19,7 +19,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.errors import NotFound, PayloadTooLarge, UnsupportedMedia
-from app.models import AccountProfile, Asset, PortfolioHeader, Section, User
+from app.models import AccountProfile, Asset, PortfolioHeader, Section, SectionImage, User
 from app.models.enums import AssetKind
 from app.services.storage import build_key, get_storage
 
@@ -40,7 +40,7 @@ JPEG_QUALITY_STEPS = (82, 72, 60, 48, 36, 25)
 ASSET_REFERENCES = (
     AccountProfile.portrait_asset_id,
     PortfolioHeader.portrait_asset_id,
-    Section.image_asset_id,
+    SectionImage.asset_id,
     Section.file_asset_id,
 )
 

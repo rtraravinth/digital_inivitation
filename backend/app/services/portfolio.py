@@ -9,11 +9,12 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.errors import Conflict, NotFound
-from app.models import Asset, Portfolio, PortfolioHeader, Section, User
+from app.models import Asset, Portfolio, PortfolioHeader, Section, SectionImage, User
 from app.models.enums import DEFAULT_TAB
 from app.models.portfolio import default_layout
 from app.schemas.asset import asset_out
 from app.schemas.portfolio import (
+    Footer,
     HeaderOut,
     HeaderPatch,
     Layout,
@@ -35,7 +36,29 @@ FOUNDER_TEMPLATE: list[tuple[str, str]] = [
 ]
 
 
-def section_out(section: Section, *, public: bool = False) -> SectionOut:
+def footer_out(raw: dict | None, *, links: bool = True) -> Footer:
+    """The stored footer, with its links dropped when contact is hidden."""
+    footer = Footer.model_validate(raw or {})
+    if not links:
+        footer = footer.model_copy(update={"links": [], "cta_url": "", "cta_label": ""})
+    return footer
+
+
+def blocks_out(raw: list | None, *, contact: bool = True) -> list:
+    """A section's components. With contact hidden, a contact component keeps
+    its words and loses the ways to reach the owner."""
+    blocks = list(raw or [])
+    if contact:
+        return blocks
+    return [
+        {**b, "email": "", "phone": "", "ctaUrl": "", "ctaLabel": "", "form": False}
+        if b.get("type") == "contact"
+        else b
+        for b in blocks
+    ]
+
+
+def section_out(section: Section, *, public: bool = False, contact: bool = True) -> SectionOut:
     return SectionOut(
         id=section.id,
         title=section.title,
@@ -45,8 +68,9 @@ def section_out(section: Section, *, public: bool = False) -> SectionOut:
         quote=section.quote,
         hidden=section.hidden,
         on_resume=section.on_resume,
-        image=asset_out(section.image, public=public),
+        images=[asset_out(image.asset, public=public) for image in section.images],
         file=asset_out(section.file, public=public),
+        blocks=blocks_out(section.blocks, contact=contact),
     )
 
 
@@ -114,6 +138,7 @@ class PortfolioService:
             layout=Layout.model_validate(portfolio.layout),
             resume=resume_from_stored(portfolio.resume),
             header=header_out(portfolio.header),
+            footer=footer_out(portfolio.footer),
             sections=[section_out(section) for section in portfolio.sections],
             published_at=portfolio.published_at,
             updated_at=portfolio.updated_at,
@@ -242,6 +267,7 @@ class PortfolioService:
             # A copy of a role is usually the start of a neighbouring role,
             # and the work history is the slowest part of a resume to type.
             portfolio.resume = resume_from_stored(source.resume).model_dump(by_alias=True)
+            portfolio.footer = dict(source.footer or {})
 
             # New rows with new ids: a copy that shared ids would not be a copy.
             return [
@@ -254,8 +280,12 @@ class PortfolioService:
                     quote=section.quote,
                     hidden=section.hidden,
                     on_resume=section.on_resume,
-                    image_asset_id=section.image_asset_id,
                     file_asset_id=section.file_asset_id,
+                    blocks=list(section.blocks or []),
+                    images=[
+                        SectionImage(asset_id=image.asset_id, position=image.position)
+                        for image in section.images
+                    ],
                 )
                 for index, section in enumerate(source.sections)
             ]
@@ -279,6 +309,8 @@ class PortfolioService:
 
         if patch.layout is not None:
             portfolio.layout = patch.layout.model_dump(by_alias=True)
+        if patch.footer is not None:
+            portfolio.footer = patch.footer.model_dump(by_alias=True)
 
         await self._touch(portfolio)
         return portfolio

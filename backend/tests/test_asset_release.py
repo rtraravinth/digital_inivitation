@@ -48,10 +48,10 @@ async def test_replacing_a_section_image_drops_the_old_one(auth_client, portfoli
     first, second = await upload(auth_client, (1, 2, 3)), await upload(auth_client, (4, 5, 6))
     path = f"/api/v1/portfolios/{portfolio['id']}/sections/{section['id']}"
 
-    await auth_client.patch(path, json={"imageAssetId": first})
+    await auth_client.patch(path, json={"imageAssetIds": [first]})
     assert first in await rows(db_session)
 
-    await auth_client.patch(path, json={"imageAssetId": second})
+    await auth_client.patch(path, json={"imageAssetIds": [second]})
     remaining = await rows(db_session)
     assert first not in remaining
     assert second in remaining
@@ -66,8 +66,8 @@ async def test_clearing_a_section_image_drops_it(auth_client, portfolio, db_sess
     asset = await upload(auth_client, (7, 8, 9))
     path = f"/api/v1/portfolios/{portfolio['id']}/sections/{section['id']}"
 
-    await auth_client.patch(path, json={"imageAssetId": asset})
-    await auth_client.patch(path, json={"clearImage": True})
+    await auth_client.patch(path, json={"imageAssetIds": [asset]})
+    await auth_client.patch(path, json={"imageAssetIds": []})
 
     assert asset not in await rows(db_session)
 
@@ -81,9 +81,9 @@ async def test_an_upload_still_used_elsewhere_survives(auth_client, portfolio, d
     asset = await upload(auth_client, (11, 12, 13))
     base = f"/api/v1/portfolios/{portfolio['id']}/sections"
 
-    await auth_client.patch(f"{base}/{one['id']}", json={"imageAssetId": asset})
-    await auth_client.patch(f"{base}/{two['id']}", json={"imageAssetId": asset})
-    await auth_client.patch(f"{base}/{one['id']}", json={"clearImage": True})
+    await auth_client.patch(f"{base}/{one['id']}", json={"imageAssetIds": [asset]})
+    await auth_client.patch(f"{base}/{two['id']}", json={"imageAssetIds": [asset]})
+    await auth_client.patch(f"{base}/{one['id']}", json={"imageAssetIds": []})
 
     assert asset in await rows(db_session)
     assert (await auth_client.get(f"/api/v1/assets/{asset}")).status_code == 200
@@ -99,7 +99,7 @@ async def test_an_unattached_upload_is_left_alone(auth_client, portfolio, db_ses
     attached, loose = await upload(auth_client, (1, 1, 1)), await upload(auth_client, (2, 2, 2))
     path = f"/api/v1/portfolios/{portfolio['id']}/sections/{section['id']}"
 
-    await auth_client.patch(path, json={"imageAssetId": attached})
+    await auth_client.patch(path, json={"imageAssetIds": [attached]})
     # An edit that touches nothing about attachments, while `loose` waits.
     await auth_client.patch(path, json={"title": "Still here"})
 

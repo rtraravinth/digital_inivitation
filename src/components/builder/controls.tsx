@@ -501,6 +501,11 @@ const IGNORED: Record<ThemeId, { nav?: string; grid?: string; density?: string }
     nav: "Journey tells every tab as a chapter on one scroll.",
     grid: "Journey's entries are one column of cards that stack as you read.",
   },
+  bio: {
+    nav: "Bio lists every link on one page, grouped by tab.",
+    grid: "Bio is a single column of link buttons.",
+    density: "Bio keeps its buttons at one comfortable spacing.",
+  },
 };
 
 function IgnoredNote({ reason }: { reason: string }) {

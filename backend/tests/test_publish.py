@@ -139,12 +139,12 @@ async def test_the_published_payload_uses_public_asset_urls(auth_client, client,
     section_id = portfolio["sections"][0]["id"]
     await auth_client.patch(
         f"/api/v1/portfolios/{portfolio['id']}/sections/{section_id}",
-        json={"imageAssetId": asset["id"]},
+        json={"imageAssetIds": [asset["id"]]},
     )
     published = await go_live(auth_client, portfolio)
 
     body = (await client.get(f"/api/v1/public/p/{TEST_HANDLE}/{published["slug"]}")).json()
-    assert body["sections"][0]["image"]["url"] == f"/api/v1/public/assets/{asset['id']}"
+    assert body["sections"][0]["images"][0]["url"] == f"/api/v1/public/assets/{asset['id']}"
 
 
 async def test_an_unpublished_assets_public_url_is_404(auth_client, client):
@@ -172,7 +172,7 @@ async def test_an_asset_on_a_hidden_section_is_not_public(auth_client, client, p
     section_id = portfolio["sections"][0]["id"]
     patch = await auth_client.patch(
         f"/api/v1/portfolios/{portfolio['id']}/sections/{section_id}",
-        json={"imageAssetId": asset["id"], "hidden": True},
+        json={"imageAssetIds": [asset["id"]], "hidden": True},
     )
     assert patch.status_code == 200, patch.text
     await go_live(auth_client, portfolio)

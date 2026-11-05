@@ -28,7 +28,7 @@ because the connection never arrives. Pass flags through when you need them:
 ```
 npm run build
 npm run lint
-cd backend && .venv/bin/python -m pytest    # 307 tests (.venv/Scripts on Windows)
+cd backend && .venv/bin/python -m pytest    # 330 tests (.venv/Scripts on Windows)
 ```
 
 `NEXT_PUBLIC_API_URL` points the frontend at the API; see
@@ -585,7 +585,7 @@ claim to be the live page.
 - **Slugs are global.** Two accounts cannot both hold `rohan`, because the
   address is `facet.page/<slug>` with nothing in front of it. The create
   dialog surfaces the 409 as a message.
-- **The frontend has no test runner.** The backend has 307 pytest tests;
+- **The frontend has no test runner.** The backend has 330 pytest tests;
   changes here are checked with `npm run lint`, `npm run build` and by
   actually opening the app.
 

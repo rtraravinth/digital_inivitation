@@ -24,6 +24,7 @@ from app.models import (
     Portfolio,
     PortfolioHeader,
     Section,
+    SectionImage,
 )
 from app.schemas.common import ERROR_RESPONSES
 from app.schemas.portfolio import Layout
@@ -34,7 +35,7 @@ from app.schemas.publish import (
 )
 from app.schemas.resume import public_resume
 from app.services.analytics import AnalyticsService
-from app.services.portfolio import header_out, section_out
+from app.services.portfolio import footer_out, header_out, section_out
 
 router = APIRouter(
     prefix="/public",
@@ -63,7 +64,9 @@ async def _load_published(
         )
         .options(
             selectinload(Portfolio.header),
-            selectinload(Portfolio.sections).selectinload(Section.image),
+            selectinload(Portfolio.sections)
+            .selectinload(Section.images)
+            .selectinload(SectionImage.asset),
             selectinload(Portfolio.sections).selectinload(Section.file),
         )
     )
@@ -109,9 +112,10 @@ async def read_published(
         body_font=portfolio.body_font,
         layout=Layout.model_validate(portfolio.layout),
         header=header_out(portfolio.header, public=True, links=show_contact),
+        footer=footer_out(portfolio.footer, links=show_contact),
         # Hidden sections never reach a visitor, whatever the theme does.
         sections=[
-            section_out(section, public=True)
+            section_out(section, public=True, contact=show_contact)
             for section in portfolio.sections
             if not section.hidden
         ],
@@ -176,11 +180,25 @@ async def _is_on_a_published_page(session: SessionDep, asset_id: uuid.UUID) -> b
         .where(
             Portfolio.status == "live",
             Section.hidden.is_(False),
-            (Section.image_asset_id == asset_id) | (Section.file_asset_id == asset_id),
+            Section.file_asset_id == asset_id,
         )
         .limit(1)
     )
     if in_a_section is not None:
+        return True
+
+    in_a_picture = await session.scalar(
+        select(SectionImage.id)
+        .join(Section, Section.id == SectionImage.section_id)
+        .join(Portfolio, Portfolio.id == Section.portfolio_id)
+        .where(
+            Portfolio.status == "live",
+            Section.hidden.is_(False),
+            SectionImage.asset_id == asset_id,
+        )
+        .limit(1)
+    )
+    if in_a_picture is not None:
         return True
 
     in_a_header = await session.scalar(

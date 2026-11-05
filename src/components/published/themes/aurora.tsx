@@ -29,6 +29,7 @@ import {
   gridCols,
   headline,
 } from "../shared";
+import { FeatureBand, FooterBody, footerHeadline, footerNote, splitFeatures } from "../components";
 
 /* ── Aurora ───────────────────────────────────────────────────────────────
    A dark page lit from behind. Its one piece of depth is glass: the work
@@ -192,11 +193,11 @@ export function Aurora({ p }: { p: Portfolio }) {
               </div>
             </div>
             <div className={`grid gap-4 md:gap-5 ${gridCols(p)}`}>
-              {c.sections.map((s, i) => {
+              {splitFeatures(c.sections).cards.map((s, i, cards) => {
                 // The chapter's first entry runs across two columns when it
                 // has a picture to carry it and there is a second entry to
                 // sit beside — a lone wide card is just a wide card.
-                const wide = i === 0 && !!s.image && p.layout.grid > 1 && c.sections.length > 1;
+                const wide = i === 0 && !!s.images[0] && p.layout.grid > 1 && cards.length > 1;
                 return (
                   <Reveal
                     key={s.id}
@@ -209,6 +210,11 @@ export function Aurora({ p }: { p: Portfolio }) {
                 );
               })}
             </div>
+            {splitFeatures(c.sections).features.map((s) => (
+              <Reveal key={s.id} kind="up" className="mt-5">
+                <FeatureBand p={p} section={s} className="fx-glass rounded-[28px] p-6 md:p-12" />
+              </Reveal>
+            ))}
           </div>
         </section>
       ))}
@@ -235,18 +241,16 @@ export function Aurora({ p }: { p: Portfolio }) {
           <div className="relative">
             <span className="mono-label">{p.header.name}</span>
             <h2
-              className="mt-4 mb-8 max-w-[18ch]"
+              className="mt-4 mb-6 max-w-[18ch]"
               style={{ ...headline("clamp(34px, 5vw, 64px)"), lineHeight: 1 }}
             >
-              Get in touch
+              {footerHeadline(p, "Get in touch")}
             </h2>
-            <HeaderLinks p={p} />
+            <FooterBody p={p} />
           </div>
         </Reveal>
         <div className="mx-auto mt-10 flex max-w-[1200px] flex-wrap items-center justify-between gap-4">
-          <span className="text-muted text-[13px]">
-            © {p.header.name}
-          </span>
+          <span className="text-muted text-[13px]">{footerNote(p)}</span>
           <a
             href="#top"
             onClick={toTop}
@@ -371,8 +375,8 @@ function Card({
         }`}
       >
         <div className={`relative overflow-hidden ${wide ? "aspect-[16/10] md:aspect-auto md:min-h-[320px]" : "aspect-[16/10]"}`}>
-          {section.image ? (
-            <Photo asset={section.image} className="absolute inset-0 h-full w-full object-cover" />
+          {section.images[0] ? (
+            <Photo asset={section.images[0]} className="absolute inset-0 h-full w-full object-cover" />
           ) : (
             <div
               aria-hidden

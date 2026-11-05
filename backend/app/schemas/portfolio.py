@@ -57,6 +57,28 @@ class Layout(StrictCamelModel):
     motion: MotionLevel = "full"
 
 
+class Footer(StrictCamelModel):
+    """The page's closing band.
+
+    Every field is optional, and an empty footer still renders: the themes
+    fall back to the header's name and links, so a portfolio that never
+    opened the footer card ends the way it always did.
+    """
+
+    #: The call to action, e.g. "Let's build something together".
+    headline: str = Field(default="", max_length=200)
+    text: str = Field(default="", max_length=2000)
+    #: The button under the headline — usually a mailto or a booking page.
+    cta_label: str = Field(default="", max_length=60)
+    cta_url: str = Field(default="", max_length=2000)
+    #: Links of the footer's own, beside the header's contact links.
+    links: list[LinkItem] = Field(default_factory=list, max_length=30)
+    #: The small print, e.g. "© 2026 Priya Raman · Bengaluru".
+    note: str = Field(default="", max_length=300)
+    #: Whether the header's links repeat in the footer.
+    show_header_links: bool = True
+
+
 class HeaderOut(CamelModel):
     """The header, plus the two lists the whole page shares.
 
@@ -106,6 +128,7 @@ class PortfolioOut(CamelModel):
     #: The owner's own document. Deliberately absent from PublicPortfolioOut.
     resume: Resume
     header: HeaderOut
+    footer: Footer
     sections: list[SectionOut]
     published_at: datetime | None
     updated_at: datetime
@@ -169,6 +192,7 @@ class PortfolioPatch(StrictCamelModel):
     font: FontId | None = None
     body_font: FontId | None = None
     layout: Layout | None = None
+    footer: Footer | None = None
 
 
 class SlugAvailableOut(CamelModel):

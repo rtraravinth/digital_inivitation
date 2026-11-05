@@ -9,6 +9,7 @@ import { PublishedLock } from "./PublishedLock";
 import { TabField } from "./TabField";
 import { TagEditor } from "./TagEditor";
 import { ResumeBlockCard, ResumeContactCard } from "./resume/ResumeContent";
+import { COMPONENT_ICON, ComponentPanel, ComponentPicker, PicturesField, componentName, componentSummary, newComponent } from "./editor/components";
 import { ICON, Icon, IconButton, LookToggles, StatusPill, TiltPanel } from "./ui";
 import { Glyph } from "@/lib/glyphs";
 import { LinkIcon, iconFor } from "@/lib/icons";
@@ -21,6 +22,7 @@ import {
   type LinkItem,
   type Portfolio,
   type PageBlock,
+  type Footer,
   type PortfolioHeader,
   type Section,
 } from "@/lib/types";
@@ -35,6 +37,7 @@ import {
    ──────────────────────────────────────────────────────────────────────── */
 
 const HEADER = "header";
+const FOOTER = "footer";
 const EASE = [0.16, 1, 0.3, 1] as const;
 
 function nn(index: number) {
@@ -102,6 +105,8 @@ export function Editor({ id }: { id: string }) {
 
   const setHeader = (recipe: (h: PortfolioHeader) => PortfolioHeader) =>
     updatePortfolio(p.id, (prev) => ({ ...prev, header: recipe(prev.header) }));
+  const setFooter = (recipe: (f: Footer) => Footer) =>
+    updatePortfolio(p.id, (prev) => ({ ...prev, footer: recipe(prev.footer) }));
 
   async function add() {
     // The server mints the id, so the new card can only open once it answers.
@@ -262,10 +267,19 @@ export function Editor({ id }: { id: string }) {
                   />
                 ))}
               </ul>
-              <button type="button" className="btn btn-ghost mt-2 w-full justify-start" onClick={add}>
+              <button type="button" className="btn btn-ghost mt-1 w-full justify-start" onClick={add}>
                 <Glyph id="plus" size={14} />
                 Add section
               </button>
+              <ul className="m-0 mt-1 flex list-none flex-col gap-0.5 p-0 pt-2" style={{ borderTop: "1px solid var(--color-divider)" }}>
+                <OutlineItem
+                  on={open === FOOTER}
+                  number="—"
+                  title={p.footer.headline || "Footer"}
+                  sub="Footer · Page only"
+                  onPick={() => setOpen(FOOTER)}
+                />
+              </ul>
             </nav>
 
             {/* ── the document ────────────────────────────────────── */}
@@ -355,6 +369,18 @@ export function Editor({ id }: { id: string }) {
                 </span>
                 Add section
               </motion.button>
+
+              <div className="mt-4 flex items-baseline gap-3 px-1">
+                <h2 className="m-0 text-[16px] tracking-[-0.01em]">Footer</h2>
+                <span className="text-[12.5px] text-muted">How the page ends — a last call to action and the small print.</span>
+              </div>
+              <FooterCard
+                p={p}
+                open={open === FOOTER}
+                onOpen={() => setOpen(FOOTER)}
+                onClose={() => setOpen(null)}
+                onChange={setFooter}
+              />
             </div>
           </div>
         </main>
@@ -501,10 +527,13 @@ function LinkList({ links }: { links: LinkItem[] }) {
   );
 }
 
-function Grouped({ title, children }: { title: string; children: React.ReactNode }) {
+function Grouped({ title, hint, children }: { title: string; hint?: string; children: React.ReactNode }) {
   return (
     <fieldset className="m-0 mt-5 min-w-0 border-0 p-0 pt-5" style={{ borderTop: "1px solid var(--color-divider)" }}>
-      <legend className="float-left mb-3 w-full p-0 text-[13px] font-semibold">{title}</legend>
+      <legend className="float-left mb-3 w-full p-0 text-[13px] font-semibold">
+        {title}
+        {hint && <span className="mt-0.5 block text-[12.5px] font-normal text-muted">{hint}</span>}
+      </legend>
       <div className="clear-both flex flex-col gap-4">{children}</div>
     </fieldset>
   );
@@ -664,7 +693,17 @@ function SectionCard({
   onDelete: () => void;
 }) {
   const [confirming, setConfirming] = useState(false);
-  const extras = [s.image && "Image", s.file && "File", s.quote?.text && "Quote"].filter(Boolean) as string[];
+  const extras = [s.file && "File", s.quote?.text && "Quote"].filter(Boolean) as string[];
+  const setBlocks = (recipe: (b: Section["blocks"]) => Section["blocks"]) => onChange((x) => ({ ...x, blocks: recipe(x.blocks) }));
+  const moveBlock = (from: number, delta: -1 | 1) =>
+    setBlocks((list) => {
+      const to = from + delta;
+      if (to < 0 || to >= list.length) return list;
+      const next = [...list];
+      const [moved] = next.splice(from, 1);
+      next.splice(to, 0, moved);
+      return next;
+    });
 
   return (
     <Card
@@ -706,6 +745,44 @@ function SectionCard({
           <p className="m-0 mt-1.5 line-clamp-3 max-w-[64ch] text-[14px] leading-relaxed text-muted">
             {s.description || <Placeholder>What it is, in a few sentences</Placeholder>}
           </p>
+          {s.images.length > 0 && (
+            <div className="mt-3 flex gap-2">
+              {s.images.slice(0, 5).map((img, i) => (
+                // An API URL — nothing for next/image to optimise.
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  key={img.id ?? i}
+                  src={assetSrc(img)}
+                  alt=""
+                  className="h-14 w-[4.6rem] flex-none rounded-lg object-cover"
+                  style={{ boxShadow: "inset 0 0 0 1px var(--color-divider)" }}
+                />
+              ))}
+              {s.images.length > 5 && (
+                <span
+                  className="grid h-14 w-14 flex-none place-items-center rounded-lg text-[12.5px] font-medium"
+                  style={{ background: "var(--color-neutral-100)" }}
+                >
+                  +{s.images.length - 5}
+                </span>
+              )}
+            </div>
+          )}
+          {s.blocks.length > 0 && (
+            <ul className="m-0 mt-3 flex list-none flex-wrap gap-1.5 p-0">
+              {s.blocks.map((b) => (
+                <li
+                  key={b.id}
+                  className="inline-flex items-center gap-1.5 rounded-full py-1 pr-3 pl-2 text-[12.5px]"
+                  style={{ boxShadow: "inset 0 0 0 1px var(--color-divider)" }}
+                >
+                  <Icon d={COMPONENT_ICON[b.type]} size={13} />
+                  <span className="font-medium">{componentName(b.type)}</span>
+                  <span className="text-muted">{componentSummary(b)}</span>
+                </li>
+              ))}
+            </ul>
+          )}
           <div className="mt-3 flex flex-wrap items-center gap-1.5">
             <span className="tag tag-neutral">{s.tab}</span>
             {extras.map((x) => (
@@ -752,11 +829,47 @@ function SectionCard({
         </div>
       </div>
 
+      <Grouped title="Pictures" hint="The first is the cover. Pick several at once.">
+        <PicturesField images={s.images} onChange={(recipe) => onChange((x) => ({ ...x, images: recipe(x.images) }))} />
+      </Grouped>
+
       <Grouped title="Links">
         <LinkEditor links={s.links} onChange={(links) => onChange((x) => ({ ...x, links }))} />
       </Grouped>
 
-      {/* Draws its own rule and "Add to this section (optional)" label. */}
+      <Grouped
+        title="Components"
+        hint="Shown under this section on your page, in this order. The resume prints the title, description and links only."
+      >
+        {s.blocks.length > 0 && (
+          <div className="flex flex-col gap-3">
+            <AnimatePresence initial={false}>
+              {s.blocks.map((b, i) => (
+                <motion.div
+                  key={b.id}
+                  layout
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.98, transition: { duration: 0.15 } }}
+                  transition={{ duration: 0.4, ease: EASE }}
+                >
+                  <ComponentPanel
+                    block={b}
+                    first={i === 0}
+                    last={i === s.blocks.length - 1}
+                    onChange={(next) => setBlocks((list) => list.map((x) => (x.id === b.id ? next : x)))}
+                    onMove={(delta) => moveBlock(i, delta)}
+                    onRemove={() => setBlocks((list) => list.filter((x) => x.id !== b.id))}
+                  />
+                </motion.div>
+              ))}
+            </AnimatePresence>
+          </div>
+        )}
+        <ComponentPicker count={s.blocks.length} onAdd={(type) => setBlocks((list) => [...list, newComponent(type)])} />
+      </Grouped>
+
+      {/* Draws its own rule and "Attach (optional)" label. */}
       <div className="mt-5">
         <SectionExtras section={s} onChange={onChange} />
       </div>
@@ -788,6 +901,138 @@ function SectionCard({
           )}
         </AnimatePresence>
         <button type="button" className="btn btn-primary ml-auto" style={{ marginTop: 0 }} onClick={onClose}>
+          Done
+        </button>
+      </div>
+    </Card>
+  );
+}
+
+/* ── the footer ───────────────────────────────────────────────────────── */
+
+function FooterCard({
+  p,
+  open,
+  onOpen,
+  onClose,
+  onChange,
+}: {
+  p: Portfolio;
+  open: boolean;
+  onOpen: () => void;
+  onClose: () => void;
+  onChange: (recipe: (f: Footer) => Footer) => void;
+}) {
+  const f = p.footer;
+  const headerLinks = f.showHeaderLinks ? p.header.links : [];
+  return (
+    <Card
+      id={FOOTER}
+      open={open}
+      onOpen={onOpen}
+      label="Footer — the end of your page"
+      tools={
+        <span className="flex items-center gap-1">
+          <LookToggles name="the footer" page resume={null} />
+          {open && (
+            <button type="button" className="btn btn-primary ml-1" style={{ marginTop: 0, minHeight: 32, fontSize: 13 }} onClick={onClose}>
+              Done
+            </button>
+          )}
+        </span>
+      }
+      preview={
+        <>
+          <div className="text-[21px] leading-snug font-semibold tracking-[-0.02em]">
+            {f.headline || <Placeholder>{p.header.name ? `Say hello to ${p.header.name.split(" ")[0]}` : "A last line to visitors"}</Placeholder>}
+          </div>
+          {f.text && <p className="m-0 mt-1.5 line-clamp-2 max-w-[64ch] text-[14px] leading-relaxed text-muted">{f.text}</p>}
+          {f.ctaLabel && (
+            <span className="mt-3 inline-flex h-8 items-center rounded-full px-3.5 text-[12.5px] font-semibold" style={{ background: "var(--color-ink)", color: "var(--color-bg)" }}>
+              {f.ctaLabel}
+            </span>
+          )}
+          <LinkList links={[...headerLinks, ...f.links]} />
+          <p className="m-0 mt-3 text-[12.5px] text-muted">{f.note || <Placeholder>© {new Date().getFullYear()} {p.header.name || "Your name"}</Placeholder>}</p>
+        </>
+      }
+    >
+      <div className="flex flex-col gap-4">
+        <div className="field">
+          <label htmlFor="f-headline">Closing line</label>
+          <input
+            id="f-headline"
+            className="input"
+            style={{ fontWeight: 600, fontSize: 18, minHeight: 46 }}
+            placeholder="Let’s build something together"
+            value={f.headline}
+            onChange={(e) => onChange((x) => ({ ...x, headline: e.target.value }))}
+          />
+          <p className="m-0 mt-1.5 text-[12px] text-muted">Left empty, the footer leads with your name.</p>
+        </div>
+        <div className="field">
+          <label htmlFor="f-text">A line under it</label>
+          <textarea
+            id="f-text"
+            className="input"
+            rows={2}
+            placeholder="Taking on two projects this quarter."
+            value={f.text}
+            onChange={(e) => onChange((x) => ({ ...x, text: e.target.value }))}
+          />
+        </div>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div className="field">
+            <label htmlFor="f-cta-label">Button label</label>
+            <input
+              id="f-cta-label"
+              className="input"
+              placeholder="Email me"
+              value={f.ctaLabel}
+              onChange={(e) => onChange((x) => ({ ...x, ctaLabel: e.target.value }))}
+            />
+          </div>
+          <div className="field">
+            <label htmlFor="f-cta-url">Button link</label>
+            <input
+              id="f-cta-url"
+              className="input"
+              placeholder="mailto:you@example.com or cal.com/you"
+              value={f.ctaUrl}
+              onChange={(e) => onChange((x) => ({ ...x, ctaUrl: e.target.value }))}
+            />
+          </div>
+        </div>
+      </div>
+
+      <Grouped title="Links" hint="Your header’s links can repeat here; these are added after them.">
+        <label className="flex cursor-pointer items-center gap-3 text-[13.5px]">
+          <input
+            type="checkbox"
+            className="h-4 w-4 flex-none accent-[var(--color-ink)]"
+            checked={f.showHeaderLinks}
+            onChange={(e) => onChange((x) => ({ ...x, showHeaderLinks: e.target.checked }))}
+          />
+          Repeat the header’s links ({p.header.links.length})
+        </label>
+        <LinkEditor links={f.links} onChange={(links) => onChange((x) => ({ ...x, links }))} />
+      </Grouped>
+
+      <Grouped title="Small print">
+        <div className="field">
+          <label htmlFor="f-note">Last line</label>
+          <input
+            id="f-note"
+            className="input"
+            placeholder={`© ${new Date().getFullYear()} ${p.header.name || "Your name"} · Bengaluru`}
+            value={f.note}
+            onChange={(e) => onChange((x) => ({ ...x, note: e.target.value }))}
+          />
+        </div>
+      </Grouped>
+
+      <div className="mt-6 flex justify-end">
+        <button type="button" className="btn btn-primary" onClick={onClose}>
           Done
         </button>
       </div>

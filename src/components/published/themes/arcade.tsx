@@ -28,6 +28,7 @@ import {
   tabs,
   useTabFilter,
 } from "../shared";
+import { FeatureBand, FooterBody, footerHeadline, footerNote, splitFeatures } from "../components";
 
 /* ── Arcade ───────────────────────────────────────────────────────────────
    For players and the people who build games. A synthwave horizon with a
@@ -169,14 +170,35 @@ export function Arcade({ p }: { p: Portfolio }) {
               </div>
             </div>
 
+            {/* One column for the run: cards, then bands, never spilling into
+                the level menu's track. */}
+            <div className="flex min-w-0 flex-col gap-5">
+            {splitFeatures(shown).cards.length > 0 && (
             <div className={`grid gap-5 ${gridCols(p)}`} style={{ perspective: 1600 }}>
               <AnimatePresence mode="popLayout" initial={false}>
-                {shown.map((s, i) => (
+                {splitFeatures(shown).cards.map((s, i) => (
                   <Flip key={s.id} index={i}>
                     <Card p={p} section={s} />
                   </Flip>
                 ))}
               </AnimatePresence>
+            </div>
+            )}
+            {splitFeatures(shown).features.map((s) => (
+              <Reveal key={`${tab}-${s.id}`} kind="up">
+                <div
+                  className="arcade-cut p-px"
+                  style={{ background: "linear-gradient(135deg, var(--color-accent), color-mix(in srgb, var(--color-accent) 20%, transparent) 60%)" }}
+                >
+                  <FeatureBand
+                    p={p}
+                    section={s}
+                    className="arcade-cut p-6 md:p-12"
+                    style={{ background: "color-mix(in srgb, var(--color-ink) 4%, var(--color-bg))" }}
+                  />
+                </div>
+              </Reveal>
+            ))}
             </div>
           </div>
         </section>
@@ -224,12 +246,13 @@ export function Arcade({ p }: { p: Portfolio }) {
         >
           Press start
         </p>
-        <h2 className="mb-8" style={{ ...headline("clamp(36px, 6vw, 80px)"), lineHeight: 1 }}>
-          Get in touch
+        <h2 className="mx-auto mb-8 max-w-[20ch]" style={{ ...headline("clamp(36px, 6vw, 80px)"), lineHeight: 1 }}>
+          {footerHeadline(p, "Get in touch")}
         </h2>
         <div className="flex justify-center">
-          <HeaderLinks p={p} />
+          <FooterBody p={p} center />
         </div>
+        <p className="text-muted m-0 mt-10 text-[13px]">{footerNote(p)}</p>
         <a
           href="#top"
           onClick={toTop}
@@ -393,9 +416,9 @@ function Card({ p, section }: { p: Portfolio; section: Section }) {
           className="arcade-cut flex h-full flex-col overflow-hidden"
           style={{ background: "color-mix(in srgb, var(--color-ink) 4%, var(--color-bg))" }}
         >
-          {section.image && (
+          {section.images[0] && (
             <div className="relative aspect-[16/9] overflow-hidden">
-              <Photo asset={section.image} className="h-full w-full object-cover" />
+              <Photo asset={section.images[0]} className="h-full w-full object-cover" />
               <div aria-hidden className="arcade-scanlines absolute inset-0" />
             </div>
           )}

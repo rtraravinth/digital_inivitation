@@ -34,7 +34,7 @@ async def test_uploading_a_large_image_downscales_and_reencodes_it(auth_client):
     assert asset["mime"] == "image/jpeg"
     assert max(asset["width"], asset["height"]) == 1400
     assert asset["size"] < 420 * 1024
-    assert asset["url"] == f"/api/v1/assets/{asset['id']}"
+    assert asset["url"].startswith(f"/api/v1/assets/{asset['id']}?t=")
     assert asset["name"] == "photo.png"
 
 
@@ -144,7 +144,11 @@ async def test_attaching_an_asset_to_a_section_returns_it_nested(auth_client, po
         json={"imageAssetId": asset["id"]},
     )
     assert response.status_code == 200
-    assert response.json()["image"]["url"] == asset["url"]
+    image = response.json()["image"]
+    # Not the whole URL: its signature is minted per response, so two
+    # serialisations a second apart carry different tokens for one asset.
+    assert image["id"] == asset["id"]
+    assert image["url"].startswith(f"/api/v1/assets/{asset['id']}?t=")
 
     cleared = await auth_client.patch(
         f"/api/v1/portfolios/{portfolio['id']}/sections/{section_id}",
@@ -191,3 +195,76 @@ async def test_uploading_requires_a_token(client):
     client.headers.pop("Authorization", None)
     response = await upload(client, png_bytes(100, 100))
     assert response.status_code == 401
+
+
+# ── signed URLs ───────────────────────────────────────────────────────────
+#
+# An <img> tag cannot send an Authorization header, so the owner's own URL
+# carries a short-lived signature instead. See app/core/security.py.
+
+
+async def test_the_owner_url_carries_a_signature(auth_client):
+    asset = (await upload(auth_client, png_bytes(200, 200))).json()
+    assert asset["url"].startswith(f"/api/v1/assets/{asset['id']}?t=")
+
+
+async def test_a_signed_url_opens_without_a_bearer_token(auth_client):
+    asset = (await upload(auth_client, png_bytes(200, 200))).json()
+    url = asset["url"]
+
+    auth_client.headers.pop("Authorization", None)
+    response = await auth_client.get(url)
+
+    assert response.status_code == 200
+    assert response.headers["content-type"] == "image/jpeg"
+
+
+async def test_a_tampered_signature_is_rejected(auth_client):
+    asset = (await upload(auth_client, png_bytes(200, 200))).json()
+    token = asset["url"].split("?t=")[1]
+
+    auth_client.headers.pop("Authorization", None)
+    response = await auth_client.get(f"/api/v1/assets/{asset['id']}?t={token}x")
+
+    assert response.status_code == 401
+    assert response.json()["error"]["code"] == "invalid_token"
+
+
+async def test_a_signature_does_not_open_a_different_asset(auth_client):
+    mine = (await upload(auth_client, png_bytes(200, 200))).json()
+    other = (await upload(auth_client, png_bytes(210, 210), name="b.png")).json()
+    token = mine["url"].split("?t=")[1]
+
+    auth_client.headers.pop("Authorization", None)
+    response = await auth_client.get(f"/api/v1/assets/{other['id']}?t={token}")
+
+    assert response.status_code == 404
+    assert response.json()["error"]["code"] == "asset_not_found"
+
+
+async def test_an_expired_signature_is_rejected(auth_client):
+    from app.core.security import create_asset_token
+
+    asset = (await upload(auth_client, png_bytes(200, 200))).json()
+    stale = create_asset_token(asset["id"], ttl_minutes=-1)
+
+    auth_client.headers.pop("Authorization", None)
+    response = await auth_client.get(f"/api/v1/assets/{asset['id']}?t={stale}")
+
+    assert response.status_code == 401
+    assert response.json()["error"]["code"] == "token_expired"
+
+
+async def test_an_access_token_is_not_an_asset_token(auth_client, registered):
+    asset = (await upload(auth_client, png_bytes(200, 200))).json()
+    access = registered["token"]["accessToken"]
+
+    auth_client.headers.pop("Authorization", None)
+    response = await auth_client.get(f"/api/v1/assets/{asset['id']}?t={access}")
+
+    assert response.status_code == 401
+
+
+async def test_a_bearer_token_still_opens_an_unsigned_url(auth_client):
+    asset = (await upload(auth_client, png_bytes(200, 200))).json()
+    assert (await auth_client.get(f"/api/v1/assets/{asset['id']}")).status_code == 200

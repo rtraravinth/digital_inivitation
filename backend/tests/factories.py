@@ -16,13 +16,29 @@ from app.models import User
 
 TEST_PASSWORD = "correct horse battery"
 
+#: The first user's handle. Published addresses are
+#: /api/v1/public/p/<handle>/<slug>, so tests need it by name.
+TEST_HANDLE = "rohan"
+
+#: The second user's, for the tests that prove one account cannot reach
+#: another's pages through its own handle.
+OTHER_HANDLE = "priya"
+
 
 async def register(
-    client: AsyncClient, email: str, *, name: str = "Test Person"
+    client: AsyncClient, email: str, *, name: str = "Test Person", handle: str | None = None
 ) -> dict:
+    # The handle is the base of every address the account publishes, so it is
+    # required at sign-up. Derived from the local part here so a test that
+    # does not care about addresses still gets a valid one.
     response = await client.post(
         "/api/v1/auth/register",
-        json={"email": email, "password": TEST_PASSWORD, "name": name},
+        json={
+            "email": email,
+            "password": TEST_PASSWORD,
+            "name": name,
+            "handle": handle or email.split("@")[0].replace(".", "-"),
+        },
     )
     assert response.status_code == 201, response.text
     return response.json()
@@ -34,7 +50,7 @@ def bearer(client: AsyncClient, access_token: str) -> None:
 
 @pytest.fixture
 async def registered(client: AsyncClient) -> dict:
-    return await register(client, "rohan@example.com", name="Rohan Mehta")
+    return await register(client, "rohan@example.com", name="Rohan Mehta", handle=TEST_HANDLE)
 
 
 @pytest.fixture
@@ -58,7 +74,9 @@ async def other_auth_client(app) -> AsyncIterator[AsyncClient]:
         base_url="http://test",
         headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0) Firefox/133.0"},
     ) as other:
-        payload = await register(other, "priya@example.com", name="Priya Nair")
+        payload = await register(
+            other, "priya@example.com", name="Priya Nair", handle=OTHER_HANDLE
+        )
         bearer(other, payload["token"]["accessToken"])
         yield other
 

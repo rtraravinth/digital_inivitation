@@ -2,6 +2,10 @@ export type LinkItem = {
   id: string;
   label: string;
   url: string;
+  /** Overrides the icon `iconFor()` would derive from `url`. Absent means
+   *  "decide from the address" — which is what almost every link wants, so
+   *  the field is optional and `normalize()` leaves it alone. */
+  icon?: string;
 };
 
 /** Optional extras — they feed the published page's stat and timeline panels. */
@@ -39,183 +43,422 @@ export function assetSrc(asset: Asset | null | undefined): string | undefined {
 export type Quote = { text: string; attribution: string };
 
 /**
- * What a section *is*, from the add-block picker. Purely presentational: it
- * picks the glyph on the Links theme's rows and the label in the block
- * manager. Every kind still has the same four fields underneath.
+ * What a section files under when the page has no tabs yet. Mirrors
+ * DEFAULT_TAB in backend/app/models/enums.py.
  */
-export type BlockKind =
-  | "link"
-  | "venture"
-  | "contact"
-  | "booking"
-  | "testimonial"
-  | "gallery"
-  | "numbers"
-  | "document";
+export const DEFAULT_TAB = "Work";
 
-export const BLOCK_TYPES: Array<{
-  id: BlockKind;
-  icon: string;
-  name: string;
-  desc: string;
-}> = [
-  { id: "link", icon: "↗", name: "Link", desc: "Anything with a URL" },
-  { id: "venture", icon: "▤", name: "Venture", desc: "Business with stats" },
-  { id: "contact", icon: "✉", name: "Contact", desc: "Email, call or form" },
-  { id: "booking", icon: "◷", name: "Booking", desc: "Calendar slot" },
-  { id: "testimonial", icon: "❝", name: "Testimonial", desc: "A client quote" },
-  { id: "gallery", icon: "▦", name: "Gallery", desc: "Photos, b&w" },
-  { id: "numbers", icon: "◸", name: "Numbers", desc: "Stat row" },
-  { id: "document", icon: "▣", name: "Document", desc: "PDF or one-pager" },
-];
-
-export const BLOCK_ICON: Record<BlockKind, string> = Object.fromEntries(
-  BLOCK_TYPES.map((b) => [b.id, b.icon]),
-) as Record<BlockKind, string>;
+/** As long as a tab name may be. Mirrors TAB_MAX_LENGTH on the API. */
+export const TAB_MAX_LENGTH = 60;
 
 /**
- * Every section is the same four fields — title, description, tags, links —
+ * Every section is the same four fields — title, description, tab, links —
  * so there is nothing to learn twice. Everything below that is opt-in.
+ *
+ * `tab` is the exception: a visitor reaches a section through its tab and
+ * nowhere else, so it is required and never blank. One tab per section, and
+ * the page's tab row is the distinct set of them.
+ *
+ * Numbers and the timeline are not here: the page draws one of each, from
+ * the header. See `PortfolioHeader`.
  */
 export type Section = {
   id: string;
   title: string;
   description: string;
-  tags: string[];
+  tab: string;
   links: LinkItem[];
-  numbers: Stat[];
-  dates: DateEntry[];
   image: Asset | null;
   file: Asset | null;
   quote: Quote | null;
   /** Hidden sections stay in the document and off the published page. */
   hidden: boolean;
-  kind: BlockKind;
+  /** Prints on the resume, under its tab as the heading. Independent of
+   *  `hidden`: a section can be on the page, the resume, or both. */
+  onResume: boolean;
 };
 
-/** The header is a section with two extra lines: who you are, and what you're doing now. */
+/**
+ * The header is a section with two extra lines: who you are, and what you're
+ * doing now — plus the two lists the whole page shares. `numbers` fills the
+ * "By the numbers" row and `dates` the timeline; both are drawn once, so
+ * they belong to the portfolio rather than to whichever section they were
+ * typed into.
+ */
 export type PortfolioHeader = {
   name: string;
   current: string;
   description: string;
   tags: string[];
   links: LinkItem[];
+  numbers: Stat[];
+  dates: DateEntry[];
   portrait: Asset | null;
 };
 
 export type PortfolioStatus = "live" | "draft" | "empty";
 
-/** The published-page structures. Content stays put; the frame changes. */
-export type ThemeId =
-  | "editorial"
-  | "index"
-  | "poster"
-  | "links"
-  | "ledger"
-  | "dossier"
-  | "broadsheet";
+/**
+ * The published-page structures. Content stays put; the frame changes.
+ *
+ * Five motion themes, each built around one piece of depth rather than a
+ * page of effects: Aurora's floating glass, Meridian's layered portrait,
+ * Stage's showreel rails, Arcade's perspective grid, Journey's stacking
+ * cards. Mirrors THEMES in backend/app/models/enums.py.
+ */
+export type ThemeId = "aurora" | "meridian" | "stage" | "arcade" | "journey";
 
 export type Ground = "light" | "dark" | "paper";
-export type FontId = "archivo" | "fraunces" | "space-grotesk";
+export type FontId =
+  | "bodoni-moda"
+  | "schibsted-grotesk"
+  | "archivo"
+  | "inter"
+  | "dm-sans"
+  | "space-grotesk"
+  | "manrope"
+  | "fraunces"
+  | "playfair-display"
+  | "source-serif-4"
+  | "lora"
+  | "roboto-slab"
+  | "bitter"
+  | "oswald"
+  | "syne"
+  | "jetbrains-mono"
+  | "lexend"
+  | "outfit";
 
-/** The gallery filters by who a theme suits, not by what it looks like. */
-export type ThemeAudience = "founders" | "advisers" | "office" | "writers" | "multi";
-
-export const THEME_AUDIENCES: Array<{ id: ThemeAudience; name: string }> = [
-  { id: "founders", name: "Founders" },
-  { id: "advisers", name: "Advisers" },
-  { id: "office", name: "Public office" },
-  { id: "writers", name: "Writers" },
-  { id: "multi", name: "Multi-role" },
-];
+/**
+ * Who the page is for. The gallery and the builder start here, because "what
+ * do you do?" is a question everyone can answer and "which layout?" is not.
+ * It is not stored: picking one applies a look, and the look is what's saved.
+ */
+export type ProfessionId =
+  | "doctor"
+  | "advocate"
+  | "business"
+  | "entrepreneur"
+  | "developer"
+  | "gamer"
+  | "musician"
+  | "dancer"
+  | "student"
+  | "social";
 
 export const THEMES: Array<{
   id: ThemeId;
   name: string;
+  /** One line for a list row. */
   desc: string;
+  /** Two sentences for the gallery card. */
   long: string;
-  badge?: string;
-  audiences: ThemeAudience[];
+  /** The theme's one piece of depth, said plainly. */
+  depth: string;
+  professions: ProfessionId[];
 }> = [
   {
-    id: "editorial",
-    name: "Editorial",
-    desc: "Tabs across a modular grid",
-    long: "A tabbed grid with the portrait on the right. The default, and the safest.",
-    audiences: ["founders", "multi", "advisers"],
+    id: "aurora",
+    name: "Aurora",
+    desc: "Glass cards floating over light",
+    long: "A dark page lit from behind, with your work on glass cards that tilt toward the pointer. Reads as a product launch.",
+    depth: "Cards lean in 3D under the pointer; tags orbit the portrait at three depths.",
+    professions: ["developer", "entrepreneur", "business"],
   },
   {
-    id: "index",
-    name: "Index rail",
-    desc: "Roles as a numbered sidebar, content as records",
-    long: "A numbered rail of roles beside records of the work. Good for long histories.",
-    audiences: ["advisers", "office", "multi"],
+    id: "meridian",
+    name: "Meridian",
+    desc: "Calm, credentialed, made to be trusted",
+    long: "A light, quiet page that leads with credentials and lets testimonials speak. For the people a visitor has to trust first.",
+    depth: "The portrait sits on layered plates that separate as you scroll.",
+    professions: ["doctor", "advocate", "business"],
   },
   {
-    id: "poster",
-    name: "Poster",
-    desc: "Accent field hero, roles as a statement",
-    long: "A colour field and display type. Loud, for people who present a lot.",
-    audiences: ["founders", "writers"],
+    id: "stage",
+    name: "Stage",
+    desc: "A billboard, then showreel rails",
+    long: "Your portrait fills the screen, then every tab becomes a rail of posters to swipe through. For people who perform.",
+    depth: "The billboard recedes as you scroll; posters turn toward the pointer.",
+    professions: ["musician", "dancer"],
   },
   {
-    id: "links",
-    name: "Links",
-    desc: "Role tabs over a stack of tappable rows",
-    long: "One shareable page of rows, sized for a thumb. The link you put in a bio.",
-    audiences: ["founders", "writers", "multi"],
+    id: "arcade",
+    name: "Arcade",
+    desc: "Neon, a moving grid, level select",
+    long: "A synthwave horizon, a glitching name and a level-select menu for your tabs. Built for players and the people who make games.",
+    depth: "A perspective grid runs to the horizon; cards flip in as you change level.",
+    professions: ["gamer", "developer"],
   },
   {
-    id: "ledger",
-    name: "Ledger",
-    desc: "Everything as one long table",
-    long: "Everything as one long table. Built for people with a lot of entries.",
-    audiences: ["advisers", "office"],
+    id: "journey",
+    name: "Journey",
+    desc: "A warm story in stacking chapters",
+    long: "A friendly page told as a story: each piece of work is a card that stacks on the last as you scroll. For impact, study and growth.",
+    depth: "Tags ring the portrait in a slow 3D orbit; cards stack and settle back as you read.",
+    professions: ["student", "social"],
   },
-  {
-    id: "dossier",
-    name: "Dossier",
-    desc: "Visitor picks a lens, the page rewrites itself",
-    long: "The visitor picks a lens first — one of your roles — and the page rewrites itself around it.",
-    badge: "New",
-    audiences: ["multi", "advisers", "office"],
-  },
-  {
-    id: "broadsheet",
-    name: "Broadsheet",
-    desc: "Columns of type with rules between",
-    long: "Three columns of type with rules between. Reads like a newspaper page.",
-    audiences: ["writers", "office"],
-  },
-];
-
-export const GROUNDS: Array<{ id: Ground; name: string }> = [
-  { id: "light", name: "Light" },
-  { id: "dark", name: "Dark" },
-  { id: "paper", name: "Paper" },
 ];
 
 /**
- * Headline faces over an Archivo body. Archivo/Archivo is the Modernist
- * default and stays the default — the alternates are opt-in per portfolio.
+ * Each profession's starting look: a theme and the colour and type that suit
+ * it. Applying one writes these fields onto the portfolio — after that they
+ * are the author's like any other choice, and the profession is forgotten.
+ *
+ * The grounds are picked colours rather than presets: the three presets are
+ * the catalogue's stocks, and none of them is the near-black a showreel
+ * wants or the cream a story page does.
  */
-export const FONTS: Array<{ id: FontId; name: string; sample: string; cssVar: string }> = [
-  { id: "archivo", name: "Archivo", sample: "One family throughout", cssVar: "--font-archivo" },
-  { id: "fraunces", name: "Fraunces", sample: "Serif headline", cssVar: "--font-fraunces" },
+export const PROFESSIONS: Array<{
+  id: ProfessionId;
+  name: string;
+  /** What the page has to do for this person, in a line. */
+  goal: string;
+  theme: ThemeId;
+  accent: string;
+  groundHex: string;
+  font: FontId;
+  bodyFont: FontId;
+}> = [
   {
-    id: "space-grotesk",
-    name: "Space Grotesk",
-    sample: "Geometric headline",
-    cssVar: "--font-space-grotesk",
+    id: "doctor",
+    name: "Doctor",
+    goal: "Qualifications, specialties and where to book",
+    theme: "meridian",
+    accent: "#0e7490",
+    groundHex: "#f3f7f9",
+    font: "lexend",
+    bodyFont: "inter",
+  },
+  {
+    id: "advocate",
+    name: "Advocate",
+    goal: "Practice areas, notable matters, chambers",
+    theme: "meridian",
+    accent: "#7a1f2b",
+    groundHex: "#f6f2ea",
+    font: "playfair-display",
+    bodyFont: "source-serif-4",
+  },
+  {
+    id: "business",
+    name: "Business",
+    goal: "Track record, numbers and the board seats",
+    theme: "aurora",
+    accent: "#3b82f6",
+    groundHex: "#0b1324",
+    font: "manrope",
+    bodyFont: "inter",
+  },
+  {
+    id: "entrepreneur",
+    name: "Entrepreneur",
+    goal: "Ventures, traction, and what's next",
+    theme: "aurora",
+    accent: "#8b5cf6",
+    groundHex: "#0a0a14",
+    font: "space-grotesk",
+    bodyFont: "dm-sans",
+  },
+  {
+    id: "developer",
+    name: "Developer",
+    goal: "Shipped projects, stack, open source",
+    theme: "aurora",
+    accent: "#22c55e",
+    groundHex: "#0b0f14",
+    font: "jetbrains-mono",
+    bodyFont: "inter",
+  },
+  {
+    id: "gamer",
+    name: "Gamer",
+    goal: "Ranks, streams, teams and highlights",
+    theme: "arcade",
+    accent: "#ff2bd6",
+    groundHex: "#07060f",
+    font: "oswald",
+    bodyFont: "space-grotesk",
+  },
+  {
+    id: "musician",
+    name: "Musician",
+    goal: "Releases, shows and where to listen",
+    theme: "stage",
+    accent: "#f43f5e",
+    groundHex: "#09090b",
+    font: "syne",
+    bodyFont: "inter",
+  },
+  {
+    id: "dancer",
+    name: "Dancer",
+    goal: "Performances, reels and companies",
+    theme: "stage",
+    accent: "#f59e0b",
+    groundHex: "#0c0a12",
+    font: "playfair-display",
+    bodyFont: "manrope",
+  },
+  {
+    id: "student",
+    name: "Student",
+    goal: "Projects, skills and what you're learning",
+    theme: "journey",
+    accent: "#6366f1",
+    groundHex: "#f7f7fb",
+    font: "outfit",
+    bodyFont: "dm-sans",
+  },
+  {
+    id: "social",
+    name: "Social work",
+    goal: "Causes, impact and the people behind it",
+    theme: "journey",
+    accent: "#e76f51",
+    groundHex: "#fbf6ef",
+    font: "fraunces",
+    bodyFont: "outfit",
   },
 ];
 
-/** One accent runs the page — buttons, kickers and the closing banner. */
-export const SWATCHES = ["#ec3013", "#201e1d", "#1d4ed8", "#0f7b52", "#b45309"];
+/** The fields a profession's look writes, applied to a portfolio. */
+export function applyProfession(p: Portfolio, id: ProfessionId): Portfolio {
+  const look = PROFESSIONS.find((x) => x.id === id);
+  if (!look) return p;
+  return {
+    ...p,
+    theme: look.theme,
+    accent: look.accent,
+    groundHex: look.groundHex,
+    font: look.font,
+    bodyFont: look.bodyFont,
+  };
+}
+
+/**
+ * The catalogue's three stocks: board, plate white, and binding cloth.
+ *
+ * `hex` is the ground each preset paints, duplicated from the palette map in
+ * `published/shared.tsx` so the picker can show a preset as a swatch and can
+ * hand the custom field somewhere to start from. The map there stays the
+ * authority on the other six variables a preset sets, foil included.
+ *
+ * The ids stay `light` / `dark` / `paper` — wire format and stored values —
+ * while Board leads the list because it is the house ground. Renaming the
+ * keys would be a migration for nothing a label change does not do, which is
+ * the same reason `roleNav` and `font` keep their names.
+ */
+export const GROUNDS: Array<{ id: Ground; name: string; hex: string }> = [
+  { id: "dark", name: "Board", hex: "#16233b" },
+  { id: "light", name: "Plate", hex: "#ffffff" },
+  { id: "paper", name: "Cloth", hex: "#1f3a32" },
+];
+
+/**
+ * The faces an author can pick, headline and body.
+ *
+ * The two house faces lead the list: Bodoni Moda sets the catalogue's
+ * half-titles and plate numbers, Schibsted Grotesk its captions and
+ * controls, and a portfolio that never opens the Type panel gets that
+ * pairing. The twelve after them are opt-in alternates.
+ *
+ * Every face here is variable and reaches at least 700. That is the entry
+ * requirement, not a coincidence: `globals.css` sets `font-weight: 700` on
+ * every heading, so a single-weight family would be faux-bolded by the
+ * browser and come out smeared. It is why the obvious display picks —
+ * Anton, Bebas Neue, Instrument Serif — are absent.
+ *
+ * Ordered by kind rather than alphabetically, so scanning the list moves
+ * through the house pairing, then sans, serif, slab, condensed, display, mono.
+ */
+export const FONTS: Array<{ id: FontId; name: string; sample: string; cssVar: string }> = [
+  {
+    id: "bodoni-moda",
+    name: "Bodoni Moda",
+    sample: "Catalogue didone",
+    cssVar: "--font-bodoni-moda",
+  },
+  {
+    id: "schibsted-grotesk",
+    name: "Schibsted Grotesk",
+    sample: "Caption grotesk",
+    cssVar: "--font-schibsted-grotesk",
+  },
+  { id: "archivo", name: "Archivo", sample: "One family throughout", cssVar: "--font-archivo" },
+  { id: "inter", name: "Inter", sample: "Neutral sans", cssVar: "--font-inter" },
+  { id: "dm-sans", name: "DM Sans", sample: "Geometric sans", cssVar: "--font-dm-sans" },
+  {
+    id: "space-grotesk",
+    name: "Space Grotesk",
+    sample: "Sans with a quirk",
+    cssVar: "--font-space-grotesk",
+  },
+  { id: "manrope", name: "Manrope", sample: "Humanist sans", cssVar: "--font-manrope" },
+  { id: "fraunces", name: "Fraunces", sample: "Soft serif", cssVar: "--font-fraunces" },
+  {
+    id: "playfair-display",
+    name: "Playfair Display",
+    sample: "High-contrast serif",
+    cssVar: "--font-playfair-display",
+  },
+  {
+    id: "source-serif-4",
+    name: "Source Serif 4",
+    sample: "Transitional serif",
+    cssVar: "--font-source-serif-4",
+  },
+  { id: "lora", name: "Lora", sample: "Bookish serif", cssVar: "--font-lora" },
+  { id: "roboto-slab", name: "Roboto Slab", sample: "Slab serif", cssVar: "--font-roboto-slab" },
+  { id: "bitter", name: "Bitter", sample: "Contemporary slab", cssVar: "--font-bitter" },
+  { id: "oswald", name: "Oswald", sample: "Condensed headline", cssVar: "--font-oswald" },
+  { id: "syne", name: "Syne", sample: "Display, wide", cssVar: "--font-syne" },
+  {
+    id: "jetbrains-mono",
+    name: "JetBrains Mono",
+    sample: "Monospace headline",
+    cssVar: "--font-jetbrains-mono",
+  },
+  { id: "lexend", name: "Lexend", sample: "Clear, open sans", cssVar: "--font-lexend" },
+  { id: "outfit", name: "Outfit", sample: "Friendly geometric", cssVar: "--font-outfit" },
+];
+
+/**
+ * One accent runs the page — the primary action's fill, the open plate's
+ * mark, the colophon field.
+ *
+ * Five binding colours, cloth red first because it is the house accent. A
+ * picked colour overrides any of them, and `--color-mark` in
+ * `published/shared.tsx` takes whatever is chosen to an instance of itself
+ * the author's ground can actually hold.
+ */
+export const SWATCHES = ["#b5261e", "#1f3a32", "#1d3f8a", "#8a6f1f", "#5b2545"];
+
+/**
+ * Both pickers write straight into a style attribute on the published page,
+ * so a value that is not exactly `#rrggbb` is never stored. This is also
+ * what lets a hex field hold a half-typed value without saving it.
+ */
+export function isHexColour(value: unknown): value is string {
+  return typeof value === "string" && /^#[0-9a-fA-F]{6}$/.test(value);
+}
+
+/**
+ * What a hex field should commit as the user types. Accepts a missing `#`
+ * and any case, and returns null while the value is still incomplete.
+ */
+export function readHexColour(value: string): string | null {
+  const trimmed = value.trim();
+  const hex = trimmed.startsWith("#") ? trimmed : `#${trimmed}`;
+  return isHexColour(hex) ? hex.toLowerCase() : null;
+}
 
 /* ── layout ───────────────────────────────────────────────────────────── */
 
-/** How a visitor moves between the things you do. */
+/**
+ * How a visitor moves between the tabs. The key stays `roleNav`: it is the
+ * wire format and a stored value, and renaming it would buy nothing a label
+ * change does not.
+ */
 export type RoleNav = "tabs" | "rail" | "scroll" | "lens";
 export type GridCols = 1 | 2 | 3;
 export type Density = "airy" | "standard" | "dense";
@@ -223,7 +466,7 @@ export type Density = "airy" | "standard" | "dense";
 export const ROLE_NAVS: Array<{ id: RoleNav; name: string }> = [
   { id: "tabs", name: "Tabs across the page" },
   { id: "rail", name: "Numbered side rail" },
-  { id: "scroll", name: "One scroll, roles as chapters" },
+  { id: "scroll", name: "One scroll, tabs as chapters" },
   { id: "lens", name: "Visitor picks a lens first" },
 ];
 
@@ -231,6 +474,38 @@ export const DENSITIES: Array<{ id: Density; name: string }> = [
   { id: "airy", name: "Airy" },
   { id: "standard", name: "Standard" },
   { id: "dense", name: "Dense — more per screen" },
+];
+
+/**
+ * How photographs are printed on the published page.
+ *
+ * "colour" is the default and was not always: every image used to run through
+ * `grayscale(1) contrast(1.08)` with no way out, because the Modernist system
+ * called for black-and-white photography. That reads as a print convention
+ * from a long way back on a page whose whole job is showing somebody's work,
+ * so the treatment became the author's to pick. Stored portfolios that never
+ * chose one get "colour" — this is a deliberate change of look for existing
+ * pages, not a backfill of what they had.
+ */
+export type PhotoTreatment = "colour" | "bw";
+
+export const PHOTO_TREATMENTS: Array<{ id: PhotoTreatment; name: string }> = [
+  { id: "colour", name: "Colour" },
+  { id: "bw", name: "Black & white" },
+];
+
+/**
+ * How much the published page moves. "full" is every theme's depth and
+ * motion; "subtle" keeps the reveals and drops the pointer tilt, parallax and
+ * ambient loops; "off" is a still page. A visitor's own reduced-motion
+ * setting caps it at "off" whatever the author picked — see `useMotionLevel`.
+ */
+export type MotionLevel = "full" | "subtle" | "off";
+
+export const MOTION_LEVELS: Array<{ id: MotionLevel; name: string; desc: string }> = [
+  { id: "full", name: "Full", desc: "Depth, tilt, parallax and ambient motion." },
+  { id: "subtle", name: "Subtle", desc: "Content eases in. Nothing follows the pointer." },
+  { id: "off", name: "Still", desc: "No motion at all. Everything is simply there." },
 ];
 
 /** The headline scale multiplies each theme's own display size. */
@@ -251,6 +526,8 @@ export type Layout = {
   scale: TypeScale;
   /** Any CSS letter-spacing value; the published page reads it as a token. */
   tracking: string;
+  photo: PhotoTreatment;
+  motion: MotionLevel;
 };
 
 export function defaultLayout(): Layout {
@@ -260,6 +537,8 @@ export function defaultLayout(): Layout {
     density: "standard",
     scale: "default",
     tracking: DEFAULT_TRACKING,
+    photo: "colour",
+    motion: "full",
   };
 }
 
@@ -271,57 +550,113 @@ export type Portfolio = {
   status: PortfolioStatus;
   summary: string;
   meta: string;
+  /** When the server last saved it, ISO 8601. Absent on seed and stored-locally data. */
+  updatedAt?: string;
   theme: ThemeId;
   accent: string;
   ground: Ground;
+  /**
+   * A picked ground colour, which wins over the `ground` preset. Empty means
+   * "use the preset" — the preset always stays set, so clearing a custom
+   * colour has somewhere to fall back to.
+   */
+  groundHex: string;
+  /** The headline face. Kept as `font` because it is the wire format and a
+   *  stored value; the body face is `bodyFont`. */
   font: FontId;
+  bodyFont: FontId;
   layout: Layout;
+  /** The document this portfolio downloads as. Never on the published page. */
+  resume: Resume;
   header: PortfolioHeader;
   sections: Section[];
 };
 
 const THEME_IDS = new Set<string>(THEMES.map((t) => t.id));
 
+/** The theme a new or unrecognised portfolio renders in. */
+export const DEFAULT_THEME: ThemeId = "aurora";
+
+/**
+ * The catalogue themes and the motion theme that took each one's place.
+ * Mirrors LEGACY_THEMES in backend/app/models/enums.py and the migration
+ * that retired them; kept here for data that reaches the page without
+ * passing through that migration.
+ */
+const LEGACY_THEMES: Record<string, ThemeId> = {
+  editorial: "aurora",
+  site: "aurora",
+  resume: "meridian",
+  poster: "stage",
+  links: "journey",
+};
+
 /** Fills in fields added after a portfolio was first stored. */
 export function normalize(p: Portfolio): Portfolio {
   const layout = { ...defaultLayout(), ...(p.layout ?? {}) };
+  const theme = LEGACY_THEMES[p.theme] ?? p.theme;
   return {
     ...p,
     // An unknown theme means data from a build that had one we've since
     // dropped; fall back rather than render nothing.
-    theme: THEME_IDS.has(p.theme) ? p.theme : "editorial",
+    theme: THEME_IDS.has(theme) ? theme : DEFAULT_THEME,
     accent: p.accent ?? SWATCHES[0],
-    ground: p.ground ?? "light",
-    font: p.font ?? "archivo",
+    // Board, not plate white. A portfolio stored without a ground is being
+    // backfilled, and the ground the house prints on is the honest answer to
+    // "this was never chosen" — the same call the photo treatment made when
+    // it stopped forcing black and white.
+    ground: p.ground ?? "dark",
+    groundHex: isHexColour(p.groundHex) ? p.groundHex : "",
+    font: p.font ?? "bodoni-moda",
+    bodyFont: p.bodyFont ?? "schibsted-grotesk",
     layout: {
       roleNav: layout.roleNav ?? "tabs",
       grid: layout.grid ?? 2,
       density: layout.density ?? "standard",
       scale: layout.scale ?? "default",
       tracking: layout.tracking ?? DEFAULT_TRACKING,
+      photo: layout.photo ?? "colour",
+      motion: layout.motion ?? "full",
     },
-    header: { ...emptyHeader(), ...(p.header ?? {}) },
+    resume: normalizeResume(p.resume),
+    header: {
+      ...emptyHeader(),
+      ...(p.header ?? {}),
+      numbers: p.header?.numbers ?? [],
+      dates: p.header?.dates ?? [],
+    },
     sections: (p.sections ?? []).map((s) => ({
       ...emptySection(s.id),
       ...s,
       links: s.links ?? [],
-      tags: s.tags ?? [],
-      numbers: s.numbers ?? [],
-      dates: s.dates ?? [],
+      // A section written before tabs existed carries none. It would be
+      // unreachable with a blank one, so it lands on the default.
+      tab: s.tab?.trim() || DEFAULT_TAB,
       hidden: s.hidden ?? false,
-      kind: s.kind ?? "link",
+      onResume: s.onResume ?? true,
     })),
   };
 }
 
 export const STATUS_LABEL: Record<PortfolioStatus, string> = {
-  live: "Live",
-  draft: "Draft",
+  live: "Published",
+  draft: "Not published",
+  // Still its own word: an empty portfolio is not published either, but it
+  // has nothing on it yet, which is what the card is telling you.
   empty: "Empty",
 };
 
 export function emptyHeader(): PortfolioHeader {
-  return { name: "", current: "", description: "", tags: [], links: [], portrait: null };
+  return {
+    name: "",
+    current: "",
+    description: "",
+    tags: [],
+    links: [],
+    numbers: [],
+    dates: [],
+    portrait: null,
+  };
 }
 
 export function emptySection(id: string): Section {
@@ -329,15 +664,13 @@ export function emptySection(id: string): Section {
     id,
     title: "",
     description: "",
-    tags: [],
+    tab: DEFAULT_TAB,
     links: [],
-    numbers: [],
-    dates: [],
     image: null,
     file: null,
     quote: null,
     hidden: false,
-    kind: "link",
+    onResume: true,
   };
 }
 
@@ -351,6 +684,35 @@ export function emptySection(id: string): Section {
 /** Mirrors PASSWORD_MIN in backend/app/schemas/auth.py. The server is what
  * enforces it; this is so the UI can say so before the round trip. */
 export const PASSWORD_MIN = 12;
+
+/** The public domain these pages are published under. */
+export const PAGE_DOMAIN = "facet.page";
+
+/**
+ * A page's address, which is `<handle>/<slug>` — the handle is the namespace,
+ * so a slug alone no longer identifies a page. One place for it, because it
+ * is printed on the dashboard, the builder, the block manager, /stats, and
+ * inside a QR code that has to match all of them.
+ */
+export function pageAddress(handle: string, slug: string): string {
+  return `${PAGE_DOMAIN}/${handle}/${slug}`;
+}
+
+/** The same page on this app: the route that actually serves it. */
+export function pagePath(handle: string, slug: string): string {
+  return `/p/${handle}/${slug}`;
+}
+
+/**
+ * The owner's own preview of a portfolio, published or not.
+ *
+ * `pagePath` is the visitor's address and only resolves while the portfolio
+ * is live; every Preview button inside the app uses this instead, so a draft
+ * previews rather than 404s.
+ */
+export function previewPath(id: string): string {
+  return `/preview/${id}`;
+}
 
 export type AccountProfile = {
   name: string;
@@ -545,3 +907,230 @@ export const NEEDS_SERVER = {
   domain: "Serving your own domain needs DNS and a host.",
   email: "Sending mail needs a mail service.",
 } as const;
+
+/* ── the resume ───────────────────────────────────────────────────────────
+   One content list, two looks. The header is the resume's top — its name,
+   current line and About are the resume's name, headline and summary — and
+   the page's own sections print under their tabs. What lives here are the
+   facts a page section has no fields for — a role's company and dates, a
+   school, a list of skills — structured, so a later ATS check can read them
+   without parsing prose. Each structured block can also go on the page
+   (`pageBlocks`). Mirrors backend/app/schemas/resume.py.
+   ──────────────────────────────────────────────────────────────────────── */
+
+/** Every template, in catalogue order. `lib/resume.ts` describes each one. */
+export const RESUME_TEMPLATE_IDS = [
+  "classic",
+  "ivy",
+  "timeline",
+  "compact",
+  "sidebar",
+  "modern",
+  "executive",
+  "scholar",
+  "minimal",
+  "swiss",
+  "banner",
+  "slate",
+  "vivid",
+  "engineer",
+  "elegant",
+  "bold",
+  "contemporary",
+  "corporate",
+  "startup",
+  "columns",
+  "simple",
+  "graduate",
+  "senior",
+  "portrait",
+  "chronicle",
+  "pathway",
+  "nordic",
+  "editorial",
+  "ledger",
+  "monogram",
+  "cobalt",
+  "harbor",
+] as const;
+export type ResumeTemplateId = (typeof RESUME_TEMPLATE_IDS)[number];
+export type Paper = "a4" | "letter";
+export type ResumeSize = "small" | "medium" | "large";
+export type ResumeSpacing = "compact" | "standard" | "airy";
+/** `auto` follows the template; anything else overrides its columns. */
+export const RESUME_COLUMNS = ["auto", "one", "left", "right", "half"] as const;
+export type ResumeColumns = (typeof RESUME_COLUMNS)[number];
+/** Decoration behind the text. `lib/resume-backdrops.ts` draws each one. */
+export const RESUME_BACKDROP_IDS = [
+  "none",
+  "dots",
+  "grid",
+  "diagonal",
+  "hexagons",
+  "topography",
+  "waves",
+  "triangles",
+  "plus",
+  "edge",
+  "cream",
+  "wash",
+  "rainbow",
+  "arcs",
+  "circles",
+  "lines",
+] as const;
+export type ResumeBackdrop = (typeof RESUME_BACKDROP_IDS)[number];
+export type ResumeBlock =
+  | "summary"
+  | "experience"
+  | "education"
+  | "projects"
+  | "skills"
+  | "certifications"
+  | "languages"
+  | "awards";
+
+/** The structured blocks — the ones with a Page switch of their own. */
+export type PageBlock = "experience" | "education" | "skills" | "certifications" | "languages" | "awards";
+export const PAGE_BLOCKS: PageBlock[] = ["experience", "education", "skills", "certifications", "languages", "awards"];
+
+export const RESUME_BLOCKS: ResumeBlock[] = [
+  "summary",
+  "experience",
+  "education",
+  "projects",
+  "skills",
+  "certifications",
+  "languages",
+  "awards",
+];
+
+export type ExperienceItem = {
+  id: string;
+  role: string;
+  company: string;
+  location: string;
+  start: string;
+  end: string;
+  current: boolean;
+  bullets: string[];
+};
+export type EducationItem = {
+  id: string;
+  degree: string;
+  school: string;
+  location: string;
+  start: string;
+  end: string;
+  detail: string;
+};
+export type SkillGroup = { id: string; name: string; items: string[] };
+export type Certification = { id: string; name: string; issuer: string; date: string; url: string };
+export type Language = { id: string; name: string; level: string };
+export type Award = { id: string; title: string; issuer: string; date: string; detail: string };
+
+export type ResumeStyle = {
+  template: ResumeTemplateId;
+  paper: Paper;
+  accent: string;
+  headingFont: FontId;
+  font: FontId;
+  size: ResumeSize;
+  spacing: ResumeSpacing;
+  photo: boolean;
+  columns: ResumeColumns;
+  backdrop: ResumeBackdrop;
+};
+
+export type Resume = {
+  /** Resume-only: printed on the resume, never sent to a visitor. */
+  email: string;
+  phone: string;
+  location: string;
+  website: string;
+  experience: ExperienceItem[];
+  education: EducationItem[];
+  skills: SkillGroup[];
+  certifications: Certification[];
+  languages: Language[];
+  awards: Award[];
+  /** Block order on the sheet, and of the structured blocks on the page. */
+  order: ResumeBlock[];
+  /** Blocks left off the resume. */
+  hidden: ResumeBlock[];
+  /** Structured blocks shown on the published page too. */
+  pageBlocks: PageBlock[];
+  style: ResumeStyle;
+};
+
+export function defaultResumeStyle(): ResumeStyle {
+  return {
+    template: "classic",
+    paper: "a4",
+    accent: "#1d3f8a",
+    headingFont: "inter",
+    font: "inter",
+    size: "medium",
+    spacing: "standard",
+    photo: false,
+    columns: "auto",
+    backdrop: "none",
+  };
+}
+
+export function defaultResume(): Resume {
+  return {
+    email: "",
+    phone: "",
+    location: "",
+    website: "",
+    experience: [],
+    education: [],
+    skills: [],
+    certifications: [],
+    languages: [],
+    awards: [],
+    order: [...RESUME_BLOCKS],
+    hidden: [],
+    pageBlocks: [...PAGE_BLOCKS],
+    style: defaultResumeStyle(),
+  };
+}
+
+/** Backfills a resume from any build, and keeps every block in the order once. */
+export function normalizeResume(raw: Partial<Resume> | null | undefined): Resume {
+  const base = defaultResume();
+  // `headline` and `summary` moved to the header; a stale copy is dropped.
+  const { headline: _h, summary: _s, ...rest } = (raw ?? {}) as Partial<Resume> & { headline?: string; summary?: string };
+  void _h;
+  void _s;
+  const r = { ...base, ...rest };
+  const known = new Set<string>(RESUME_BLOCKS);
+  const order = [...new Set((r.order ?? []).filter((b) => known.has(b)))] as ResumeBlock[];
+  for (const b of RESUME_BLOCKS) if (!order.includes(b)) order.push(b);
+  return {
+    ...r,
+    experience: (r.experience ?? []).map((e) => ({ ...e, bullets: e.bullets ?? [], current: !!e.current })),
+    education: r.education ?? [],
+    skills: (r.skills ?? []).map((g) => ({ ...g, items: g.items ?? [] })),
+    certifications: r.certifications ?? [],
+    languages: r.languages ?? [],
+    awards: r.awards ?? [],
+    order,
+    hidden: (r.hidden ?? []).filter((b) => known.has(b)) as ResumeBlock[],
+    pageBlocks: [...new Set((r.pageBlocks ?? PAGE_BLOCKS).filter((b) => PAGE_BLOCKS.includes(b)))],
+    style: normalizeResumeStyle({ ...base.style, ...(r.style ?? {}) }),
+  };
+}
+
+/** A template, layout or background this build no longer has falls back to the default rather than unstyled. */
+function normalizeResumeStyle(style: ResumeStyle): ResumeStyle {
+  const known = <T extends string>(list: readonly T[], v: string, fallback: T): T =>
+    (list as readonly string[]).includes(v) ? (v as T) : fallback;
+  return {
+    ...style,
+    template: known(RESUME_TEMPLATE_IDS, style.template, "classic"),
+    columns: known(RESUME_COLUMNS, style.columns, "auto"),
+    backdrop: known(RESUME_BACKDROP_IDS, style.backdrop, "none"),
+  };
+}

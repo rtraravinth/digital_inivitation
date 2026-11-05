@@ -6,7 +6,7 @@ from typing import Literal
 
 from fastapi import APIRouter, Query, status
 
-from app.api.deps import CurrentUser, OwnedPortfolio, SessionDep
+from app.api.deps import CurrentUser, EditablePortfolio, OwnedPortfolio, SessionDep
 from app.api.route import TransactionRoute
 from app.schemas.common import ERROR_RESPONSES
 from app.schemas.portfolio import (
@@ -18,6 +18,7 @@ from app.schemas.portfolio import (
     SlugAvailableOut,
     SlugField,
 )
+from app.schemas.resume import Resume
 from app.services.portfolio import PortfolioService
 
 router = APIRouter(
@@ -54,9 +55,9 @@ async def list_portfolios(
 async def slug_available(
     session: SessionDep,
     user: CurrentUser,
-    slug: SlugField = Query(description="The address to check, without the facet.page/ prefix"),
+    slug: SlugField = Query(description="The address to check, without facet.page/<handle>/"),
 ) -> SlugAvailableOut:
-    available = await PortfolioService(session).slug_available(slug)
+    available = await PortfolioService(session).slug_available(user.id, slug)
     return SlugAvailableOut(slug=slug, available=available)
 
 
@@ -81,7 +82,7 @@ async def read_portfolio(portfolio: OwnedPortfolio, session: SessionDep) -> Port
 
 @router.patch("/{portfolio_id}", response_model=PortfolioOut, summary="Edit a portfolio")
 async def update_portfolio(
-    payload: PortfolioPatch, portfolio: OwnedPortfolio, session: SessionDep
+    payload: PortfolioPatch, portfolio: EditablePortfolio, session: SessionDep
 ) -> PortfolioOut:
     service = PortfolioService(session)
     return service.to_out(await service.update(portfolio, payload))
@@ -91,10 +92,27 @@ async def update_portfolio(
     "/{portfolio_id}/header", response_model=PortfolioOut, summary="Edit the header"
 )
 async def update_header(
-    payload: HeaderPatch, portfolio: OwnedPortfolio, session: SessionDep
+    payload: HeaderPatch, portfolio: EditablePortfolio, session: SessionDep
 ) -> PortfolioOut:
     service = PortfolioService(session)
     return service.to_out(await service.update_header(portfolio, payload))
+
+
+@router.put(
+    "/{portfolio_id}/resume",
+    response_model=PortfolioOut,
+    summary="Replace the resume",
+    description=(
+        "The resume's facts and its template, sent whole. Allowed while the "
+        "portfolio is live: the freeze protects the published page, and the "
+        "resume is never on it."
+    ),
+)
+async def update_resume(
+    payload: Resume, portfolio: OwnedPortfolio, session: SessionDep
+) -> PortfolioOut:
+    service = PortfolioService(session)
+    return service.to_out(await service.update_resume(portfolio, payload))
 
 
 @router.post("/{portfolio_id}/publish", response_model=PortfolioOut, summary="Publish")
@@ -112,5 +130,5 @@ async def unpublish(portfolio: OwnedPortfolio, session: SessionDep) -> Portfolio
 @router.delete(
     "/{portfolio_id}", status_code=status.HTTP_204_NO_CONTENT, summary="Delete a portfolio"
 )
-async def delete_portfolio(portfolio: OwnedPortfolio, session: SessionDep) -> None:
+async def delete_portfolio(portfolio: EditablePortfolio, session: SessionDep) -> None:
     await PortfolioService(session).delete(portfolio)

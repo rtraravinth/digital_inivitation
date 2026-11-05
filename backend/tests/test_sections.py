@@ -2,40 +2,23 @@
 
 from __future__ import annotations
 
+import pytest
 from sqlalchemy import select
 
 from app.models import Section
 
 
-async def test_adding_a_block_seeds_the_kinds_title(auth_client, portfolio):
+async def test_adding_a_section_has_an_empty_title_and_no_kind(auth_client, portfolio):
+    """A section has no type. Every one is the same fields underneath."""
+    response = await auth_client.post(f"/api/v1/portfolios/{portfolio['id']}/sections", json={})
+    assert response.status_code == 201
+    assert response.json()["title"] == ""
+    assert "kind" not in response.json()
+
+
+async def test_adding_a_section_rejects_a_kind(auth_client, portfolio):
     response = await auth_client.post(
         f"/api/v1/portfolios/{portfolio['id']}/sections", json={"kind": "venture"}
-    )
-    assert response.status_code == 201
-    assert response.json()["kind"] == "venture"
-    assert response.json()["title"] == "A business you run"
-
-
-async def test_every_block_kind_is_accepted(auth_client, portfolio):
-    kinds = ["link", "venture", "contact", "booking",
-             "testimonial", "gallery", "numbers", "document"]
-    for kind in kinds:
-        response = await auth_client.post(
-            f"/api/v1/portfolios/{portfolio['id']}/sections", json={"kind": kind}
-        )
-        assert response.status_code == 201, kind
-        assert response.json()["kind"] == kind
-
-
-async def test_adding_a_plain_section_has_an_empty_title(auth_client, portfolio):
-    response = await auth_client.post(f"/api/v1/portfolios/{portfolio['id']}/sections", json={})
-    assert response.json()["title"] == ""
-    assert response.json()["kind"] == "link"
-
-
-async def test_an_unknown_kind_is_422(auth_client, portfolio):
-    response = await auth_client.post(
-        f"/api/v1/portfolios/{portfolio['id']}/sections", json={"kind": "podcast"}
     )
     assert response.status_code == 422
 
@@ -47,10 +30,8 @@ async def test_patch_stores_every_optional_extra(auth_client, portfolio):
         json={
             "title": "Northwell Kitchens",
             "description": "Cloud kitchens in three cities.",
-            "tags": ["Food", "Ops"],
+            "tab": "Ventures",
             "links": [{"id": "l1", "label": "Site", "url": "northwell.in"}],
-            "numbers": [{"id": "n1", "label": "Cities", "value": "3"}],
-            "dates": [{"id": "d1", "year": "2021", "text": "Founded"}],
             "quote": {"text": "They shipped fast.", "attribution": "A client"},
             "hidden": True,
         },
@@ -59,11 +40,44 @@ async def test_patch_stores_every_optional_extra(auth_client, portfolio):
 
     section = response.json()
     assert section["title"] == "Northwell Kitchens"
-    assert section["tags"] == ["Food", "Ops"]
-    assert section["numbers"][0]["value"] == "3"
-    assert section["dates"][0]["year"] == "2021"
+    assert section["tab"] == "Ventures"
     assert section["quote"]["attribution"] == "A client"
     assert section["hidden"] is True
+
+
+async def test_a_new_section_starts_on_the_pages_first_tab(auth_client, portfolio):
+    """Adding a block must not silently open a tab of its own."""
+    first = portfolio["sections"][0]
+    assert first["tab"] == "Work"
+
+    await auth_client.patch(
+        f"/api/v1/portfolios/{portfolio['id']}/sections/{first['id']}",
+        json={"tab": "Advisory"},
+    )
+    added = await auth_client.post(f"/api/v1/portfolios/{portfolio['id']}/sections", json={})
+
+    assert added.status_code == 201
+    assert added.json()["tab"] == "Advisory"
+
+
+@pytest.mark.parametrize("blank", ["", "   "])
+async def test_a_section_cannot_be_left_without_a_tab(auth_client, portfolio, blank):
+    """A blank tab would take the section off the page altogether."""
+    section_id = portfolio["sections"][0]["id"]
+    response = await auth_client.patch(
+        f"/api/v1/portfolios/{portfolio['id']}/sections/{section_id}",
+        json={"tab": blank},
+    )
+    assert response.status_code == 422
+
+
+async def test_a_tab_is_trimmed(auth_client, portfolio):
+    section_id = portfolio["sections"][0]["id"]
+    response = await auth_client.patch(
+        f"/api/v1/portfolios/{portfolio['id']}/sections/{section_id}",
+        json={"tab": "  Writing  "},
+    )
+    assert response.json()["tab"] == "Writing"
 
 
 async def test_an_absent_quote_is_left_alone_and_null_clears_it(auth_client, portfolio):

@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.errors import Conflict, NotFound
 from app.models import Asset, Portfolio, PortfolioHeader, Section, User
+from app.models.enums import DEFAULT_TAB
 from app.models.portfolio import default_layout
 from app.schemas.asset import asset_out
 from app.schemas.portfolio import (
@@ -21,6 +22,7 @@ from app.schemas.portfolio import (
     PortfolioPatch,
     PortfolioSummaryOut,
 )
+from app.schemas.resume import RESUME_ONLY_FIELDS, Resume, resume_from_stored
 from app.schemas.section import SectionOut
 from app.services.asset import AssetService
 
@@ -38,13 +40,11 @@ def section_out(section: Section, *, public: bool = False) -> SectionOut:
         id=section.id,
         title=section.title,
         description=section.description,
-        tags=list(section.tags or []),
+        tab=section.tab,
         links=list(section.links or []),
-        numbers=list(section.numbers or []),
-        dates=list(section.dates or []),
         quote=section.quote,
         hidden=section.hidden,
-        kind=section.kind,
+        on_resume=section.on_resume,
         image=asset_out(section.image, public=public),
         file=asset_out(section.file, public=public),
     )
@@ -59,6 +59,8 @@ def header_out(header: PortfolioHeader, *, public: bool = False, links: bool = T
         # When the owner has hidden contact details the links are absent from
         # the payload, not merely hidden by the page.
         links=list(header.links or []) if links else [],
+        numbers=list(header.numbers or []),
+        dates=list(header.dates or []),
         portrait=asset_out(header.portrait, public=public),
     )
 
@@ -106,8 +108,11 @@ class PortfolioService:
             theme=portfolio.theme,
             accent=portfolio.accent,
             ground=portfolio.ground,
+            ground_hex=portfolio.ground_hex,
             font=portfolio.font,
+            body_font=portfolio.body_font,
             layout=Layout.model_validate(portfolio.layout),
+            resume=resume_from_stored(portfolio.resume),
             header=header_out(portfolio.header),
             sections=[section_out(section) for section in portfolio.sections],
             published_at=portfolio.published_at,
@@ -155,7 +160,9 @@ class PortfolioService:
                 theme=portfolio.theme,
                 accent=portfolio.accent,
                 ground=portfolio.ground,
+                ground_hex=portfolio.ground_hex,
                 font=portfolio.font,
+                body_font=portfolio.body_font,
                 section_count=total,
                 published_at=portfolio.published_at,
                 updated_at=portfolio.updated_at,
@@ -163,48 +170,61 @@ class PortfolioService:
             for portfolio, total in rows.all()
         ]
 
-    async def slug_available(self, slug: str, *, exclude_id: uuid.UUID | None = None) -> bool:
-        query = select(Portfolio.id).where(Portfolio.slug == slug)
+    async def slug_available(
+        self, user_id: uuid.UUID, slug: str, *, exclude_id: uuid.UUID | None = None
+    ) -> bool:
+        query = select(Portfolio.id).where(
+            Portfolio.user_id == user_id, Portfolio.slug == slug
+        )
         if exclude_id is not None:
             query = query.where(Portfolio.id != exclude_id)
         return await self.session.scalar(query) is None
 
-    async def _assert_slug_free(self, slug: str, *, exclude_id: uuid.UUID | None = None) -> None:
-        if not await self.slug_available(slug, exclude_id=exclude_id):
-            # Slugs are global: facet.page/<slug> has nothing in front of it,
-            # so two accounts cannot both hold one.
+    async def _assert_slug_free(
+        self, user_id: uuid.UUID, slug: str, *, exclude_id: uuid.UUID | None = None
+    ) -> None:
+        if not await self.slug_available(user_id, slug, exclude_id=exclude_id):
+            # Only within this account: the address is facet.page/<handle>/<slug>,
+            # so the handle in front is what separates one person's "freelancer"
+            # from another's.
             raise Conflict(
-                "That address is already in use.", code="slug_taken", details={"slug": slug}
+                "You already have a page at that address.",
+                code="slug_taken",
+                details={"slug": slug},
             )
 
     # ── writes ──────────────────────────────────────────────────────────
 
     async def create(self, user: User, payload: PortfolioCreate) -> Portfolio:
-        await self._assert_slug_free(payload.slug)
+        await self._assert_slug_free(user.id, payload.slug)
 
         portfolio = Portfolio(
             user_id=user.id,
             name=payload.name,
             slug=payload.slug,
             status="empty",
-            summary="Not published yet.",
+            summary=payload.summary,
             layout=default_layout(),
         )
-        portfolio.header = PortfolioHeader(tags=[], links=[])
-        portfolio.sections = await self._starting_sections(user, payload)
+        portfolio.header = PortfolioHeader(
+            tags=[], links=[], numbers=[], dates=[]
+        )
+        portfolio.sections = await self._starting_sections(user, payload, portfolio)
 
         self.session.add(portfolio)
         await self.session.flush()
         await self.session.refresh(portfolio)
         return portfolio
 
-    async def _starting_sections(self, user: User, payload: PortfolioCreate) -> list[Section]:
+    async def _starting_sections(
+        self, user: User, payload: PortfolioCreate, portfolio: Portfolio
+    ) -> list[Section]:
         start = payload.start_from
 
         if start.kind == "founder":
             return [
                 Section(position=index, title=title, description=description,
-                        tags=[], links=[], numbers=[], dates=[])
+                        tab=DEFAULT_TAB, links=[])
                 for index, (title, description) in enumerate(FOUNDER_TEMPLATE)
             ]
 
@@ -214,40 +234,74 @@ class PortfolioService:
             )
             if source is None:
                 raise NotFound("That portfolio does not exist.", code="portfolio_not_found")
+            # The numbers and the timeline are the page's, not a section's, so
+            # copying the work without them would drop half of what the source
+            # page showed.
+            portfolio.header.numbers = list(source.header.numbers or [])
+            portfolio.header.dates = list(source.header.dates or [])
+            # A copy of a role is usually the start of a neighbouring role,
+            # and the work history is the slowest part of a resume to type.
+            portfolio.resume = resume_from_stored(source.resume).model_dump(by_alias=True)
+
             # New rows with new ids: a copy that shared ids would not be a copy.
             return [
                 Section(
                     position=index,
                     title=section.title,
                     description=section.description,
-                    tags=list(section.tags or []),
+                    tab=section.tab,
                     links=list(section.links or []),
-                    numbers=list(section.numbers or []),
-                    dates=list(section.dates or []),
                     quote=section.quote,
                     hidden=section.hidden,
-                    kind=section.kind,
+                    on_resume=section.on_resume,
                     image_asset_id=section.image_asset_id,
                     file_asset_id=section.file_asset_id,
                 )
                 for index, section in enumerate(source.sections)
             ]
 
-        return [Section(position=0, tags=[], links=[], numbers=[], dates=[])]
+        return [Section(position=0, tab=DEFAULT_TAB, links=[])]
 
     async def update(self, portfolio: Portfolio, patch: PortfolioPatch) -> Portfolio:
         changes = patch.model_dump(exclude_unset=True, exclude_none=True)
 
         if "slug" in changes:
-            await self._assert_slug_free(changes["slug"], exclude_id=portfolio.id)
+            await self._assert_slug_free(
+                portfolio.user_id, changes["slug"], exclude_id=portfolio.id
+            )
 
-        for field in ("name", "slug", "summary", "theme", "accent", "ground", "font"):
+        for field in (
+            "name", "slug", "summary", "theme", "accent",
+            "ground", "ground_hex", "font", "body_font",
+        ):
             if field in changes:
                 setattr(portfolio, field, changes[field])
 
         if patch.layout is not None:
             portfolio.layout = patch.layout.model_dump(by_alias=True)
 
+        await self._touch(portfolio)
+        return portfolio
+
+    async def update_resume(self, portfolio: Portfolio, resume: Resume) -> Portfolio:
+        """Replace the resume whole.
+
+        Whole rather than patched: it is one document the editor holds in
+        full, and merging nested lists would gain nothing.
+
+        A live page is frozen, and the resume's structured blocks can be on
+        it, so while live only what never reaches the page may change - the
+        template and style, which blocks print, the contact details.
+        """
+        if portfolio.status == "live":
+            before = resume_from_stored(portfolio.resume).model_dump(exclude=RESUME_ONLY_FIELDS)
+            after = resume.model_dump(exclude=RESUME_ONLY_FIELDS)
+            if before != after:
+                raise Conflict(
+                    "Unpublish this page before you change what it shows.",
+                    code="portfolio_published",
+                )
+        portfolio.resume = resume.model_dump(by_alias=True)
         await self._touch(portfolio)
         return portfolio
 
@@ -263,6 +317,10 @@ class PortfolioService:
             header.tags = list(patch.tags)
         if patch.links is not None:
             header.links = [link.model_dump(by_alias=True) for link in patch.links]
+        if patch.numbers is not None:
+            header.numbers = [stat.model_dump(by_alias=True) for stat in patch.numbers]
+        if patch.dates is not None:
+            header.dates = [entry.model_dump(by_alias=True) for entry in patch.dates]
 
         portrait_changed = patch.clear_portrait or patch.portrait_asset_id is not None
         replaced = header.portrait_asset_id if portrait_changed else None
@@ -292,17 +350,19 @@ class PortfolioService:
             raise NotFound("That upload does not exist.", code="asset_not_found")
         return asset
 
+    # `summary` is the author's own line about the page, so publishing does
+    # not touch it. It used to be overwritten with "Live." / "Not published.",
+    # which threw the sentence away and then said on the card what the status
+    # tag beside it already said.
     async def publish(self, portfolio: Portfolio) -> Portfolio:
         portfolio.status = "live"
         portfolio.published_at = datetime.now(UTC)
-        portfolio.summary = "Live."
         await self._touch(portfolio)
         return portfolio
 
     async def unpublish(self, portfolio: Portfolio) -> Portfolio:
         portfolio.status = "draft"
         portfolio.published_at = None
-        portfolio.summary = "Not published."
         await self._touch(portfolio)
         return portfolio
 

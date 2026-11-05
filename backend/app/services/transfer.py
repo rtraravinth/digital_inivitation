@@ -18,15 +18,19 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.errors import AppError, ValidationFailed
 from app.models import Asset, Portfolio, PortfolioHeader, Section, User
 from app.models.enums import (
-    BLOCK_KINDS,
     DEFAULT_ACCENT,
+    DEFAULT_TAB,
+    DEFAULT_THEME,
     FONTS,
     GROUNDS,
+    LEGACY_THEMES,
     STATUSES,
+    TAB_MAX_LENGTH,
     THEMES,
 )
 from app.models.portfolio import default_layout
 from app.schemas.asset import asset_out
+from app.schemas.resume import resume_from_stored
 from app.schemas.transfer import ImportResultOut
 from app.services.asset import AssetService
 
@@ -60,14 +64,19 @@ class TransferService:
             "theme": portfolio.theme,
             "accent": portfolio.accent,
             "ground": portfolio.ground,
+            "groundHex": portfolio.ground_hex,
             "font": portfolio.font,
+            "bodyFont": portfolio.body_font,
             "layout": dict(portfolio.layout or default_layout()),
+            "resume": resume_from_stored(portfolio.resume).model_dump(by_alias=True),
             "header": {
                 "name": header.name,
                 "current": header.current,
                 "description": header.description,
                 "tags": list(header.tags or []),
                 "links": list(header.links or []),
+                "numbers": list(header.numbers or []),
+                "dates": list(header.dates or []),
                 "portrait": _asset_dict(header.portrait),
             },
             "sections": [
@@ -75,13 +84,11 @@ class TransferService:
                     "id": str(section.id),
                     "title": section.title,
                     "description": section.description,
-                    "tags": list(section.tags or []),
+                    "tab": section.tab,
                     "links": list(section.links or []),
-                    "numbers": list(section.numbers or []),
-                    "dates": list(section.dates or []),
                     "quote": section.quote,
                     "hidden": section.hidden,
-                    "kind": section.kind,
+                    "onResume": section.on_resume,
                     "image": _asset_dict(section.image),
                     "file": _asset_dict(section.file),
                 }
@@ -133,6 +140,7 @@ class TransferService:
         self, user: User, raw: dict[str, Any], slug: str
     ) -> Portfolio:
         header_raw = raw.get("header") or {}
+        sections_raw = [s for s in (raw.get("sections") or []) if isinstance(s, dict)]
 
         portfolio = Portfolio(
             user_id=user.id,
@@ -142,11 +150,22 @@ class TransferService:
             slug=slug,
             status=_one_of(raw.get("status"), STATUSES, "draft"),
             summary=str(raw.get("summary") or "")[:2000],
-            theme=_one_of(raw.get("theme"), THEMES, "editorial"),
+            # An export from an older build names a retired theme; it lands on
+            # the one that replaced it rather than on the default.
+            theme=_one_of(
+                LEGACY_THEMES.get(str(raw.get("theme")), raw.get("theme")),
+                THEMES,
+                DEFAULT_THEME,
+            ),
             accent=str(raw.get("accent") or DEFAULT_ACCENT)[:32],
             ground=_one_of(raw.get("ground"), GROUNDS, "light"),
+            ground_hex=_hex_or_blank(raw.get("groundHex")),
             font=_one_of(raw.get("font"), FONTS, "archivo"),
+            body_font=_one_of(raw.get("bodyFont"), FONTS, "archivo"),
             layout={**default_layout(), **(raw.get("layout") or {})},
+            # An export from before resumes existed has none; an invalid one
+            # lands on the defaults rather than failing the whole import.
+            resume=resume_from_stored(raw.get("resume")).model_dump(by_alias=True),
         )
 
         portfolio.header = PortfolioHeader(
@@ -155,6 +174,8 @@ class TransferService:
             description=str(header_raw.get("description") or ""),
             tags=list(header_raw.get("tags") or []),
             links=list(header_raw.get("links") or []),
+            numbers=_page_list(header_raw, sections_raw, "numbers"),
+            dates=_page_list(header_raw, sections_raw, "dates"),
             portrait_asset_id=await self._restore_asset(user, header_raw.get("portrait")),
         )
 
@@ -163,18 +184,15 @@ class TransferService:
                 position=index,
                 title=str(section.get("title") or ""),
                 description=str(section.get("description") or ""),
-                tags=list(section.get("tags") or []),
+                tab=_tab_of(section),
                 links=list(section.get("links") or []),
-                numbers=list(section.get("numbers") or []),
-                dates=list(section.get("dates") or []),
                 quote=section.get("quote"),
                 hidden=bool(section.get("hidden")),
-                kind=_one_of(section.get("kind"), BLOCK_KINDS, "link"),
+                on_resume=bool(section.get("onResume", True)),
                 image_asset_id=await self._restore_asset(user, section.get("image")),
                 file_asset_id=await self._restore_asset(user, section.get("file")),
             )
-            for index, section in enumerate(raw.get("sections") or [])
-            if isinstance(section, dict)
+            for index, section in enumerate(sections_raw)
         ]
 
         self.session.add(portfolio)
@@ -246,15 +264,57 @@ class _MemoryUpload:
         return chunk
 
 
+def _tab_of(section: dict[str, Any]) -> str:
+    """The section's tab, or the first of the tags an older export wrote.
+
+    Tags used to be a list, and the page filtered on all of them. Only the
+    first can survive as a tab, which is what the tab row showed first.
+    """
+    tab = str(section.get("tab") or "").strip()
+    if tab:
+        return tab[:TAB_MAX_LENGTH]
+    for tag in section.get("tags") or []:
+        if isinstance(tag, str) and tag.strip():
+            return tag.strip()[:TAB_MAX_LENGTH]
+    return DEFAULT_TAB
+
+
+def _page_list(
+    header_raw: dict[str, Any], sections_raw: list[dict[str, Any]], field: str
+) -> list[Any]:
+    """The page's numbers, or its timeline, wherever the export put them.
+
+    They used to be written on each section and gathered up for display. An
+    export from that build has them there and nowhere else, so it is read the
+    same way the page read it: every section's, in order.
+    """
+    on_header = header_raw.get(field)
+    if on_header:
+        return list(on_header)
+    return [entry for section in sections_raw for entry in (section.get(field) or [])]
+
+
 def _asset_dict(asset: Asset | None) -> dict[str, Any] | None:
     out = asset_out(asset)
     return out.model_dump(by_alias=True, mode="json") if out else None
+
+
+HEX_COLOUR = re.compile(r"#[0-9a-fA-F]{6}")
 
 
 def _one_of(value: Any, allowed: tuple[str, ...], fallback: str) -> str:
     # An unknown value means data from a build that offered something we have
     # since dropped. Fall back rather than refuse the import.
     return value if isinstance(value, str) and value in allowed else fallback
+
+
+def _hex_or_blank(value: Any) -> str:
+    # This lands in a style attribute on the published page, so anything that
+    # is not exactly #rrggbb becomes "" and the ground falls back to its
+    # preset. An import is user-supplied text like any other.
+    if isinstance(value, str) and HEX_COLOUR.fullmatch(value):
+        return value
+    return ""
 
 
 def _clean_slug(value: str) -> str:

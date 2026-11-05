@@ -4,12 +4,13 @@ from __future__ import annotations
 
 import uuid
 
-from fastapi import APIRouter, File, Form, UploadFile, status
+from fastapi import APIRouter, File, Form, Query, Request, UploadFile, status
 from fastapi.responses import FileResponse, Response
 
-from app.api.deps import CurrentUser, SessionDep
+from app.api.deps import CurrentUser, SessionDep, get_caller
 from app.api.route import TransactionRoute
 from app.core.errors import NotFound
+from app.core.security import decode_asset_token
 from app.models import Asset
 from app.models.enums import AssetKind
 from app.schemas.asset import AssetOut, asset_out
@@ -46,10 +47,44 @@ async def upload_asset(
     return asset_out(asset)
 
 
-@router.get("/{asset_id}", summary="Read one of your uploads")
-async def read_asset(asset_id: uuid.UUID, session: SessionDep, user: CurrentUser) -> Response:
-    asset = await AssetService(session).get_owned(user, asset_id)
-    return serve(asset)
+@router.get(
+    "/{asset_id}",
+    summary="Read one of your uploads",
+    description=(
+        "Either a signed URL — the `t` this asset was serialised with — or a "
+        "bearer token. The signature exists because an `<img>` cannot send an "
+        "Authorization header."
+    ),
+)
+async def read_asset(
+    asset_id: uuid.UUID,
+    session: SessionDep,
+    request: Request,
+    t: str | None = Query(default=None, description="The signature from the asset's url"),
+) -> Response:
+    return serve(await _readable(session, request, asset_id, t))
+
+
+async def _readable(
+    session: SessionDep, request: Request, asset_id: uuid.UUID, token: str | None
+) -> Asset:
+    """The asset, if this request may have it. Raises otherwise.
+
+    A signature names one asset, so it is checked against the id in the path
+    before anything is loaded: a token for someone else's upload is a 404
+    here, the same answer ownership gives.
+    """
+    if token is None:
+        caller = await get_caller(request, session)
+        return await AssetService(session).get_owned(caller.user, asset_id)
+
+    if decode_asset_token(token) != str(asset_id):
+        raise NotFound("That upload does not exist.", code="asset_not_found")
+
+    asset = await session.get(Asset, asset_id)
+    if asset is None:
+        raise NotFound("That upload does not exist.", code="asset_not_found")
+    return asset
 
 
 @router.delete(

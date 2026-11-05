@@ -1,5 +1,7 @@
 "use client";
 
+import { IconSelect } from "@/components/IconSelect";
+import { Glyph } from "@/lib/glyphs";
 import { newId } from "@/lib/store";
 import type { LinkItem } from "@/lib/types";
 
@@ -18,7 +20,8 @@ export function LinkEditor({
     <div className="flex flex-col gap-1.5">
       {links.map((link) => (
         <div key={link.id} className="flex items-start gap-1.5">
-          <div className="grid flex-1 gap-1.5 sm:grid-cols-[170px_1fr]">
+          <div className="grid flex-1 gap-1.5 sm:grid-cols-[40px_170px_1fr]">
+            <IconSelect link={link} onChange={(icon) => update(link.id, { icon })} />
             <input
               className="input"
               value={link.label}
@@ -40,7 +43,7 @@ export function LinkEditor({
             aria-label={`Remove link ${link.label || "untitled"}`}
             onClick={() => onChange(links.filter((l) => l.id !== link.id))}
           >
-            ✕
+            <Glyph id="close" size={15} />
           </button>
         </div>
       ))}
@@ -51,7 +54,8 @@ export function LinkEditor({
         style={{ fontSize: 12, padding: "4px 10px" }}
         onClick={() => onChange([...links, { id: newId(), label: "", url: "" }])}
       >
-        + Add link
+        <Glyph id="plus" size={15} />
+        Add link
       </button>
     </div>
   );

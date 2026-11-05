@@ -5,6 +5,7 @@ from __future__ import annotations
 import base64
 import io
 
+import pytest
 from PIL import Image
 
 
@@ -157,8 +158,60 @@ async def test_a_legacy_export_keeps_its_content(auth_client):
 
     assert full["name"] == "Legacy"
     assert full["sections"][0]["title"] == "With an image"
-    assert full["sections"][0]["tags"] == ["Old"]
-    assert full["sections"][0]["kind"] == "gallery"
+    assert full["sections"][0]["tab"] == "Old"
+    # `kind` is in the payload and is simply ignored: sections no longer
+    # have a type, and an old export must still import.
+    assert "kind" not in full["sections"][0]
+
+
+async def test_a_legacy_exports_section_numbers_move_up_to_the_header(auth_client):
+    """An export from the build that stored them per section still reads.
+
+    The page gathered every section's entries into one row and one timeline,
+    so that is what the header gets, in section order.
+    """
+    payload = legacy_export()
+    payload[0]["slug"] = "legacy-extras"
+    payload[0]["sections"][0]["numbers"] = [{"id": "n1", "label": "Cities", "value": "3"}]
+    payload[0]["sections"][0]["dates"] = [{"id": "d1", "year": "2021", "text": "Founded"}]
+
+    await auth_client.post("/api/v1/import", json={"mode": "merge", "portfolios": payload})
+    imported = next(
+        p for p in (await auth_client.get("/api/v1/portfolios")).json()
+        if p["slug"] == "legacy-extras"
+    )
+    full = (await auth_client.get(f"/api/v1/portfolios/{imported['id']}")).json()
+
+    assert full["header"]["numbers"][0]["value"] == "3"
+    assert full["header"]["dates"][0]["year"] == "2021"
+
+
+async def test_an_export_writes_numbers_and_the_timeline_on_the_header(auth_client, portfolio):
+    await auth_client.patch(
+        f"/api/v1/portfolios/{portfolio['id']}/header",
+        json={"numbers": [{"id": "n1", "label": "Cities", "value": "3"}]},
+    )
+
+    exported = (await auth_client.get("/api/v1/export")).json()
+    mine = next(p for p in exported if p["slug"] == portfolio["slug"])
+
+    assert mine["header"]["numbers"][0]["value"] == "3"
+    assert "numbers" not in mine["sections"][0]
+
+
+async def test_a_legacy_export_with_no_tags_lands_on_the_default_tab(auth_client):
+    payload = legacy_export()
+    payload[0]["slug"] = "legacy-untagged"
+    payload[0]["sections"][0]["tags"] = []
+
+    await auth_client.post("/api/v1/import", json={"mode": "merge", "portfolios": payload})
+    imported = next(
+        p for p in (await auth_client.get("/api/v1/portfolios")).json()
+        if p["slug"] == "legacy-untagged"
+    )
+    full = (await auth_client.get(f"/api/v1/portfolios/{imported['id']}")).json()
+
+    assert full["sections"][0]["tab"] == "Work"
 
 
 async def test_an_unknown_theme_in_an_import_falls_back(auth_client):
@@ -172,7 +225,91 @@ async def test_an_unknown_theme_in_an_import_falls_back(auth_client):
         p for p in (await auth_client.get("/api/v1/portfolios")).json()
         if p["slug"] == "dropped-theme"
     )
-    assert imported["theme"] == "editorial"
+    assert imported["theme"] == "aurora"
+
+
+@pytest.mark.parametrize(
+    ("old", "new"),
+    [
+        ("editorial", "aurora"),
+        ("site", "aurora"),
+        ("resume", "meridian"),
+        ("poster", "stage"),
+        ("links", "journey"),
+    ],
+)
+async def test_a_retired_theme_in_an_import_lands_on_its_successor(auth_client, old, new):
+    """Not on the default: an export from the catalogue build keeps its nearest look."""
+    payload = legacy_export()
+    payload[0]["theme"] = old
+    payload[0]["slug"] = f"retired-{old}"
+
+    await auth_client.post("/api/v1/import", json={"mode": "merge", "portfolios": payload})
+
+    imported = next(
+        p for p in (await auth_client.get("/api/v1/portfolios")).json()
+        if p["slug"] == f"retired-{old}"
+    )
+    assert imported["theme"] == new
+
+
+async def test_a_custom_ground_survives_an_export_and_import(auth_client, portfolio):
+    await auth_client.patch(
+        f"/api/v1/portfolios/{portfolio['id']}", json={"groundHex": "#2b3a67"}
+    )
+    exported = (await auth_client.get("/api/v1/export")).json()
+
+    await auth_client.post(
+        "/api/v1/import", json={"mode": "replace", "portfolios": exported}
+    )
+
+    restored = (await auth_client.get("/api/v1/portfolios")).json()[0]
+    assert restored["groundHex"] == "#2b3a67"
+
+
+async def test_both_faces_survive_an_export_and_import(auth_client, portfolio):
+    await auth_client.patch(
+        f"/api/v1/portfolios/{portfolio['id']}",
+        json={"font": "syne", "bodyFont": "lora"},
+    )
+    exported = (await auth_client.get("/api/v1/export")).json()
+    await auth_client.post(
+        "/api/v1/import", json={"mode": "replace", "portfolios": exported}
+    )
+
+    restored = (await auth_client.get("/api/v1/portfolios")).json()[0]
+    assert restored["font"] == "syne"
+    assert restored["bodyFont"] == "lora"
+
+
+async def test_a_legacy_export_with_no_body_font_lands_on_archivo(auth_client):
+    """Anything exported before the column existed has no bodyFont at all."""
+    payload = legacy_export()
+    payload[0]["slug"] = "no-body-font"
+    assert "bodyFont" not in payload[0]
+
+    await auth_client.post("/api/v1/import", json={"mode": "merge", "portfolios": payload})
+
+    imported = next(
+        p for p in (await auth_client.get("/api/v1/portfolios")).json()
+        if p["slug"] == "no-body-font"
+    )
+    assert imported["bodyFont"] == "archivo"
+
+
+async def test_a_junk_ground_colour_in_an_import_falls_back(auth_client):
+    """The value lands in a style attribute, so anything but #rrggbb is dropped."""
+    payload = legacy_export()
+    payload[0]["groundHex"] = "red; background-image: url(x)"
+    payload[0]["slug"] = "junk-ground"
+
+    await auth_client.post("/api/v1/import", json={"mode": "merge", "portfolios": payload})
+
+    imported = next(
+        p for p in (await auth_client.get("/api/v1/portfolios")).json()
+        if p["slug"] == "junk-ground"
+    )
+    assert imported["groundHex"] == ""
 
 
 async def test_a_corrupt_data_uri_does_not_fail_the_import(auth_client):

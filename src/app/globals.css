@@ -1,54 +1,166 @@
 @import "tailwindcss";
 
 /* ══════════════════════════════════════════════════════════════════════════
-   Modernist — design tokens.
-   Ported from the design system's styles.css. This block is the source of
-   truth for the look: retune here, never hard-code a hex or a font name.
+   Mono — the application's design tokens.
+
+   The app is a tool, so it is black and white and nothing else: one ink, one
+   ground, a ramp of greys between them, and two themes that swap which end
+   is which. Colour belongs to the portfolios people make, never to the
+   machinery they make them with.
+
+   - **Light is the default token set** (@theme, below); `[data-theme="dark"]`
+     redefines the same names. The inline script in app/layout.tsx sets the
+     attribute before first paint from the stored preference or the device.
+   - **The neutral ramp inverts in dark**, so a step keeps its meaning rather
+     than its value: 700 is "muted text" and 300 is "a quiet fill" in both.
+   - **Accent and foil are the ink.** They are the names every component
+     marks state with; in the app they resolve to black or white, and the
+     published page's `groundStyle()` sets them back to the author's colours.
+
+   The published page is the one place none of this applies — see
+   `groundStyle()` in published/shared.tsx, which pins the catalogue tokens
+   the themes were drawn against.
    ══════════════════════════════════════════════════════════════════════ */
 @theme {
-  --color-bg: #f3f2f2;
-  --color-surface: #eae9e9;
-  --color-ink: #201e1d;
-  --color-divider: #201e1d66;
-  --color-accent: #ec3013;
-  --color-accent-2: #e15b47;
+  --color-bg: #ffffff;
+  /* A panel, a recess, a sidebar: one step toward the ink. */
+  --color-surface: #f6f6f6;
+  --color-ink: #0a0a0a;
+  --color-divider: #0a0a0a1a;
+  --color-accent: #0a0a0a;
+  /* What reads on an accent fill. The published page derives it from the
+     author's accent; in the app the accent is the ink, so this is the ground.
+     Without it `.btn-primary` falls back to white — invisible on dark's
+     white button. */
+  --color-accent-ink: #ffffff;
+  --color-accent-2: #262626;
+  --color-foil: #0a0a0a;
+  --color-foil-dim: #a3a3a3;
+  /* Monochrome includes failure: an error is told by its words and its
+     icon, and `role="alert"` tells assistive tech. */
+  --color-alert: #0a0a0a;
 
-  /* Tonal ramps — generated in OKLCH on one shared lightness scale, so the
-     same step of any role matches the others in visual value. */
-  --color-neutral-100: #f8f4f4;
-  --color-neutral-200: #eae7e7;
-  --color-neutral-300: #d7d3d3;
-  --color-neutral-400: #bab6b6;
-  --color-neutral-500: #9b9797;
-  --color-neutral-600: #7d7979;
-  --color-neutral-700: #605d5d;
-  --color-neutral-800: #444141;
-  --color-neutral-900: #2d2b2b;
+  --color-neutral-100: #f5f5f5;
+  --color-neutral-200: #ebebeb;
+  --color-neutral-300: #dedede;
+  --color-neutral-400: #b3b3b3;
+  --color-neutral-500: #8a8a8a;
+  --color-neutral-600: #6b6b6b;
+  --color-neutral-700: #545454;
+  --color-neutral-800: #2e2e2e;
+  --color-neutral-900: #0a0a0a;
 
-  --color-accent-100: #fff2ef;
-  --color-accent-200: #ffe0d9;
-  --color-accent-300: #ffc4b8;
-  --color-accent-400: #ff9783;
-  --color-accent-500: #ff563c;
-  --color-accent-600: #dd2b0f;
-  --color-accent-700: #ae1800;
-  --color-accent-800: #7c1405;
-  --color-accent-900: #4d170e;
+  /* The accent ramp is the grey ramp: callers that ask for "a lighter
+     accent" get a lighter ink, which is the only lighter accent there is. */
+  --color-accent-100: #f5f5f5;
+  --color-accent-200: #ebebeb;
+  --color-accent-300: #dedede;
+  --color-accent-400: #b3b3b3;
+  --color-accent-500: #2e2e2e;
+  --color-accent-600: #0a0a0a;
+  --color-accent-700: #545454;
+  --color-accent-800: #2e2e2e;
+  --color-accent-900: #0a0a0a;
 
-  /* Zero radius is the system, not an oversight. */
-  --radius-sm: 0px;
-  --radius-md: 0px;
-  --radius-lg: 0px;
+  /* Tool corners: soft enough to read as controls, small enough to stay
+     out of the way. The published page sets these back to 0. */
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
 
-  --shadow-sm: 0 1px 2px color-mix(in srgb, #2d2b2b 14%, transparent);
-  --shadow-md: 0 3px 10px color-mix(in srgb, #2d2b2b 16%, transparent);
-  --shadow-lg: 0 12px 32px color-mix(in srgb, #2d2b2b 22%, transparent);
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-turn: cubic-bezier(0.33, 0, 0.1, 1);
+
+  --shadow-sm: 0 1px 2px #0000000f;
+  --shadow-md: 0 4px 16px -4px #0000001f, 0 1px 3px #00000014;
+  --shadow-lg: 0 24px 48px -16px #00000033, 0 2px 6px #0000001a;
 }
 
-@theme inline {
-  --font-heading: var(--font-archivo), system-ui, sans-serif;
-  --font-body: var(--font-archivo), system-ui, sans-serif;
-  --font-sans: var(--font-archivo), system-ui, sans-serif;
+/* Not `@theme inline`. Inline compiles a utility with the value written in,
+   so `.font-heading` would be Inter everywhere — including on a published
+   page, where `groundStyle()` sets `--font-heading` to the author's face and
+   every `font-heading` element ignored it. A plain @theme makes the utility
+   read `var(--font-heading)`, which the wrapper can override. */
+@theme {
+  /* Inter sets the whole interface; JetBrains Mono sets what a person might
+     copy or compare — addresses, counts, ids. The published page overwrites
+     every one of these from the portfolio's own pairing and the catalogue's
+     house faces. */
+  --font-heading: var(--font-inter), system-ui, sans-serif;
+  --font-body: var(--font-inter), system-ui, sans-serif;
+  --font-sans: var(--font-inter), system-ui, sans-serif;
+  --font-apparatus: var(--font-inter), system-ui, sans-serif;
+  --font-plate-no: var(--font-jetbrains-mono), ui-monospace, monospace;
+  --font-mono: var(--font-jetbrains-mono), ui-monospace, monospace;
+}
+
+/* The interface's control voice. Every label-like class reads these with its
+   catalogue value as the fallback, so the app sets plain sentence-case
+   labels here while `groundStyle()` sets each one to `initial` — which makes
+   `var()` take the fallback — and the published page keeps its tracked
+   capitals untouched. */
+:root {
+  --ui-case: none;
+  --ui-track: -0.005em;
+  --ui-weight: 500;
+  --ui-label: 12.5px;
+  --ui-btn: 14px;
+  --ui-btn-pad: 0.5rem 0.9rem;
+  --ui-btn-h: 36px;
+  --ui-tag: 12px;
+  --ui-pill: 999px;
+  --ui-heading-weight: 640;
+  --ui-label-ink: color-mix(in srgb, var(--color-ink) 64%, var(--color-bg));
+  --ui-meta: 12px;
+  --ui-meta-font: var(--font-mono);
+  --ui-meta-track: 0;
+  /* The two chart series, run through the dataviz validator against each
+     theme's surface: separation ΔE 36 (normal and colour-blind), both above
+     3:1. Monochrome fails its chroma check by design, so identity is never
+     shade alone — the second series is also dashed, legended and labelled. */
+  --chart-1: #2b2b2b;
+  --chart-2: #8f8f8f;
+  color-scheme: light;
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --chart-1: #d4d4d4;
+  --chart-2: #6e6e6e;
+  --color-bg: #0a0a0a;
+  --color-surface: #141414;
+  --color-ink: #fafafa;
+  --color-divider: #ffffff1f;
+  --color-accent: #fafafa;
+  --color-accent-ink: #0a0a0a;
+  --color-accent-2: #d4d4d4;
+  --color-foil: #fafafa;
+  --color-foil-dim: #525252;
+  --color-alert: #fafafa;
+
+  --color-neutral-100: #171717;
+  --color-neutral-200: #1f1f1f;
+  --color-neutral-300: #2b2b2b;
+  --color-neutral-400: #474747;
+  --color-neutral-500: #737373;
+  --color-neutral-600: #8f8f8f;
+  --color-neutral-700: #a8a8a8;
+  --color-neutral-800: #d4d4d4;
+  --color-neutral-900: #fafafa;
+
+  --color-accent-100: #171717;
+  --color-accent-200: #1f1f1f;
+  --color-accent-300: #2b2b2b;
+  --color-accent-400: #474747;
+  --color-accent-500: #d4d4d4;
+  --color-accent-600: #fafafa;
+  --color-accent-700: #a8a8a8;
+  --color-accent-800: #d4d4d4;
+  --color-accent-900: #fafafa;
+
+  --shadow-sm: 0 1px 2px #00000066;
+  --shadow-md: 0 4px 16px -4px #00000099, 0 0 0 1px #ffffff0f;
+  --shadow-lg: 0 24px 48px -16px #000000b3, 0 0 0 1px #ffffff14;
 }
 
 /* — base — */
@@ -57,8 +169,8 @@
     background: var(--color-bg);
     color: var(--color-ink);
     font-family: var(--font-body);
-    font-size: 15px;
-    line-height: 1.55;
+    font-size: 16px;
+    line-height: 1.6;
     font-weight: 400;
   }
 
@@ -69,21 +181,24 @@
   h5,
   h6 {
     font-family: var(--font-heading);
-    font-weight: 800;
-    line-height: 1.12;
+    /* 700 on the published page — a didone carries a half-title on its own
+       stroke contrast, and the faces that stop at 700 get a real instance.
+       The app's Inter reads heavier at the same number, so it asks for 640. */
+    font-weight: var(--ui-heading-weight, 700);
+    line-height: 1.08;
     /* Retuned per portfolio by the Layout panel; groundStyle() sets the var
        on the published page's wrapper. */
     letter-spacing: var(--tracking, -0.015em);
     margin: 0 0 0.5rem;
   }
   h1 {
-    font-size: 42px;
+    font-size: 56px;
   }
   h2 {
-    font-size: 32px;
+    font-size: 38px;
   }
   h3 {
-    font-size: 25px;
+    font-size: 27px;
   }
   h4 {
     font-size: 20px;
@@ -92,62 +207,192 @@
     font-size: 16px;
   }
   h6 {
-    font-size: 13px;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
+    font-family: var(--font-apparatus);
+    font-size: var(--ui-label, 11px);
+    font-weight: var(--ui-weight, 600);
+    letter-spacing: var(--ui-track, 0.14em);
+    text-transform: var(--ui-case, uppercase);
+    color: var(--ui-label-ink, inherit);
+    line-height: 1.3;
   }
   p {
     margin: 0 0 0.75rem;
   }
   a {
-    color: var(--color-accent);
-    text-underline-offset: 3px;
+    /* Foil, not cloth: cloth red cannot be read on board. */
+    color: var(--color-foil);
+    text-underline-offset: 4px;
+    text-decoration-thickness: 1px;
   }
   img {
     display: block;
     max-width: 100%;
   }
 
+  /* Figures in a catalogue line up in columns — dates, counts, plate numbers.
+     Lining tabular figures everywhere, so a column of them never jitters. */
+  table,
+  time,
+  .figure {
+    font-variant-numeric: tabular-nums lining-nums;
+  }
+
   :focus {
     outline: none;
   }
   :focus-visible {
-    outline: 2px solid var(--color-accent);
+    outline: 2px solid var(--color-foil);
     outline-offset: 2px;
   }
+
+  /* ── browser surfaces ──────────────────────────────────────────────────
+     The parts we did not draw still carry the design. Left at their defaults
+     these ship a blue selection, a black caret and a grey scrollbar that
+     belong to no design system at all.
+     ──────────────────────────────────────────────────────────────────── */
   ::selection {
-    background: color-mix(in srgb, var(--color-accent) 30%, transparent);
+    background: var(--color-foil);
+    color: var(--color-surface);
+  }
+  ::placeholder {
+    /* Mixed from the ink rather than set grey, so it follows a picked ground
+       and still clears 4.5:1 against it. */
+    color: color-mix(in srgb, var(--color-ink) 58%, var(--color-bg));
+  }
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-foil-dim) transparent;
+  }
+  ::-webkit-scrollbar {
+    width: 11px;
+    height: 11px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: var(--color-foil-dim);
+    border: 3px solid transparent;
+    background-clip: content-box;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--color-foil);
+    background-clip: content-box;
   }
 }
 
 /* ══════════════════════════════════════════════════════════════════════════
-   Components — the design system's class layer. Build with these rather
-   than inventing parallel ones.
+   Components — the catalogue's own apparatus. Build with these rather than
+   inventing parallel ones.
    ══════════════════════════════════════════════════════════════════════ */
 @layer components {
   .text-muted {
-    color: color-mix(in srgb, var(--color-ink) 55%, transparent);
+    /* 6.5:1 on board. Mixed toward the ground rather than toward grey, so it
+       stays in the page's own hue on any picked ground. */
+    color: color-mix(in srgb, var(--color-ink) 62%, var(--color-bg));
   }
 
-  /* The small uppercase Archivo labels that mark every structural slot. */
+  /* The small tracked label that marks every structural slot.
+     The class keeps the name `.mono-label` because it has call sites across
+     every theme and the editor, and renaming it would be a sweep for nothing
+     a restyle does not already do. Nothing about it is monospaced — a mono
+     face as a costume for "technical" is exactly what this world refuses. */
   .mono-label {
-    font-family: var(--font-heading);
-    font-weight: 800;
-    font-size: 10px;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-    color: var(--color-neutral-600);
+    font-family: var(--font-apparatus);
+    font-weight: var(--ui-weight, 600);
+    font-size: var(--ui-label, 11px);
+    letter-spacing: var(--ui-track, 0.14em);
+    text-transform: var(--ui-case, uppercase);
+    color: color-mix(in srgb, var(--color-ink) 62%, var(--color-bg));
   }
 
+  /* ── the plate ─────────────────────────────────────────────────────────
+     A reproduction mounted on board: a hairline trim, a lift, and nothing
+     else. Not a card — it holds one image at plate scale, and its caption
+     lives outside it on the board.
+     ──────────────────────────────────────────────────────────────────── */
+  .plate {
+    position: relative;
+    display: block;
+    /* A step off the ground toward the ink, rather than `--color-surface`.
+       Surface is the colour of a recess *cut into* the board, so on the board
+       ground it is darker than the board — and a mount darker than what it is
+       mounted on disappears. Deriving it from the ink instead makes the sheet
+       lighter on a dark ground and darker on a light one, which is what a
+       mounted sheet does under any light, on any ground an author picks. */
+    background: color-mix(in srgb, var(--color-ink) 7%, var(--color-bg));
+    box-shadow:
+      0 0 0 1px var(--color-divider),
+      var(--shadow-md);
+  }
+  /* The plate's own ruled edge, drawn inside the trim the way a catalogue
+     prints a keyline around a reproduction. */
+  .plate-keyline::after {
+    content: "";
+    position: absolute;
+    inset: 7px;
+    pointer-events: none;
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-ink) 22%, transparent);
+  }
+  /* Specular travel for the tilt: a soft band that moves with the pointer.
+     `--tilt-x` / `--tilt-y` are written by the tilt island; with no pointer,
+     or with reduced motion, they never change and this stays a flat sheen. */
+  .plate-sheen::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    opacity: 0.5;
+    background: radial-gradient(
+      44rem circle at var(--tilt-x, 50%) var(--tilt-y, 0%),
+      color-mix(in srgb, var(--color-ink) 16%, transparent),
+      transparent 62%
+    );
+  }
+
+  /* ── the caption ───────────────────────────────────────────────────────
+     Small, flush left, set on the board under the plate it describes. Its
+     measure is short because a caption is read once and not studied.
+     ──────────────────────────────────────────────────────────────────── */
+  .caption {
+    font-family: var(--font-apparatus);
+    font-size: 14px;
+    line-height: 1.5;
+    max-width: 46ch;
+  }
+  /* role · date · credit. Always present: an empty field shows as an em dash
+     rather than dropping the line, so two plates' captions stay comparable. */
+  .caption-credit {
+    font-family: var(--ui-meta-font, var(--font-apparatus));
+    font-size: var(--ui-meta, 11.5px);
+    letter-spacing: var(--ui-meta-track, 0.06em);
+    text-transform: var(--ui-case, uppercase);
+    font-variant-numeric: tabular-nums lining-nums;
+    color: color-mix(in srgb, var(--color-ink) 62%, var(--color-bg));
+  }
+
+  /* A plate number. Bodoni's lining figures, tabular so a column of them
+     aligns, and foil on the open one. */
+  .plate-no {
+    font-family: var(--font-plate-no);
+    font-variant-numeric: tabular-nums lining-nums;
+    font-weight: 500;
+    letter-spacing: 0;
+  }
+
+  /* The hairline a catalogue rules between bands. 1px, never 2. */
   .hr {
-    height: 2px;
+    height: 1px;
     border: 0;
-    margin: 1rem 0;
+    margin: 1.25rem 0;
     background: var(--color-divider);
   }
 
-  .grayscale-photo {
-    filter: grayscale(1) contrast(1.08);
+  /* A photograph on the published page. The filter is a variable rather than
+     a class swap because `groundStyle()` already writes the page's whole look
+     onto one wrapper, and every theme draws its images through `Media`. */
+  .published-photo {
+    filter: var(--photo-filter, none);
   }
 
   /* — buttons — */
@@ -155,56 +400,70 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    gap: 6px;
+    gap: 8px;
     cursor: pointer;
     text-decoration: none;
     white-space: nowrap;
-    font-family: var(--font-heading);
-    font-weight: 800;
-    font-size: 14px;
+    font-family: var(--font-apparatus);
+    font-weight: var(--ui-weight, 600);
+    font-size: var(--ui-btn, 13px);
+    letter-spacing: var(--ui-track, 0.08em);
+    text-transform: var(--ui-case, uppercase);
     line-height: 1.2;
     color: var(--color-ink);
     background: transparent;
     border: 1px solid transparent;
-    padding: 0.5rem 0.9rem;
+    padding: var(--ui-btn-pad, 0.6rem 1rem);
+    min-height: var(--ui-btn-h, auto);
     border-radius: var(--radius-md);
+    transition:
+      background-color 180ms var(--ease-out),
+      border-color 180ms var(--ease-out),
+      color 180ms var(--ease-out);
   }
   .btn:disabled {
-    opacity: 0.45;
+    opacity: 0.4;
     cursor: not-allowed;
   }
+  /* The one cloth fill on the page. White on cloth measures 6.44:1.
+     On the published page `--color-accent-ink` is worked out from whatever
+     accent the author picked, so a pale accent carries dark ink instead of a
+     white label nobody can read. */
   .btn-primary {
     background: var(--color-accent);
-    color: var(--color-bg);
+    color: var(--color-accent-ink, #ffffff);
   }
+  /* Mixed from whatever the accent is, so the same rule gives a grey step on
+     the app's black or white and a lighter step on an author's colour. */
   .btn-primary:hover:not(:disabled) {
-    background: var(--color-accent-600);
+    background: color-mix(in srgb, var(--color-accent) 84%, var(--color-bg));
   }
   .btn-primary:active:not(:disabled) {
-    background: var(--color-accent-700);
+    background: color-mix(in srgb, var(--color-accent) 72%, var(--color-bg));
   }
   .btn-secondary {
     border-color: var(--color-divider);
   }
   .btn-secondary:hover:not(:disabled) {
-    background: color-mix(in srgb, var(--color-ink) 7%, transparent);
+    border-color: var(--color-foil);
+    color: var(--color-foil);
   }
   .btn-secondary:active:not(:disabled) {
-    background: color-mix(in srgb, var(--color-ink) 14%, transparent);
+    background: color-mix(in srgb, var(--color-foil) 16%, transparent);
   }
   .btn-ghost {
-    color: var(--color-accent);
-    padding-inline: 0.25rem;
+    color: var(--color-foil);
+    padding-inline: 0.35rem;
   }
   .btn-ghost:hover:not(:disabled) {
-    background: color-mix(in srgb, var(--color-accent) 10%, transparent);
+    background: color-mix(in srgb, var(--color-foil) 14%, transparent);
   }
   .btn-ghost:active:not(:disabled) {
-    background: color-mix(in srgb, var(--color-accent) 18%, transparent);
+    background: color-mix(in srgb, var(--color-foil) 22%, transparent);
   }
   .btn-icon {
-    width: 36px;
-    height: 36px;
+    width: 38px;
+    height: 38px;
     padding: 0;
     flex: none;
   }
@@ -215,41 +474,51 @@
     text-align: left;
   }
 
-  /* — forms — */
+  /* — forms —
+     A field is a recess cut into the board: deeper ground, a hairline, and a
+     foil rule under it when it has focus. */
   .field > label {
     display: block;
-    font-size: 12px;
-    margin-bottom: 5px;
-    color: color-mix(in srgb, var(--color-ink) 70%, transparent);
+    font-family: var(--font-apparatus);
+    font-size: var(--ui-label, 11px);
+    font-weight: var(--ui-weight, 600);
+    letter-spacing: var(--ui-track, 0.1em);
+    text-transform: var(--ui-case, uppercase);
+    margin-bottom: 7px;
+    color: color-mix(in srgb, var(--color-ink) 62%, var(--color-bg));
   }
   .input {
     width: 100%;
-    min-height: 36px;
-    padding: 6px 10px;
+    min-height: 40px;
+    padding: 8px 11px;
     font: inherit;
-    font-size: 14px;
+    font-size: 15px;
     color: var(--color-ink);
-    caret-color: var(--color-accent);
+    caret-color: var(--color-foil);
     background: var(--color-surface);
     border: 1px solid var(--color-divider);
     border-radius: var(--radius-md);
+    transition:
+      border-color 160ms var(--ease-out),
+      box-shadow 160ms var(--ease-out);
   }
   .input:hover {
     border-color: color-mix(in srgb, var(--color-ink) 45%, transparent);
   }
   .input:focus-visible {
-    border-color: var(--color-accent);
+    border-color: var(--color-foil);
+    box-shadow: inset 0 -2px 0 var(--color-foil);
     outline-offset: 0;
   }
   textarea.input {
-    min-height: 90px;
+    min-height: 96px;
     resize: vertical;
   }
 
   .radio {
     display: inline-flex;
     align-items: center;
-    gap: 8px;
+    gap: 9px;
     cursor: pointer;
     font-size: 14px;
   }
@@ -261,23 +530,28 @@
     height: 0;
     pointer-events: none;
   }
+  /* Square, like everything else trimmed on this board. */
   .radio .dot {
-    width: 16px;
-    height: 16px;
+    width: 14px;
+    height: 14px;
     flex: none;
-    border-radius: 50%;
-    border: 1.5px solid var(--color-divider);
+    /* Round in the app, square on the published page (`--ui-pill` is set
+       to `initial` there, so the fallback wins). */
+    border-radius: var(--ui-pill, 0px);
+    border: 1px solid var(--color-divider);
+    transition:
+      border-color 160ms var(--ease-out),
+      box-shadow 160ms var(--ease-out);
   }
   .radio:hover .dot {
-    border-color: var(--color-accent);
+    border-color: var(--color-foil);
   }
   .radio input:checked + .dot {
-    border-color: var(--color-accent);
-    background: var(--color-accent);
-    box-shadow: inset 0 0 0 4px var(--color-bg);
+    border-color: var(--color-foil);
+    box-shadow: inset 0 0 0 3px var(--color-foil);
   }
   .radio input:focus-visible + .dot {
-    outline: 2px solid var(--color-accent);
+    outline: 2px solid var(--color-foil);
     outline-offset: 2px;
   }
 
@@ -291,114 +565,180 @@
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    padding: 7px 12px;
-    font-size: 13px;
+    padding: 8px 13px;
+    font-family: var(--font-apparatus);
+    font-size: var(--ui-label, 11px);
+    font-weight: var(--ui-weight, 600);
+    letter-spacing: var(--ui-track, 0.08em);
+    text-transform: var(--ui-case, uppercase);
     cursor: pointer;
+    transition:
+      background-color 160ms var(--ease-out),
+      color 160ms var(--ease-out);
   }
   .seg-opt + .seg-opt {
     border-left: 1px solid var(--color-divider);
   }
   .seg-opt:has(input:checked) {
-    background: var(--color-accent);
-    color: var(--color-bg);
+    background: var(--color-foil);
+    color: var(--color-surface);
   }
   .seg-opt:not(:has(input:checked)):hover {
-    background: color-mix(in srgb, var(--color-ink) 7%, transparent);
+    color: var(--color-foil);
   }
 
-  /* — tags — */
+  /* — tags —
+     A catalogue's classification line: ruled, tracked, never a filled pill. */
   .tag {
     display: inline-flex;
     align-items: center;
-    font-size: 11px;
-    letter-spacing: 0.02em;
-    padding: 3px 10px;
+    font-family: var(--font-apparatus);
+    font-size: var(--ui-tag, 10.5px);
+    font-weight: var(--ui-weight, 600);
+    letter-spacing: var(--ui-track, 0.1em);
+    text-transform: var(--ui-case, uppercase);
+    padding: 4px 9px;
     border-radius: var(--radius-sm);
     white-space: nowrap;
   }
-  .tag-accent {
-    background: var(--color-accent-100);
-    color: var(--color-accent-800);
+  /* Marked and unmarked. `.tag-accent` and `.tag-outline` are two names for
+     one device — a tag ruled and lettered in foil — kept apart only because
+     both are called by name, the first across the themes and the builder,
+     the second on the account page. `.tag-neutral` is the unmarked tag:
+     the same shape ruled in the divider and lettered in the ink. */
+  .tag-accent,
+  .tag-outline {
+    box-shadow: inset 0 0 0 1px var(--color-foil);
+    color: var(--color-foil);
   }
   .tag-neutral {
-    background: var(--color-neutral-100);
-    color: var(--color-neutral-800);
-  }
-  .tag-outline {
-    border: 1px solid var(--color-accent);
-    color: var(--color-accent);
+    box-shadow: inset 0 0 0 1px var(--color-divider);
+    color: color-mix(in srgb, var(--color-ink) 70%, var(--color-bg));
   }
 
-  /* — navigation — */
+  /* — status —
+     Published or not is the one fact a card has to answer across a room, so
+     it is a stamp rather than a tinted word: foil struck solid when the page
+     is out there, a hairline ring when it is not. The square before the label
+     repeats the fact without colour, for anyone who cannot use it. */
+  .status {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-family: var(--font-apparatus);
+    font-size: var(--ui-tag, 10px);
+    font-weight: var(--ui-weight, 600);
+    letter-spacing: var(--ui-track, 0.1em);
+    text-transform: var(--ui-case, uppercase);
+    padding: 5px 10px;
+    border-radius: var(--ui-pill, 0px);
+    white-space: nowrap;
+  }
+  .status::before {
+    content: "";
+    width: 6px;
+    height: 6px;
+    flex: none;
+    border-radius: var(--ui-pill, 0px);
+  }
+  .status-live {
+    background: var(--color-foil);
+    color: var(--color-surface);
+  }
+  .status-live::before {
+    background: var(--color-surface);
+  }
+  .status-draft {
+    box-shadow: inset 0 0 0 1px var(--color-divider);
+    color: color-mix(in srgb, var(--color-ink) 70%, var(--color-bg));
+  }
+  .status-draft::before {
+    box-shadow: inset 0 0 0 1px currentColor;
+  }
+
+  /* — navigation —
+     The catalogue's running head: the title left, the apparatus right, one
+     hairline under it. */
   .nav {
     display: flex;
-    align-items: center;
+    align-items: baseline;
     /* Wraps rather than pushing the primary action off a narrow screen. */
     flex-wrap: wrap;
-    gap: 1rem;
+    gap: 1.25rem;
     row-gap: 0.5rem;
-    padding: 0.75rem 1rem;
-    border-bottom: 2px solid var(--color-divider);
+    padding: 1rem 1.25rem;
+    border-bottom: 1px solid var(--color-divider);
   }
   .nav-brand {
     font-family: var(--font-heading);
-    font-weight: 800;
-    font-size: 18px;
+    font-weight: 700;
+    font-size: 22px;
+    letter-spacing: 0.01em;
     margin-right: auto;
   }
   .nav a {
     color: inherit;
     text-decoration: none;
-    font-size: 14px;
+    font-family: var(--font-apparatus);
+    font-size: var(--ui-label, 11px);
+    font-weight: var(--ui-weight, 600);
+    letter-spacing: var(--ui-track, 0.1em);
+    text-transform: var(--ui-case, uppercase);
+    transition: color 160ms var(--ease-out);
   }
   .nav a:hover,
   .nav a[aria-current="page"] {
-    color: var(--color-accent);
+    color: var(--color-foil);
   }
 
-  /* — tables — */
+  /* — tables — a plate list is a table, so the table is the plate list. */
   .table {
     width: 100%;
     border-collapse: collapse;
     font-size: 14px;
   }
   .table th {
+    font-family: var(--font-apparatus);
     text-align: left;
-    font-size: 11px;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    color: color-mix(in srgb, var(--color-ink) 60%, transparent);
-    padding: 0.5rem;
-    border-bottom: 2px solid var(--color-divider);
+    font-size: var(--ui-label, 10.5px);
+    font-weight: var(--ui-weight, 600);
+    letter-spacing: var(--ui-track, 0.1em);
+    text-transform: var(--ui-case, uppercase);
+    color: color-mix(in srgb, var(--color-ink) 62%, var(--color-bg));
+    padding: 0.6rem 0.5rem;
+    border-bottom: 1px solid var(--color-ink);
   }
   .table td {
-    padding: 0.5rem;
+    padding: 0.6rem 0.5rem;
     border-bottom: 1px solid var(--color-divider);
   }
 
-  /* — dialog — */
+  /* — dialog — a loose insert laid on the board. */
   .dialog-backdrop {
     position: fixed;
     inset: 0;
     display: grid;
     place-items: center;
     padding: 1rem;
-    background: color-mix(in srgb, var(--color-neutral-900) 50%, transparent);
+    background: color-mix(in srgb, #050a14 72%, transparent);
   }
   .dialog {
-    width: min(440px, 100%);
+    width: min(460px, 100%);
     display: flex;
     flex-direction: column;
-    gap: 0.75rem;
-    padding: 1rem;
+    gap: 0.9rem;
+    padding: 1.5rem;
     border-radius: var(--radius-lg);
     background: var(--color-surface);
-    box-shadow: var(--shadow-lg);
+    box-shadow:
+      0 0 0 1px var(--color-divider),
+      var(--shadow-lg);
   }
   .dialog-title {
     font-family: var(--font-heading);
-    font-weight: 800;
-    font-size: 20px;
+    font-weight: 700;
+    font-size: 26px;
+    letter-spacing: -0.01em;
   }
   .dialog-actions {
     display: flex;
@@ -406,12 +746,879 @@
     gap: 0.5rem;
     margin-top: 0.5rem;
   }
+
+  /* ── the app's backdrop ────────────────────────────────────────────────
+     A dot grid fading out down the page, a soft light at the top, and a
+     glow that follows the pointer (`--mx` / `--my`, written by the page).
+     All of it from the ink, so it is the same pattern in either theme. */
+  .app-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background:
+      radial-gradient(
+        600px circle at var(--mx, 50%) var(--my, -200px),
+        color-mix(in srgb, var(--color-ink) 6%, transparent),
+        transparent 70%
+      ),
+      radial-gradient(
+        ellipse 80% 50% at 50% -10%,
+        color-mix(in srgb, var(--color-ink) 7%, transparent),
+        transparent 70%
+      );
+  }
+  .app-backdrop::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background-image: radial-gradient(
+      color-mix(in srgb, var(--color-ink) 16%, transparent) 1px,
+      transparent 1px
+    );
+    background-size: 22px 22px;
+    mask-image: radial-gradient(ellipse 90% 70% at 50% 0%, #000 30%, transparent 85%);
+    -webkit-mask-image: radial-gradient(ellipse 90% 70% at 50% 0%, #000 30%, transparent 85%);
+  }
+
+  /* ── the portfolio grid ────────────────────────────────────────────────
+     Hovering a card sets the others back, so the one under the pointer is
+     the only thing at full strength. A pointer that hovers only: on touch a
+     tap would leave every other card dimmed. */
+  .portfolio-grid [data-card] {
+    transition: opacity 400ms var(--ease-out);
+  }
+  @media (hover: hover) {
+    .portfolio-grid:has([data-card]:hover) [data-card]:not(:hover):not(:has([data-menu-open])) {
+      opacity: 0.45;
+    }
+  }
+
+  /* The featured card's edge: one light that keeps travelling round it. A
+     conic gradient turned by a registered angle (`--orbit`, below), masked
+     to the 1px ring the card leaves round its body. */
+  .card-orbit {
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    pointer-events: none;
+    padding: 1px;
+    background: conic-gradient(
+      from var(--orbit),
+      transparent 0 72%,
+      color-mix(in srgb, var(--color-ink) 75%, transparent) 88%,
+      transparent 100%
+    );
+    mask:
+      linear-gradient(#000 0 0) content-box exclude,
+      linear-gradient(#000 0 0);
+    animation: card-orbit 6s linear infinite;
+  }
+  @keyframes card-orbit {
+    to {
+      --orbit: 360deg;
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .card-orbit {
+      animation: none;
+    }
+  }
+
+  /* A picker's panel drops in from just above where it settles. */
+  .picker-pop {
+    animation: picker-pop 160ms var(--ease-out);
+    transform-origin: top;
+  }
+
+  /* A published page's status dot: solid, with a ring that keeps leaving it. */
+  .app-live-dot {
+    position: relative;
+    width: 7px;
+    height: 7px;
+    border-radius: 999px;
+    background: currentColor;
+    flex: none;
+  }
+  .app-live-dot::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: currentColor;
+    animation: fx-ping 1.8s var(--ease-out) infinite;
+  }
+
+  /* A link inside a published section. The rule sweeps in from the left on
+     hover rather than switching on, which keeps a small interaction on the
+     same curve as the page's large ones. `text-decoration` cannot be
+     animated, so the underline is a gradient background sized from 0. */
+  .published-link-text {
+    background-image: linear-gradient(currentColor, currentColor);
+    background-repeat: no-repeat;
+    background-position: 0 100%;
+    background-size: 0 1px;
+    transition: background-size 220ms var(--ease-out);
+  }
+  .published-link:hover .published-link-text,
+  .published-link:focus-visible .published-link-text {
+    background-size: 100% 1px;
+  }
+
+  /* Résumé's figures band, under the masthead.
+
+     Per-cell rules rather than `gap` over a coloured ground, for the reason
+     the whole system avoids gap rules: a partly-filled last row shows the
+     ground as empty blocks. The rule is dropped on whichever cell opens a
+     row so the first figure stays flush with the page's own margin — which
+     is why the reset is written once per breakpoint rather than once in
+     total. The cell count changes at `md`, so `2n + 1` stops being the
+     answer there and `4n + 1` becomes it. */
+  .resume-stats {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .resume-stats > * {
+    border-left: 1px solid var(--color-divider);
+    padding-left: 1.25rem;
+  }
+  .resume-stats > :nth-child(2n + 1) {
+    border-left: 0;
+    padding-left: 0;
+  }
+  /* `data-cols` is set from the number of figures, so five of them read as
+     3 + 2 rather than 4 + 1 orphan. The count has to reach CSS as an
+     attribute rather than a variable: `grid-template-columns` would take a
+     variable happily, but `:nth-child()` would not, and the two have to
+     agree or a cell in the middle of a row loses its rule. */
+  @media (width >= 48rem) {
+    .resume-stats {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+    /* Equal specificity to the `4n + 1` reset below, so source order decides
+       and every cell gets its rule back before the row-opener loses it. */
+    .resume-stats > :nth-child(n) {
+      border-left: 1px solid var(--color-divider);
+      padding-left: 1.25rem;
+    }
+    .resume-stats > :nth-child(4n + 1) {
+      border-left: 0;
+      padding-left: 0;
+    }
+    .resume-stats[data-cols="3"] {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+    .resume-stats[data-cols="3"] > :nth-child(n) {
+      border-left: 1px solid var(--color-divider);
+      padding-left: 1.25rem;
+    }
+    .resume-stats[data-cols="3"] > :nth-child(3n + 1) {
+      border-left: 0;
+      padding-left: 0;
+    }
+    .resume-stats[data-cols="2"] {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+    .resume-stats[data-cols="2"] > :nth-child(2n + 1) {
+      border-left: 0;
+      padding-left: 0;
+    }
+    .resume-stats[data-cols="1"] {
+      grid-template-columns: minmax(0, 1fr);
+    }
+    .resume-stats[data-cols="1"] > :nth-child(n) {
+      border-left: 0;
+      padding-left: 0;
+    }
+  }
+
+  /* Site's reveal on scroll. The observer adds `.in`; the escapes for print,
+     reduced motion and no JavaScript all restore the finished state.
+
+     The plate arrives from below with its keyline already drawn and a short
+     blur coming off — a reproduction settling onto board, not a card sliding
+     in. Content is legible the moment it lands; nothing waits on this. */
+  .reveal {
+    opacity: 0;
+    transform: translateY(14px);
+    filter: blur(6px);
+    transition:
+      opacity 520ms var(--ease-out),
+      transform 520ms var(--ease-out),
+      filter 520ms var(--ease-out);
+  }
+  .reveal.in {
+    opacity: 1;
+    transform: none;
+    filter: none;
+  }
+
+  /* ── motion themes ─────────────────────────────────────────────────────
+     The shared layer under Aurora, Meridian, Stage, Arcade and Journey —
+     `published/fx.tsx` renders it. `data-motion` on the theme root is the
+     author's level: "full" is everything below, "subtle" keeps short rises
+     and stops every loop, "off" is a still page. A visitor's reduced-motion
+     preference, print and no-JS all land on the finished state; their rules
+     are at the bottom of this file and in app/layout.tsx.
+     ──────────────────────────────────────────────────────────────────── */
+
+  /* The house system is square. A motion theme picks its own corner, and the
+     shared buttons and tags follow it so a pill page does not carry square
+     buttons. Arcade cuts its corners with clip-path instead. */
+  [data-fx-root="aurora"],
+  [data-fx-root="meridian"],
+  [data-fx-root="stage"],
+  [data-fx-root="journey"] {
+    --fx-pill: 999px;
+  }
+  .fx-root .btn,
+  .fx-root .tag {
+    border-radius: var(--fx-pill, 0px);
+  }
+
+  /* — reveal: one entrance per block, staggered by --fx-delay — */
+  .fx-reveal {
+    opacity: 0;
+    transform: translate3d(0, 28px, 0);
+    filter: blur(8px);
+    transition:
+      opacity 700ms var(--ease-out),
+      transform 900ms var(--ease-out),
+      filter 700ms var(--ease-out);
+    transition-delay: var(--fx-delay, 0ms);
+  }
+  .fx-reveal[data-fx="tilt"] {
+    transform: perspective(1000px) translate3d(0, 48px, 0) rotateX(-16deg);
+    transform-origin: 50% 100%;
+  }
+  .fx-reveal[data-fx="flip"] {
+    transform: perspective(1000px) translate3d(40px, 0, 0) rotateY(-38deg);
+    transform-origin: 0 50%;
+  }
+  .fx-reveal[data-fx="scale"] {
+    transform: scale(0.92);
+  }
+  .fx-reveal[data-fx="left"] {
+    transform: translate3d(-36px, 0, 0);
+  }
+  .fx-reveal[data-fx="right"] {
+    transform: translate3d(36px, 0, 0);
+  }
+  .fx-reveal.in {
+    opacity: 1;
+    transform: none;
+    filter: none;
+  }
+  [data-motion="subtle"] .fx-reveal:not(.in) {
+    transform: translate3d(0, 12px, 0);
+    filter: none;
+  }
+  [data-motion="off"] .fx-reveal {
+    opacity: 1;
+    transform: none;
+    filter: none;
+    transition: none;
+  }
+
+  /* — words: each turns up out of the baseline — */
+  .fx-words {
+    perspective: 900px;
+  }
+  .fx-words .fx-w {
+    display: inline-block;
+    opacity: 0;
+    transform: translate3d(0, 0.5em, 0) rotateX(-75deg);
+    transform-origin: 50% 100%;
+    transition:
+      opacity 600ms var(--ease-out),
+      transform 900ms var(--ease-out);
+    transition-delay: calc(var(--i, 0) * 70ms + 80ms);
+  }
+  .fx-words.in .fx-w {
+    opacity: 1;
+    transform: none;
+  }
+  [data-motion="subtle"] .fx-words:not(.in) .fx-w {
+    transform: translate3d(0, 0.2em, 0);
+  }
+  [data-motion="off"] .fx-words .fx-w {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+
+  /* — depth: a tilt surface, its glare, and children set at --z — */
+  .fx-z {
+    transform: translateZ(var(--z, 0px));
+  }
+  .fx-glare {
+    position: absolute;
+    inset: 0;
+    z-index: 3;
+    border-radius: inherit;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 320ms var(--ease-out);
+    background: radial-gradient(
+      circle at var(--gx, 50%) var(--gy, 50%),
+      color-mix(in srgb, #ffffff 20%, transparent),
+      transparent 55%
+    );
+    mix-blend-mode: overlay;
+  }
+  .fx-tilt[data-hot] .fx-glare {
+    opacity: 1;
+  }
+
+  /* — the pointer's light, from --mx / --my on the theme root — */
+  .fx-spot {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: radial-gradient(
+      560px circle at var(--mx, 70%) var(--my, -10%),
+      color-mix(in srgb, var(--color-accent) 16%, transparent),
+      transparent 62%
+    );
+  }
+
+  /* Anything that loops forever carries `.fx-loop`, so one rule stops them
+     all when the author asks for less. */
+  [data-motion="subtle"] .fx-loop,
+  [data-motion="off"] .fx-loop {
+    animation: none;
+  }
+
+  /* — marquee — */
+  .fx-marquee {
+    overflow: hidden;
+    mask-image: linear-gradient(90deg, transparent, #000 7%, #000 93%, transparent);
+  }
+  .fx-marquee-track {
+    display: flex;
+    width: max-content;
+    animation: fx-marquee var(--fx-marquee, 32s) linear infinite;
+  }
+  .fx-marquee:hover .fx-marquee-track {
+    animation-play-state: paused;
+  }
+  [data-motion="subtle"] .fx-marquee,
+  [data-motion="off"] .fx-marquee {
+    mask-image: none;
+  }
+  [data-motion="subtle"] .fx-marquee-track,
+  [data-motion="off"] .fx-marquee-track {
+    animation: none;
+    width: auto;
+  }
+  [data-motion="subtle"] .fx-marquee-row,
+  [data-motion="off"] .fx-marquee-row {
+    flex: 1 1 auto;
+    flex-wrap: wrap;
+    row-gap: 0.75rem;
+  }
+  [data-motion="subtle"] .fx-marquee-copy,
+  [data-motion="off"] .fx-marquee-copy {
+    display: none;
+  }
+
+  /* A sideways rail that scrolls inside itself, never the page. */
+  .fx-rail {
+    scrollbar-width: none;
+    overscroll-behavior-x: contain;
+  }
+  .fx-rail::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* A pulsing status dot. */
+  .fx-pulse {
+    position: relative;
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 999px;
+    background: var(--color-mark);
+  }
+  .fx-pulse::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: inherit;
+    animation: fx-ping 1.8s var(--ease-out) infinite;
+  }
+  [data-motion="subtle"] .fx-pulse::after,
+  [data-motion="off"] .fx-pulse::after {
+    animation: none;
+    opacity: 0;
+  }
+
+  /* Glass: a surface the page shows through. */
+  .fx-glass {
+    background: color-mix(in srgb, var(--color-ink) 5%, transparent);
+    border: 1px solid color-mix(in srgb, var(--color-ink) 12%, transparent);
+    backdrop-filter: blur(14px) saturate(140%);
+    -webkit-backdrop-filter: blur(14px) saturate(140%);
+  }
+
+  /* — Aurora — */
+  .aurora-orb {
+    position: absolute;
+    border-radius: 999px;
+    filter: blur(80px);
+    opacity: 0.55;
+    animation: aurora-drift 22s ease-in-out infinite alternate;
+  }
+  .aurora-dots {
+    background-image: radial-gradient(
+      color-mix(in srgb, var(--color-ink) 14%, transparent) 1px,
+      transparent 1px
+    );
+    background-size: 28px 28px;
+    mask-image: linear-gradient(180deg, #000, transparent 70%);
+  }
+  .aurora-card {
+    transition:
+      border-color 260ms var(--ease-out),
+      background-color 260ms var(--ease-out);
+  }
+  .aurora-card:hover {
+    border-color: color-mix(in srgb, var(--color-mark) 55%, transparent);
+  }
+  .aurora-card img {
+    transition: transform 900ms var(--ease-out);
+  }
+  .aurora-card:hover img {
+    transform: scale(1.05);
+  }
+
+  /* — Stage — */
+  .stage-ken {
+    animation: stage-ken 26s ease-in-out infinite alternate;
+  }
+  .stage-poster img {
+    transition: transform 900ms var(--ease-out);
+  }
+  .stage-poster:hover img {
+    transform: scale(1.08);
+  }
+  .stage-outline,
+  .stage-marquee li:nth-child(even) {
+    color: transparent;
+    -webkit-text-stroke: 1px color-mix(in srgb, var(--color-ink) 70%, transparent);
+  }
+  .stage-marquee li:nth-child(4n + 1) {
+    color: var(--color-mark);
+  }
+
+  /* — Arcade — */
+  .arcade-floor {
+    background-image:
+      linear-gradient(var(--arcade-grid) 2px, transparent 2px),
+      linear-gradient(90deg, var(--arcade-grid) 2px, transparent 2px);
+    background-size: 64px 64px;
+    animation: arcade-run 1.4s linear infinite;
+  }
+  .arcade-scanlines {
+    background: repeating-linear-gradient(
+      180deg,
+      color-mix(in srgb, #000 22%, transparent) 0 1px,
+      transparent 1px 3px
+    );
+    opacity: 0.35;
+    mix-blend-mode: multiply;
+  }
+  .arcade-cut {
+    clip-path: polygon(0 0, calc(100% - 16px) 0, 100% 16px, 100% 100%, 16px 100%, 0 calc(100% - 16px));
+  }
+  .arcade-glitch {
+    position: relative;
+    text-shadow: 0 0 22px color-mix(in srgb, var(--color-accent) 70%, transparent);
+  }
+  .arcade-glitch::before,
+  .arcade-glitch::after {
+    content: attr(data-text);
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    text-shadow: none;
+  }
+  .arcade-glitch::before {
+    color: var(--color-accent);
+    transform: translate(-3px, 0);
+    clip-path: inset(0 0 60% 0);
+    animation: arcade-glitch-a 3.2s steps(1, end) infinite;
+  }
+  .arcade-glitch::after {
+    color: color-mix(in srgb, var(--color-mark) 40%, #22d3ee);
+    transform: translate(3px, 0);
+    clip-path: inset(55% 0 0 0);
+    animation: arcade-glitch-b 2.7s steps(1, end) infinite;
+  }
+  [data-motion="subtle"] .arcade-glitch::before,
+  [data-motion="subtle"] .arcade-glitch::after,
+  [data-motion="off"] .arcade-glitch::before,
+  [data-motion="off"] .arcade-glitch::after {
+    display: none;
+  }
+  .arcade-blink {
+    animation: arcade-blink 1.1s steps(2, start) infinite;
+  }
+  .arcade-level[aria-pressed="true"] {
+    box-shadow:
+      inset 0 0 0 1px var(--color-mark),
+      0 0 24px color-mix(in srgb, var(--color-accent) 35%, transparent);
+  }
+
+  /* — Journey — */
+  .journey-orbit {
+    /* The ring's radius: inside a phone's width, wider from md up. */
+    --journey-r: 150px;
+    transform: rotateX(-14deg) rotateY(0deg);
+    animation: journey-spin 46s linear infinite;
+  }
+  /* Each tag turns back as far as the ring turns it, on the individual
+     `rotate` property so it composes with the tag's own transform rather
+     than replacing it — the tag then always faces the reader. */
+  .journey-face {
+    animation: journey-face 46s linear infinite;
+  }
+  @media (width >= 48rem) {
+    .journey-orbit {
+      --journey-r: 215px;
+    }
+  }
+
+  /* ── theme thumbnails ──────────────────────────────────────────────────
+     `ThemeThumb` in builder/controls.tsx: each theme's one piece of depth,
+     in miniature, in the author's accent (`--thumb-accent`). Every loop is
+     `.fx-loop`, so reduced motion stops them all.
+     ──────────────────────────────────────────────────────────────────── */
+  .thumb > * {
+    position: absolute;
+  }
+  .thumb[data-thumb="aurora"] {
+    background: #0b0f1a;
+  }
+  .thumb-orb {
+    width: 70%;
+    aspect-ratio: 1;
+    border-radius: 999px;
+    background: var(--thumb-accent);
+    filter: blur(14px);
+    opacity: 0.7;
+    animation: aurora-drift 9s ease-in-out infinite alternate;
+  }
+  .thumb[data-size="sm"] .thumb-orb {
+    filter: blur(6px);
+  }
+  .thumb-glass {
+    left: 22%;
+    top: 24%;
+    width: 56%;
+    height: 52%;
+    border-radius: 6px;
+    background: #ffffff1c;
+    border: 1px solid #ffffff38;
+    backdrop-filter: blur(6px);
+    transform: perspective(200px) rotateY(-16deg) rotateX(8deg);
+  }
+
+  .thumb[data-thumb="meridian"] {
+    background: #f6f3ec;
+  }
+  .thumb-plate {
+    right: 12%;
+    top: 14%;
+    width: 30%;
+    height: 72%;
+    border-radius: 999px 999px 4px 4px;
+  }
+  .thumb-lines {
+    left: 10%;
+    top: 32%;
+    width: 42%;
+    display: flex;
+    flex-direction: column;
+    gap: 14%;
+    height: 40%;
+  }
+  .thumb-lines i {
+    display: block;
+    height: 3px;
+    border-radius: 2px;
+    background: #1d2433;
+    opacity: 0.55;
+  }
+  .thumb-lines i:first-child {
+    height: 6px;
+    opacity: 0.85;
+  }
+
+  .thumb[data-thumb="stage"] {
+    background: #09090b;
+  }
+  .thumb-billboard {
+    inset: 0 0 42% 0;
+    background:
+      linear-gradient(0deg, #09090b, transparent 70%),
+      radial-gradient(ellipse at 70% 30%, var(--thumb-accent), transparent 70%);
+  }
+  .thumb-rail {
+    left: 0;
+    right: 0;
+    bottom: 8%;
+    height: 34%;
+    overflow: hidden;
+  }
+  .thumb-rail-track {
+    display: flex;
+    gap: 3%;
+    width: 200%;
+    height: 100%;
+    animation: fx-marquee 9s linear infinite;
+  }
+  .thumb-rail-track i {
+    flex: none;
+    width: 10.5%;
+    height: 100%;
+    border-radius: 3px;
+    background: linear-gradient(160deg, var(--thumb-accent), #1a1a1f);
+  }
+
+  .thumb[data-thumb="arcade"] {
+    --arcade-grid: var(--thumb-accent);
+    background: linear-gradient(
+      180deg,
+      #07060f 0%,
+      color-mix(in srgb, var(--thumb-accent) 35%, #07060f) 58%,
+      #07060f 58%
+    );
+  }
+  .thumb-sun {
+    left: 50%;
+    top: 14%;
+    width: 30%;
+    aspect-ratio: 1;
+    transform: translateX(-50%);
+    border-radius: 999px;
+    background: linear-gradient(180deg, #fde047, var(--thumb-accent));
+    box-shadow: 0 0 18px var(--thumb-accent);
+  }
+  .thumb-floor-wrap {
+    left: -30%;
+    right: -30%;
+    bottom: 0;
+    height: 42%;
+    perspective: 90px;
+  }
+  .thumb-floor {
+    position: absolute;
+    inset: 0;
+    transform-origin: top;
+    transform: rotateX(58deg);
+    background-size: 16px 16px;
+  }
+  .thumb[data-size="sm"] .thumb-floor {
+    background-image:
+      linear-gradient(var(--arcade-grid) 1px, transparent 1px),
+      linear-gradient(90deg, var(--arcade-grid) 1px, transparent 1px);
+  }
+
+  .thumb[data-thumb="journey"] {
+    background: #fbf6ef;
+  }
+  .thumb-card {
+    left: 50%;
+    width: 64%;
+    height: 44%;
+    border-radius: 8px;
+    background: color-mix(in srgb, var(--thumb-accent) 20%, #ffffff);
+    border: 1px solid color-mix(in srgb, var(--thumb-accent) 35%, transparent);
+    transform: translate(-50%, 0);
+  }
+  .thumb-ring {
+    left: 8%;
+    top: 10%;
+    width: 16%;
+    aspect-ratio: 1;
+    border-radius: 999px;
+    border: 2px dashed var(--thumb-accent);
+    animation: thumb-spin 7s linear infinite;
+  }
+
+  .thumb-bob {
+    animation: thumb-bob 4s ease-in-out infinite alternate;
+  }
+  .thumb-rise {
+    animation: thumb-rise 3.2s ease-in-out infinite alternate;
+  }
+}
+
+@keyframes thumb-bob {
+  from {
+    translate: 0 -5%;
+  }
+  to {
+    translate: 0 5%;
+  }
+}
+/* `translate` rather than `transform`, so the card's own centring transform
+   is composed with the rise rather than replaced by it. */
+@keyframes thumb-rise {
+  from {
+    translate: 0 14%;
+  }
+  to {
+    translate: 0 0;
+  }
+}
+@keyframes thumb-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes picker-pop {
+  from {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.98);
+  }
+}
+@keyframes fx-marquee {
+  to {
+    transform: translateX(-50%);
+  }
+}
+@keyframes fx-ping {
+  0% {
+    transform: scale(1);
+    opacity: 0.7;
+  }
+  80%,
+  100% {
+    transform: scale(2.8);
+    opacity: 0;
+  }
+}
+@keyframes aurora-drift {
+  0% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  50% {
+    transform: translate3d(7%, -5%, 0) scale(1.12);
+  }
+  100% {
+    transform: translate3d(-6%, 6%, 0) scale(0.94);
+  }
+}
+@keyframes stage-ken {
+  from {
+    transform: scale(1.04);
+  }
+  to {
+    transform: scale(1.14) translate3d(-1.5%, -1%, 0);
+  }
+}
+@keyframes arcade-run {
+  to {
+    background-position: 0 64px;
+  }
+}
+@keyframes arcade-blink {
+  to {
+    visibility: hidden;
+  }
+}
+@keyframes arcade-glitch-a {
+  0%,
+  86%,
+  100% {
+    clip-path: inset(0 0 100% 0);
+  }
+  87% {
+    clip-path: inset(10% 0 62% 0);
+  }
+  90% {
+    clip-path: inset(48% 0 30% 0);
+  }
+  93% {
+    clip-path: inset(70% 0 8% 0);
+  }
+}
+@keyframes arcade-glitch-b {
+  0%,
+  80%,
+  100% {
+    clip-path: inset(100% 0 0 0);
+  }
+  81% {
+    clip-path: inset(60% 0 12% 0);
+  }
+  84% {
+    clip-path: inset(20% 0 58% 0);
+  }
+  88% {
+    clip-path: inset(36% 0 40% 0);
+  }
+}
+@keyframes journey-spin {
+  to {
+    transform: rotateX(-14deg) rotateY(360deg);
+  }
+}
+@keyframes journey-face {
+  to {
+    rotate: y -360deg;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reveal,
+  .reveal.in {
+    opacity: 1;
+    transform: none;
+    filter: none;
+    transition: none;
+  }
+  .published-link-text {
+    transition: none;
+  }
+  .plate-sheen::before {
+    display: none;
+  }
+  .app-live-dot::after {
+    animation: none;
+    opacity: 0;
+  }
+  .picker-pop {
+    animation: none;
+  }
+  /* The motion themes, finished and still. */
+  .fx-reveal,
+  .fx-words .fx-w {
+    opacity: 1;
+    transform: none;
+    filter: none;
+    transition: none;
+  }
+  .fx-loop,
+  .fx-marquee-track,
+  .fx-pulse::after {
+    animation: none;
+  }
+  .arcade-glitch::before,
+  .arcade-glitch::after,
+  .fx-glare {
+    display: none;
+  }
 }
 
 /* ── print ─────────────────────────────────────────────────────────────
    /print stacks every published page for the browser's own Save as PDF.
    Chrome drops background colours unless the user ticks "Background
-   graphics", so ask for them: the accent bands are the design, not decoration.
+   graphics", so ask for them: the board is the design, not decoration.
    ──────────────────────────────────────────────────────────────────── */
 @media print {
   .no-print {
@@ -427,4 +1634,84 @@
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
   }
+  /* A résumé entry stays whole on one sheet. */
+  .resume-entry {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+  /* A stacked sheet is as tall as its content. `groundStyle()` reads this
+     variable for the published wrapper's minimum height, so dropping it to
+     zero here is enough — on paper a viewport minimum would put a blank
+     page between every portfolio /print stacks. */
+  :root {
+    --ground-min-h: 0;
+  }
+
+  /* A plate does not lift off paper, and nothing reveals: there is no
+     scrolling to reveal it and no light to catch. */
+  .reveal,
+  .reveal.in {
+    opacity: 1;
+    transform: none;
+    filter: none;
+    transition: none;
+  }
+  .plate {
+    box-shadow: 0 0 0 1px var(--color-divider);
+  }
+  .plate-sheen::before {
+    display: none;
+  }
+
+  /* The motion themes on paper: every block in place, nothing looping, no
+     light layers (a blurred orb prints as a grey smudge), the tilt and the
+     scroll-linked depth flat, and a sideways rail wrapped into rows so no
+     poster is cut off at the sheet's edge. */
+  .fx-reveal,
+  .fx-words .fx-w {
+    opacity: 1 !important;
+    transform: none !important;
+    filter: none !important;
+    transition: none !important;
+  }
+  .fx-ambient,
+  .fx-glare,
+  .fx-spot,
+  .arcade-glitch::before,
+  .arcade-glitch::after,
+  .no-print-fx {
+    display: none !important;
+  }
+  .fx-loop,
+  .fx-marquee-track {
+    animation: none !important;
+  }
+  .fx-tilt,
+  .fx-depth {
+    transform: none !important;
+  }
+  .fx-rail {
+    flex-wrap: wrap !important;
+    overflow: visible !important;
+  }
+  .fx-rail > * {
+    break-inside: avoid;
+  }
+  .fx-stack-card {
+    position: static !important;
+    transform: none !important;
+    break-inside: avoid;
+  }
+  .fx-sticky {
+    position: static !important;
+  }
+}
+
+/* The featured card's travelling light turns this; registered so it animates
+   as an angle rather than jumping from 0 to 360. Top level: @property is not
+   allowed inside a layer. */
+@property --orbit {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 0deg;
 }

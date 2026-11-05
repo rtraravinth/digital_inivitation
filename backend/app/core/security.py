@@ -121,6 +121,34 @@ def decode_challenge_token(token: str) -> str:
     return subject
 
 
+def create_asset_token(asset_id: str, *, ttl_minutes: int | None = None) -> str:
+    """Signs one asset id, so its URL can be opened without a header.
+
+    An ``<img src>`` cannot carry ``Authorization``, which is why the owner's
+    own upload URL needs a signature in the query string instead. The token
+    names a single asset: possession of one grants nothing else.
+    """
+    settings = get_settings()
+    now = datetime.now(UTC)
+    minutes = settings.asset_url_ttl_minutes if ttl_minutes is None else ttl_minutes
+    return _encode(
+        {
+            "sub": asset_id,
+            "typ": "asset",
+            "iat": int(now.timestamp()),
+            "exp": int((now + timedelta(minutes=minutes)).timestamp()),
+        }
+    )
+
+
+def decode_asset_token(token: str) -> str:
+    """The asset id the token was signed for. Raises on anything else."""
+    subject = _decode(token, expected_type="asset").get("sub")
+    if not isinstance(subject, str):
+        raise Unauthenticated("That token is not valid.", code="invalid_token")
+    return subject
+
+
 def hash_token(plaintext: str) -> str:
     """SHA-256, not argon2.
 

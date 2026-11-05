@@ -8,6 +8,7 @@ from typing import Literal
 
 from pydantic import EmailStr, Field, field_validator
 
+from app.schemas.account import HANDLE_PATTERN
 from app.schemas.common import CamelModel
 
 #: Long enough that a wordlist is useless, short enough to be a passphrase.
@@ -28,6 +29,23 @@ class _EmailNormalising(CamelModel):
 class RegisterRequest(_EmailNormalising):
     password: str = Field(min_length=PASSWORD_MIN, max_length=PASSWORD_MAX)
     name: str = Field(default="", max_length=200)
+    #: Required at sign-up because it is the base of every address the account
+    #: will ever publish — facet.com/<handle>/<slug>. Asking later means an
+    #: account can exist with no address, which is the state that let a null
+    #: handle reach the UI in the first place.
+    handle: str = Field(pattern=HANDLE_PATTERN)
+
+    @field_validator("handle", mode="before")
+    @classmethod
+    def _normalise_handle(cls, value: str) -> str:
+        # Before, not after: the pattern is lowercase-only, so trimming and
+        # lowercasing has to happen first or "Aravinth" fails as a format
+        # error rather than being read as the typo it is.
+        if not isinstance(value, str):
+            return value
+        # Addresses are lowercase, so "Aravinth" is a typo rather than an
+        # error — fix it here instead of failing the pattern.
+        return value.strip().lower()
 
 
 class LoginRequest(_EmailNormalising):

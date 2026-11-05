@@ -3,7 +3,7 @@
 # FACET
 
 A multi-role portfolio builder. One page per portfolio: a header, then N
-sections, each with the same four fields — title, description, tags, links.
+sections, each with the same four fields — title, description, tab, links.
 Built from a Claude Design canvas (`Portfolio Page.dc.html`), which now runs
 to five turns. Every artboard in it is implemented; the map from artboard to
 code is under "Layout" below.
@@ -13,14 +13,22 @@ code is under "Layout" below.
 Two processes. The frontend does nothing useful without the API.
 
 ```
-cd backend && .venv/Scripts/python -m uvicorn app.main:app --reload   # :8000
-npm run dev                                                          # :3000
+npm run api    # :8000 — uvicorn, bound to every interface
+npm run dev    # :3000
 ```
+
+`npm run api` exists because typing the uvicorn command by hand went wrong
+twice: the venv is at `.venv/bin` on Linux and macOS but `.venv/Scripts` on
+Windows, and uvicorn binds loopback by default. A loopback bind breaks every
+request the moment `NEXT_PUBLIC_API_URL` names a LAN address — opening the app
+from a phone — with `ERR_CONNECTION_REFUSED` and nothing in the API's log,
+because the connection never arrives. Pass flags through when you need them:
+`npm run api -- --host 127.0.0.1`.
 
 ```
 npm run build
 npm run lint
-cd backend && .venv/Scripts/python -m pytest    # 208 tests
+cd backend && .venv/bin/python -m pytest    # 307 tests (.venv/Scripts on Windows)
 ```
 
 `NEXT_PUBLIC_API_URL` points the frontend at the API; see
@@ -45,7 +53,13 @@ your browser keeps hitting the stale server on 3000. Kill it (`taskkill //F
 
 - `src/lib/types.ts` — `Portfolio` / `Section` / `PortfolioHeader` / `Layout`
   / `AccountSettings`, plus `normalize()`, which backfills fields added after
-  data was stored. Extend it whenever you add a field, or data written by an
+  data was stored. **Numbers and the timeline live on the header, not on a
+  section**: the page draws one "By the numbers" row and one timeline, so a
+  per-section copy only had to be gathered back up — and the author had to
+  guess which section to type them into. A section's own extras are its
+  image, its file and its quote. The editor says which is which: "Add to this
+  portfolio (optional)" against the header, "Add to this section (optional)"
+  against a section. Extend it whenever you add a field, or data written by an
   older build will break. `assetSrc()` lives here too: it resolves an upload
   whether it carries an API `url` or a pre-backend `dataUrl`.
 - `src/lib/api.ts` — the typed API client. Access token in memory, refresh
@@ -63,26 +77,76 @@ your browser keeps hitting the stale server on 3000. Kill it (`taskkill //F
   mask 0). It exists because the print code on `/stats` has to actually scan
   and the CSP rules out a CDN. Verified against published Reed–Solomon
   generator polynomials and by round-tripping through an independent decoder.
+- `src/lib/icons.tsx` — link icons. The brand marks are Simple Icons (CC0),
+  copied in as path data rather than added as a dependency: the published
+  page's CSP rules out a CDN and thirty paths cost ~15KB. `iconFor()` reads a
+  link's stored `icon` override, then its hostname, then falls back to a
+  generic glyph — and never throws, because it runs during render in every
+  theme while the editor writes a half-typed address on every keystroke.
+  Hostname matching is on the registrable domain, never a substring, or
+  `mysite.com/instagram-clone` takes the Instagram mark. Adding a brand is one
+  line in `ICONS` and one in `HOSTS` — **except LinkedIn.** Simple Icons
+  permanently removed that mark at LinkedIn's own request over trademark
+  enforcement, so there is no CC0 path to copy and this repo does not
+  redistribute it; `linkedin.com` and `lnkd.in` resolve to the generic
+  `briefcase` glyph, display name "Profile". Do not add a LinkedIn icon. The
+  reasoning is in the `icons.tsx` file header, along with why twenty-three
+  solid brand marks sit beside seven stroked generics and stay that way.
 - `src/lib/seed.ts` — the five seeded portfolios. `backend/scripts/dump_seed.mjs`
   transpiles this file and writes `backend/app/seed_data.json`, so the seed is
   not maintained twice; re-run it whenever this changes.
 - `src/components/Editor.tsx` — artboards 4b (desktop document) and 4d (mobile),
   sharing one state tree.
-- `src/components/builder/` — `Builder.tsx` is artboards 2a (three-pane:
-  section rail, live canvas, tabbed inspector) and 2c (mobile control sheet);
-  `ThemeGallery.tsx` is 2b; `controls.tsx` holds the Theme / Colour / Type /
-  Layout controls **shared** with the editor's drawer so the two cannot drift.
-- `src/components/BlockManager.tsx` — artboard 3b, at `/blocks/[id]`.
+- `src/components/builder/` — `Builder.tsx` is artboards 2a (a window-height
+  workspace: section rail, live canvas with a device toolbar and "Replay
+  motion", inspector tabbed Look / Colour / Type / Motion) and 2c (canvas over
+  a five-tab control sheet). `Canvas.tsx` is the live canvas, shared with
+  `ThemeGallery.tsx` (2b), which is try-before-you-apply: picking a profession
+  or theme changes a local draft only the preview sees, and nothing is written
+  until "Use this look". `controls.tsx` holds the Profession / Theme / Colour /
+  Type / Motion / Layout controls **shared** with the editor's drawer so the
+  two cannot drift.
 - `src/components/PrintAll.tsx` — `/print` stacks every published page with a
   page break between so the browser's own **Save as PDF** can export them.
   That is what "Download all pages as PDF" on `/account` opens; generating a
   PDF in-process would mean a library, and the themes already print correctly.
+- `src/components/resume/` — the resume, a portfolio's second look; see "The
+  resume" below. `ResumeDocument.tsx` draws all six templates from one markup,
+  `src/app/resume.css` gives each its look, `ResumeSheet.tsx` is the scaled
+  preview, `ResumeContent.tsx` the editor's Resume view, `ResumeStudio.tsx`
+  the builder's Resume side and `ResumePrint.tsx` the `/resume/[id]` page
+  that Download PDF opens. `src/lib/resume.ts` holds what they share.
 - `src/components/account/panels.tsx` + `Account.tsx` — artboards 5a and 5b.
-- `src/components/published/themes.tsx` — the published page in seven themes:
-  Editorial (1a), Index rail (1b), Poster (1c), Links (3a), Ledger, Dossier,
-  Broadsheet. Also `SectionDetail`, artboard 1d, reached at `?section=<id>`.
+- `src/components/published/themes.tsx` — the published page in five motion
+  themes: Aurora (the default), Meridian, Stage, Arcade, Journey, one file
+  each under `themes/`. Also `SectionDetail`, artboard 1d, reached at
+  `?section=<id>`. The catalogue themes (Résumé, Editorial, Poster, Links,
+  Site) are retired; migration `b6e2f0d4a913` remapped stored rows, and
+  `LEGACY_THEMES` on both sides maps old ids arriving any other way.
+- `src/components/published/fx.tsx` — the motion layer every theme is built
+  on: `ThemeRoot`, `Reveal`, `Words`, `Tilt`, `useScrollProgress`, `CountUp`,
+  `Marquee`. Read its header before adding motion — see "Motion" below.
 - `src/app/globals.css` — the Modernist design system: tokens in `@theme`,
   component classes in `@layer components`.
+
+**The live canvas is an iframe, and it has to be.** A theme's `md:` and `lg:`
+utilities are media queries, and a media query answers about the *window* — so
+a 390px box inside a 1440px window still got the desktop layout, crammed and
+overflowing sideways. An iframe has a window of its own, so `Desktop`/`Mobile`
+finally previews what the device actually renders. `CanvasFrame` copies this
+document's stylesheets into the frame — rendered through a portal, never
+appended, because the React Compiler rule rejects mutating a document held in
+state — and re-reads them on a `MutationObserver` so dev HMR keeps working.
+The page itself is portaled into the frame's body, so it stays in this React
+tree: same context, same live edits.
+
+**The phone canvas refuses horizontal swipes.** `Canvas` takes `panX`, and the
+mobile sheet passes `false`, which puts `touch-action: pan-y` on the wrapper
+*inside* the iframe — the parent cannot govern a gesture that starts in
+another document. The canvas fills the middle of that screen and the page
+inside it has its own sideways tab row, so a swipe meant to scroll the builder
+dragged that row instead. Taps still land: `touch-action` does not affect
+them, and `pointer-events: none` (which does) is the wrong tool here.
 
 **The live canvas scales with a CSS transform, not `zoom`.** A transform does
 not change layout size, so the inner element gets the unscaled height it needs
@@ -97,16 +161,208 @@ rule in `globals.css` reads `--tracking`. A Tailwind `text-[64px]` utility
 would beat a base rule, so the size has to be inline — that is why `headline()`
 returns a style object rather than a class.
 
-**`p.layout.roleNav` only applies to Editorial, Links, Ledger and Broadsheet.**
-Index rail, Poster and Dossier carry their own navigation — it is the reason
-you would pick them. The Layout panel says so on screen rather than offering a
-control that silently does nothing.
+**Every section files under exactly one tab, and the tab is required.** The
+tab row on a published page is `tabs(p)` in `published/themes.tsx` — every
+distinct tab its visible sections use, in section order, uncapped, because a
+tab is the only route to the sections under it. There is no "All work" tab
+and no "everything" state: one tab is always open, the first until the
+visitor picks another. The editor's `TabField` offers the page's existing
+tabs before letting you name a new one, so "Advisory" typed twice cannot
+become two tabs. The backend refuses a blank tab (`SectionPatch.tab`), and a
+new section starts on the page's first tab, or `Work` on an empty page.
 
-## Design system: Modernist
+**`p.layout.roleNav` keeps its name, not its wording.** It is the wire
+format, a stored value and in tests, so it is still `roleNav`; every label it
+shows says "tab". Renaming the key would be a migration for no user-visible
+gain.
 
-Archivo throughout, `#f3f2f2` ground, `#201e1d` ink, one accent `#ec3013`.
-**Zero border radius anywhere** — `--radius-*` is `0` on purpose. 2px dividers,
-flush-left labels (including inside wide buttons), photography in grayscale.
+**`p.layout.roleNav` only applies to Meridian.** It is the one theme built
+on `useTabFilter` with all four shapes (tabs, rail, scroll, lens). Aurora
+and Journey show every tab as a chapter on one scroll, Stage gives each tab a
+rail, and Arcade's tabs are its level-select menu. "Content grid" is read by
+Aurora, Meridian and Arcade (`gridCols`); "Density" by Aurora, Meridian and
+Journey. The Layout panel says so on screen rather than offering a control
+that silently does nothing: `IGNORED` in `builder/controls.tsx` carries one
+reason per theme per control — grep `useTabFilter`, `gridCols(` and
+`layout.density` under `src/components/published/themes/` before editing it.
+
+**Professions are looks, not data.** `PROFESSIONS` in `types.ts` maps ten
+professions to a theme, accent, picked ground and type pairing;
+`applyProfession()` writes those fields and nothing remembers which
+profession was picked. The Colour panel's palettes and the Type panel's
+pairings are read off the same list, so adding a profession extends all three.
+
+## The resume
+
+**One content list, two looks: the page it publishes and the resume it
+downloads.** Nothing is typed twice. Edit text is a single list — the
+header, the resume-only contact details, the structured blocks (Experience,
+Education, Skills, Certifications, Languages, Awards, always listed), then
+the page's own sections — and every card carries **Page** and **Resume**
+switches (`LookToggles` in `ui.tsx`). There used to be a separate Resume
+view of the editor; two places to type one person's history is exactly what
+this replaced, so do not bring it back. The builder still has a **Page /
+Resume** switch (`/builder/<id>?mode=resume`), because the two *looks* are
+styled separately.
+
+- **The header is the resume's top.** Its name, current line and About are
+  the resume's name, headline and summary; there is no resume-only copy.
+  Migration `d2f7b8c41a90` moved any old `headline`/`summary` into the
+  header and `resume_from_stored()` ignores the stale keys.
+- **The facts a page section has no fields for are structured, not prose.**
+  `p.resume` holds roles (company, dates, `current`, bullets), education,
+  skill groups, certifications, languages and awards, plus the template and
+  its style. Structured so a later ATS check can read a role and its dates
+  without parsing text — keep it that way.
+- **Switches.** A structured block is on the page when it is in
+  `resume.pageBlocks` and on the resume unless it is in `resume.hidden`. A
+  section is on the page unless `hidden` and on the resume while
+  `onResume` (a column, `sections.on_resume`). On the resume, sections print
+  grouped under their **Section title** — the field that used to be labelled
+  "Tab", now first in the card — via `sectionGroups()`.
+- **Structured blocks reach the page as sections.** `withPageBlocks()` in
+  `lib/resume.ts` turns each entry of a page-enabled block into a synthetic
+  section (id `resume-…`, tab = the block's name) ahead of the page's own
+  sections. It runs in `PublishedBody` and wherever `?section=` is looked
+  up, never in the editor; it is idempotent. The themes therefore know
+  nothing about roles or degrees, and section descriptions are
+  `whitespace-pre-line` so a role's bullet points keep their lines.
+- **It is one JSONB column, `portfolios.resume`, sent whole** with `PUT
+  /portfolios/{id}/resume`, validated by `app/schemas/resume.py`. `{}` is a
+  valid resume, and `resume_from_stored()` turns anything that no longer
+  validates into the defaults rather than failing the portfolio read.
+- **Only page-enabled blocks ever leave the account.** `PublicPortfolioOut`
+  carries `public_resume()` — the blocks in `pageBlocks` and their order,
+  nothing else: no email, phone, location, website or style.
+  `tests/test_resume.py` pins that.
+- **A live page freezes what can reach it.** `PUT /resume` takes
+  `OwnedPortfolio` so the builder can restyle a live page's resume, but
+  while live it answers 409 `portfolio_published` to any change outside
+  `RESUME_ONLY_FIELDS` (style, `hidden`, the contact details). The editor
+  renders `PublishedLock` for a live portfolio as before, and the builder's
+  block rail cannot reorder while live (the order is the page's too).
+  `updateResume` is its own debounced write, not part of `updatePortfolio`.
+- **Thirty-two templates, one markup — and a template is a row, not a
+  stylesheet.** `RESUME_TEMPLATES` in `lib/resume.ts` gives each one a part
+  per slot: layout (`one` / `left` / `right`), aside, header, heading, entry,
+  skills, contact. `ResumeDocument` writes the parts as `data-*` attributes
+  and `resume.css` styles each part once, plus a short "finishing touches"
+  list keyed off `data-template`. A new template is usually a new row. Its id
+  goes in `RESUME_TEMPLATE_IDS` (`types.ts`) **and** the backend's
+  `ResumeTemplate` Literal. `test_the_template_list_matches_the_frontend`
+  fails if the two drift. Two-column layouts put Skills, Certifications,
+  Languages and Awards in the narrow column (`SIDE_BLOCKS`). Every template
+  sets real text in reading order, name first, because that is what an ATS
+  reads. Never render a resume as an image or a canvas. Organisation-first
+  entries and the date gutters are markup every template shares (`Entry`
+  writes the dates twice), so no template moves a node.
+- **A solid column is the paper's background, not the column's.** Under
+  `aside: "solid"` the sheet becomes the grid (`.r-columns` is
+  `display: contents`) so the column can run past the header. The colour is
+  `paperGround()`, a horizontal gradient set on the sheet, on the print
+  margin cells and on the printed page's `html`. Painted on the column
+  instead, it stops where its text does — on page 2, partway down. The
+  `band` header reaches the paper's top edge with negative margins of
+  `--r-my` / `--r-mx`.
+- **Columns and Background are style, not template.** `style.columns`
+  (`auto` follows the template) is laid over the template's parts by
+  `sheetParts()`, which everything that draws a sheet reads instead of
+  `templateOf()`. Picking a template resets it to `auto`, and the picker's
+  thumbnails ignore it. `style.backdrop` is decoration in
+  `lib/resume-backdrops.ts`: CSS background layers of SVG drawn in the
+  accent, never an element, so the PDF's text layer is unchanged. On screen
+  the sheet paints them; in print `resume.css` clears the sheet and
+  `/resume/[id]` paints the same layers on `html`. That is the only
+  surface that reaches every page's edges, and it puts a corner graphic flush
+  with the paper's top. Layers that fill the page repeat: on a printed page,
+  `100%` is one page tall.
+- **`resume.css` is unlayered on purpose**, so it beats `globals.css`'s heading
+  and link rules, and it is imported in `layout.tsx`. The sheet is paper:
+  white with near-black ink in either app theme, sized in mm and pt so the
+  preview and the PDF agree.
+- **The PDF is the browser's own Save as PDF**, from `/resume/[id]`, which
+  writes the `@page` size and margin per resume, names the document after the
+  person (the PDF's default file name) and, with `?print=1`, opens the print
+  dialog once fonts and the photo have loaded. **The `@page` margin is 0**:
+  the browser prints its own header and footer (date, title, address, page
+  number) in that margin, and with none it has nowhere to put them. Each
+  page's top and bottom room comes from empty cells in a table's `thead` and
+  `tfoot`, which repeat on every printed page, so the sheet drops its own
+  vertical padding in print. Entries are `break-inside: avoid`.
+- **The preview's page breaks are close, not exact.** `ResumeSheet` is one
+  continuous sheet with a dashed line wherever a page's room runs out; the
+  printer moves an entry that will not fit whole, so a real break can land a
+  little earlier. The page count is what matters for keeping a resume to one.
+- **Testing the PDF:** this machine's Edge refuses to print over CDP
+  ("Printing is not available") in both headless modes. Headless Chrome
+  (`%LOCALAPPDATA%/Google/Chrome`) prints; sign in and move with
+  `window.next.router.push` so the in-memory access token survives.
+
+## Motion
+
+`p.layout.motion` is `full`, `subtle` or `off` (labelled Full / Subtle /
+Still), stored in the layout JSON like `photo` — no migration. `ThemeRoot`
+writes it to `data-motion`, and CSS under "motion themes" in `globals.css`
+does most of the work from there. Rules the code depends on:
+
+- **Frame-aware, always.** Every observer and scroll listener is built from
+  `node.ownerDocument.defaultView` with no explicit root, never this module's
+  globals and never Motion's `useScroll` / `whileInView` — inside the builder
+  canvas those measure the builder, and nothing in the page would ever
+  reveal or move.
+- **The visitor's reduced-motion setting is never read during render.** The
+  page is server-rendered and the server cannot know it; CSS escapes it and
+  JS re-checks at event time (`reducedNow`).
+- **Paper and no-JS see the finished page.** Anything that starts hidden has
+  a print rule, a reduced-motion rule and the `<noscript>` in `layout.tsx`.
+- **Motion owns its own transforms.** On an element with a Motion `style`
+  transform, depth is Motion's `z`, not the `.fx-z` class — the inline
+  transform overwrites the class.
+- **A grid always has a column template.** A grid with none gets an `auto`
+  column that grows past the viewport and `overflow-x: clip` on the theme
+  root hides it. `gridCols()` and every theme grid start from `grid-cols-1`.
+
+Testing motion headlessly lies in two ways: headless Edge clamps windows to
+492px (emulate a phone over CDP instead), and virtual-time budgets can catch
+transitions mid-flight. `CountUp` lands its exact value on a timer for that
+reason as much as for throttled tabs.
+
+## Design system: Mono (the app) and the catalogue (published pages)
+
+**The app is black and white, in a light and a dark theme.** Inter for the
+interface, JetBrains Mono for things a person copies or compares (addresses,
+counts). No colour of its own anywhere — accent and foil resolve to the ink,
+errors are told by words and an icon, and portfolio thumbnails on the list
+are greyscale. Tool corners: `--radius-sm/md/lg` are 6/8/12px.
+
+- **Light is the `@theme` token set; `:root[data-theme="dark"]` redefines
+  the same names.** The neutral ramp *inverts* in dark, so a step keeps its
+  meaning: `neutral-700` is muted text and `neutral-200` a quiet fill in
+  both. Never hard-code a grey; take it from the ramp or it will be wrong in
+  one of the two themes.
+- **The theme is applied before first paint** by `THEME_BOOT`
+  (`lib/theme-boot.ts`, inlined in `app/layout.tsx`'s `<head>`); `<html>`
+  carries `suppressHydrationWarning` for exactly that. `lib/theme.ts` keeps
+  it current after load. The switch is `ThemeSwitch` in `AppHeader.tsx`,
+  which is the one header for Portfolios, Stats and Account.
+- **Control voice is tokens, with the catalogue value as the fallback.**
+  Label-like classes (`.btn`, `.tag`, `.mono-label`, `.caption-credit`,
+  `.field > label`, `.seg-opt`, `.status`, `.nav a`, `.table th`, `h6`) read
+  `var(--ui-*, <catalogue value>)`. The app sets sentence case and Inter on
+  `:root`; `groundStyle()` sets every `--ui-*` to `initial`, which makes
+  `var()` take the fallback, so a published page keeps its tracked capitals.
+  Add a new label class the same way or it will leak the app's voice into
+  portfolios.
+- **Font tokens are a plain `@theme`, not `@theme inline`.** Inline compiles
+  `.font-heading` with the face written in, so a published page's
+  `font-heading` elements ignored the author's pick.
+
+**Published pages are the catalogue, untouched by any of the above.**
+`groundStyle()` pins `CATALOGUE_APPARATUS` — the house faces, square trim,
+catalogue shadows — and its palette, whichever app theme the viewer is in.
+The motion themes then pick their own corners: `--fx-pill` rounds the shared
+`.btn` and `.tag` inside them.
+
 Build with the `.btn` / `.tag` / `.input` / `.nav` / `.table` classes rather
 than inventing parallel ones, and take every colour from a token.
 
@@ -122,6 +378,96 @@ The published page swaps the design system's own CSS variables on a wrapper
 (`groundStyle`), so every `.btn` and `.tag` follows the chosen accent and
 ground with no per-theme restyling.
 
+**Accent and ground are both any colour, and the ground carries two fields.**
+The builder's Colour panel draws an always-visible picker for each —
+`ColourPicker` in `builder/ColourPicker.tsx`, a saturation/value box over a
+hue slider with a hex field under it. Hand-rolled because `<input
+type="color">` is only a button: it shows a swatch and opens the operating
+system's dialog, and cannot render its controls inline. It holds **hue in
+state** rather than reading it back from the colour every time, because a
+grey has no hue and black has neither hue nor saturation — without that the
+marker snaps to red the moment you drag the value down to black. Accent has
+no preset swatches; ground keeps Light/Dark/Paper, and picking a colour
+overrides whichever is selected. `p.ground` still names one of three presets
+and `p.groundHex` overrides it; empty means "use the preset", which is why
+the preset is never cleared and always has something to fall back to.
+A preset supplies six variables — paper, surface, ink, divider and two
+neutrals — so a picked colour has to supply the same six: `derivedGround()`
+in `published/themes.tsx` works them out, choosing whichever ink contrasts
+better rather than thresholding on luminance, because a threshold gets
+mid-tones wrong. The presets keep their hand-tuned maps; derivation runs only
+for a picked colour. Contrast is derived, not enforced — a mid-grey ground
+tops out around 4.2:1 whichever ink it gets.
+
+**Eighteen faces, and only the two house faces are preloaded.** `layout.tsx`
+declares them all through `next/font/google`; the thirteen alternates carry
+`preload: false`. Preloading is per-family rather than per-page, so with it
+on, every face would be fetched on every page load to serve the one a
+portfolio picked — the three faces we started with cost ~93KB that way, and
+all fourteen preloaded would be far worse. Without it a face is fetched only
+when text renders in it, which is what `display: swap` covers. One preload
+link is emitted, for Archivo, the body face every page uses.
+
+**A face has to reach 700 to be offered at all.** `globals.css` sets
+`font-weight: 800` on every heading and the themes add `font-extrabold` 22
+times, so a single-weight family would be faux-bolded by the browser into a
+smear. That is why Anton, Bebas Neue and Instrument Serif are not in the
+list, however well they would suit a poster. Every face in `FONTS` is
+variable; where a family stops short — Space Grotesk, Lora and Oswald cap at
+700 — the axis clamps to a real instance rather than synthesising one. Adding
+a face means editing `FontId` and `FONTS` on both sides plus a migration for
+the `font_is_known` check constraint; that constraint stays, because making
+drift loud is the point of it.
+
+**Every radio group needs a `useId()` suffix, because the builder mounts its
+controls twice.** The desktop inspector and the mobile sheet are both in the
+DOM at once — the sheet is `lg:hidden`, not unmounted — so `ColourControl`,
+`TypeControl` and `LayoutControl` each render twice. A radio `name` is scoped
+to the *document*, so a fixed name put all eight `rolenav` inputs in one
+native group, and a native group allows exactly one checked member: React set
+`checked` on the visible copy and the browser immediately moved it to the
+hidden one. Since `.radio input:checked + .dot` and `.seg-opt:has(input:checked)`
+both key off the *native* state, the selection silently stopped showing while
+the page itself kept updating — the state was never wrong, only the dot. Name
+every radio group `` `<group>-${useId()}` ``.
+
+**Type pairing is two faces, and `font` is only the headline.** `p.font` sets
+`--font-heading`, which drives `h1`-`h6`, `.btn`, `.mono-label`, `.status`,
+`.nav-brand`, `.dialog-title` and every `.font-heading` element in the
+themes. `p.bodyFont` sets `--font-body` **and** `--font-sans` — both, because
+`--font-sans` is what Tailwind's `font-sans` utility resolves to, and leaving
+it behind would split the page between two faces depending on whether an
+element happens to name one. The body used to be Archivo always, which made
+a "pairing" panel with one half missing: picking Playfair moved the headings
+and left every description in Archivo. `bodyFont` defaults to `archivo`, so
+an untouched portfolio renders exactly as before. `font` keeps its name for
+the same reason `roleNav` does — it is the wire format and a stored value.
+
+**The face is a dropdown, not a `<select>`** (`builder/FontSelect.tsx`, used
+by both the inspector and the mobile sheet). `font-family` on an `<option>`
+is ignored on macOS and unreliable in Chrome, so a native list would name
+fourteen fonts in the system font and show none of them — and seeing the face
+is the whole point of the control. **It closes on a backdrop, not a listener
+on `document`.** Most of the builder is the live canvas and that canvas is an
+iframe, so a `pointerdown` inside it never reaches this document: a document
+listener leaves the dropdown open when you click the page you are styling.
+
+**The Type panel's specimens load lazily** (`builder/FontSample.tsx`). A font
+downloads when text renders in it, so a list drawing all fourteen at once
+fetches all fourteen at once. Each row renders in the inherited face and
+names no family until it scrolls within 200px of the viewport — inside the
+dropdown's own scrolling panel as much as anywhere. The observer is wired in
+a **ref callback, not an effect**: the React Compiler lint rejects `setState`
+called straight from an effect body (`react-hooks/set-state-in-effect`),
+which the no-observer fallback has to do. The row for the face already in use
+passes `eager` — the canvas is rendering it anyway.
+
+**A hex field must not write every keystroke into the store.** The accent
+field used to, so typing `#ec3013` sent `#e`, `#ec`, `#ec3` — the API
+rejects those, and the first characters of any hand-typed colour raised a
+save-failed banner. `ColourField` keeps a local draft and commits only a
+complete `#rrggbb`, dropping the draft on blur.
+
 ## The backend
 
 `backend/` is a FastAPI service on PostgreSQL, and it is where everything now
@@ -131,9 +477,26 @@ it, but two rules matter from this side:
 - **The frontend needs it up.** With the API down, every authenticated page
   shows its error banner and `/p/[slug]` returns a 404 — there is no local
   fallback and there should not be one.
+- **An owner's asset URL is signed, not merely authenticated.** `asset_out()`
+  appends `?t=<jwt>` to `/api/v1/assets/{id}`, and the route takes that
+  signature *or* a bearer token. An `<img>` cannot send an `Authorization`
+  header, and the access token lives in memory in `src/lib/api.ts` and never
+  reaches the markup — without the signature every owner-side image (editor,
+  builder canvas, `/preview`, `/print`) is a 401 and renders
+  broken. The token names one asset and expires
+  (`FACET_ASSET_URL_TTL_MINUTES`, 24h). Published pages are unaffected: they
+  use `/api/v1/public/assets/{id}`, which needs nothing.
 - **`src/lib/api.ts` is the only module that knows the API exists.** It owns
   the access token, one silent refresh-and-retry on a 401, and turning an
   error envelope into an `ApiError` with a `code` a caller can branch on.
+- **A live portfolio is frozen.** `EditablePortfolio` in `backend/app/api/deps.py`
+  answers 409 `portfolio_published` to every portfolio and section write while
+  `status == "live"`; publish and unpublish take `OwnedPortfolio`, or there
+  would be no way back out. The editor, builder and theme gallery all render
+  `PublishedLock` instead of themselves for a live portfolio, and the list card offers Preview and Unpublish in place of Edit,
+  Builder and Delete. `updatePortfolio` in `src/lib/store.tsx` therefore
+  unpublishes *before* its patches and publishes *after* them — a batch that
+  published first would 409 on its own edits.
 
 The API is camelCase on the wire, so its responses drop straight into the
 types in `src/lib/types.ts` with no mapping layer. Keep it that way.
@@ -179,8 +542,31 @@ contact is hidden, hidden sections are absent — and reach the themes through
 the *visitor's* account, which meant a signed-out visitor saw the defaults and
 a signed-in one had their own settings applied to somebody else's page.
 
+**A preview knows it is one, and every theme asks.** `PreviewProvider` wraps
+`PublishedBody` wherever it is *not* the published page — `/preview/[id]`,
+the builder canvas and `/print` — and two things read that context.
+`useRecordClick` goes quiet, so the owner's own clicks never reach analytics.
+`usePageHref` returns `/preview/<id>` instead of `/p/<handle>/<slug>`, because
+the public address does not resolve until the portfolio is published: a
+section title inside a draft preview used to link straight to a 404. Render
+`PublishedBody` anywhere new and wrap it in both providers, or it will quietly
+claim to be the live page.
+
 ## Known gaps
 
+- **No ATS score yet.** It is meant to be a feature of its own. The resume is
+  stored structured so one can read it; do not ship a score that is not a
+  real analysis — the same rule as the analytics.
+
+- **Artboard 3b — the block manager, at `/blocks/[id]` — is deliberately not
+  built.** It listed the sections with reorder, hide and delete buttons, a
+  click count each, a copy-address bar and a typed "+ Add block" picker.
+  Every one of those lives somewhere else: the editor reorders and deletes,
+  the builder's rail hides and shows, `/stats` counts the clicks, and
+  `ShareDialog` copies the address. It was a second front door to one set of
+  writes, so it went, and with it `Section.kind` — the picker was the only
+  thing that ever set a kind, and every kind was the same fields underneath.
+  Do not rebuild it from the canvas.
 - **Three `/account` groups still describe services this build has not
   chosen.** Billing needs a payment processor, custom domains need DNS and a
   host, email notifications need a mail service. Each renders a
@@ -194,11 +580,11 @@ a signed-in one had their own settings applied to somebody else's page.
 - **Reordering is buttons, not drag.** The canvas draws a drag handle and says
   "hold to reorder"; the implementation uses up/down buttons, which are
   keyboard-reachable and need no pointer heuristics.
-- **The canvas says "all 12 themes"; there are seven.** Seven are built and
+- **The canvas says "all 12 themes"; there are five.** Five are built and
   real. Do not pad the gallery to hit the number in the artboard.
 - **Slugs are global.** Two accounts cannot both hold `rohan`, because the
   address is `facet.page/<slug>` with nothing in front of it. The create
   dialog surfaces the 409 as a message.
-- **The frontend has no test runner.** The backend has 208 pytest tests;
+- **The frontend has no test runner.** The backend has 307 pytest tests;
   changes here are checked with `npm run lint`, `npm run build` and by
   actually opening the app.

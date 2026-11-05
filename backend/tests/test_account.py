@@ -64,6 +64,29 @@ async def test_patch_profile_stores_name_tags_and_links(auth_client):
     assert profile["links"][0]["url"] == "rohan@northwell.in"
 
 
+async def test_profile_link_round_trips_an_icon(auth_client):
+    response = await auth_client.patch(
+        "/api/v1/account/profile",
+        json={
+            "links": [
+                {"id": "al1", "label": "LinkedIn", "url": "/in/rohan", "icon": "linkedin"}
+            ]
+        },
+    )
+    assert response.status_code == 200
+    assert response.json()["profile"]["links"][0]["icon"] == "linkedin"
+
+
+async def test_profile_link_without_an_icon_still_validates(auth_client):
+    """The field is an override, so most links never carry one."""
+    response = await auth_client.patch(
+        "/api/v1/account/profile",
+        json={"links": [{"id": "al2", "label": "Email", "url": "a@b.in"}]},
+    )
+    assert response.status_code == 200
+    assert response.json()["profile"]["links"][0]["icon"] == ""
+
+
 async def test_handle_is_unique_across_users(auth_client, other_auth_client):
     assert (
         await auth_client.patch("/api/v1/account/profile", json={"handle": "rohan"})

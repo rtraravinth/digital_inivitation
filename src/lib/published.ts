@@ -11,6 +11,13 @@ import { normalize, type Portfolio } from "./types";
  * who is not signed in.
  */
 
+/**
+ * Where this server reaches the API. Behind one address (see the
+ * Dockerfile) the browser's base is "" — a relative URL, which means
+ * nothing to a fetch made on the server — so the server is told separately.
+ */
+const SERVER_API_BASE = process.env.API_INTERNAL_URL?.replace(/\/$/, "") || API_BASE;
+
 export type PublishedPrivacy = {
   noindex: boolean;
   badge: boolean;
@@ -30,7 +37,7 @@ export async function fetchPublished(
 ): Promise<Published | null> {
   let response: Response;
   try {
-    response = await fetch(`${API_BASE}/api/v1/public/p/${encodeURIComponent(handle)}/${encodeURIComponent(slug)}`, {
+    response = await fetch(`${SERVER_API_BASE}/api/v1/public/p/${encodeURIComponent(handle)}/${encodeURIComponent(slug)}`, {
       // Always current: a page edited a moment ago must not be served stale.
       cache: "no-store",
     });

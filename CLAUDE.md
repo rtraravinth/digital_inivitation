@@ -49,6 +49,28 @@ If port 3000 is held by an old process, Next silently starts on 3001 while
 your browser keeps hitting the stale server on 3000. Kill it (`taskkill //F
 //PID <pid>`) and restart.
 
+## Deploying
+
+One container, one address: the `Dockerfile` builds the frontend and runs it
+beside the API, and `render.yaml` is a Render blueprint for that container
+plus its PostgreSQL (New → Blueprint → this repository; every push
+redeploys). `scripts/start.sh` migrates, optionally creates a demo account
+(`FACET_DEMO_EMAIL` / `FACET_DEMO_PASSWORD`, seeded once), then starts both.
+
+- **One address is the point, not a convenience.** The refresh cookie is
+  `SameSite=Lax`, so a frontend and an API on two hosts sign you out on every
+  reload. The image is built with `NEXT_PUBLIC_API_URL=""`, which makes every
+  browser request relative, and `API_PROXY_TARGET`, which turns on the
+  `/api/*` rewrite in `next.config.ts`. Both are **build-time**. Do not split
+  the two onto separate hosts without a shared parent domain.
+- **The server cannot use a relative URL**, so `/p/[...slug]` reads
+  `API_INTERNAL_URL` (`lib/published.ts`) and falls back to `API_BASE`.
+- **`FACET_DATABASE_URL` takes the host's own `postgres://` string**;
+  `Settings` names the asyncpg driver itself.
+- **Uploads live on the container's disk** (`FACET_MEDIA_ROOT`). On a host
+  that wipes it — Render's free plan does — pictures do not survive a
+  restart. `render.yaml` says how to attach a disk.
+
 ## Layout
 
 - `src/lib/types.ts` — `Portfolio` / `Section` / `PortfolioHeader` / `Layout`

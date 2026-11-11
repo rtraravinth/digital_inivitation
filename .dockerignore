@@ -1,0 +1,13 @@
+.git
+.next
+node_modules
+backend/.venv
+backend/media
+backend/.env
+backend/**/__pycache__
+backend/.pytest_cache
+backend/.ruff_cache
+.env*
+graphify-out
+.claude
+docs

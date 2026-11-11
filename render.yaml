@@ -1,0 +1,47 @@
+# Render blueprint: one web service (the Dockerfile — frontend and API behind
+# one address) and its PostgreSQL. In Render: New → Blueprint → pick this
+# repository. Every push to main redeploys.
+#
+# Both are on the free plan, which is for trying it out, not for keeping:
+#   - a free service sleeps when idle and its disk is wiped when it wakes, so
+#     UPLOADED PICTURES DO NOT SURVIVE. For them to last, set `plan: starter`
+#     on the service and uncomment the `disk` block below.
+#   - a free database is deleted after a limited period. Set a paid `plan` on
+#     the database before relying on it.
+
+databases:
+  - name: facet-db
+    plan: free
+    databaseName: facet
+
+services:
+  - type: web
+    name: facet
+    runtime: docker
+    plan: free
+    healthCheckPath: /health
+    # disk:
+    #   name: facet-media
+    #   mountPath: /var/data
+    #   sizeGB: 1
+    envVars:
+      - key: FACET_ENV
+        value: prod
+      - key: FACET_DATABASE_URL
+        fromDatabase:
+          name: facet-db
+          property: connectionString
+      # Signs every access token. Generated once and kept; changing it signs
+      # everybody out.
+      - key: FACET_JWT_SECRET
+        generateValue: true
+      # With the disk above, change this to /var/data/media.
+      - key: FACET_MEDIA_ROOT
+        value: /app/backend/media
+      # A demo account with the five seeded portfolios, created on first
+      # start. The password is generated: read it under the service's
+      # Environment tab. Delete both to have no demo account.
+      - key: FACET_DEMO_EMAIL
+        value: demo@example.com
+      - key: FACET_DEMO_PASSWORD
+        generateValue: true

@@ -72,3 +72,31 @@ Not real, and labelled as such on screen: **billing**, **custom domains** and
 chosen, so each renders a notice saying the setting is stored and enforces
 nothing. If you add one of those backends, delete its notice in the same
 change.
+
+## Deploying
+
+The app is a Next.js frontend, a FastAPI backend and a PostgreSQL database.
+The `Dockerfile` packs the first two into one container behind one address,
+and `render.yaml` describes that container and its database for
+[Render](https://render.com):
+
+1. In Render, choose **New → Blueprint** and pick this repository.
+2. Approve the two resources it lists (`facet`, `facet-db`) and wait for the
+   first deploy.
+3. Open the service's `…onrender.com` address. Create an account, or sign in
+   as `demo@example.com` — its generated password is `FACET_DEMO_PASSWORD`
+   under the service's **Environment** tab.
+
+Every push to the deployed branch redeploys. The blueprint uses Render's free
+plan, which sleeps when idle and does not keep uploaded pictures or the
+database for long; `render.yaml` says what to change before relying on it.
+
+To run the same container anywhere else:
+
+```bash
+docker build -t facet .
+```
+
+```bash
+docker run -p 3000:3000 -e FACET_ENV=prod -e FACET_JWT_SECRET=<long random string> -e FACET_DATABASE_URL=postgresql://user:password@host:5432/facet facet
+```

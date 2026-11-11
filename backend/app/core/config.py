@@ -70,6 +70,21 @@ class Settings(BaseSettings):
             r"):3000$"
         )
 
+    @field_validator("database_url", "test_database_url")
+    @classmethod
+    def _use_asyncpg(cls, value: str) -> str:
+        """Accept the URL a host hands out as it is.
+
+        Managed Postgres gives ``postgres://`` or ``postgresql://``; this
+        app's engine is asyncpg and needs the driver named. Rewriting it here
+        means the deployment can pass the host's own connection string
+        through rather than someone editing it by hand.
+        """
+        for scheme in ("postgres://", "postgresql://"):
+            if value.startswith(scheme):
+                return "postgresql+asyncpg://" + value[len(scheme) :]
+        return value
+
     @field_validator("media_root")
     @classmethod
     def _resolve_media_root(cls, value: Path) -> Path:

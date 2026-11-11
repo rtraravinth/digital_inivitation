@@ -6,9 +6,13 @@ import { Icon, IconButton } from "../ui";
 import { Glyph } from "@/lib/glyphs";
 import { readImageAsset } from "@/lib/assets";
 import { newId } from "@/lib/store";
+import { ResumeListRows, listSummary } from "../resume/ResumeContent";
 import {
   BLOCK_TYPES,
   GALLERY_LAYOUTS,
+  LIST_LOOKS,
+  LOOK_NAME,
+  PAGE_BLOCKS,
   SECTION_BLOCKS_MAX,
   SECTION_IMAGES_MAX,
   assetSrc,
@@ -16,12 +20,17 @@ import {
   coverOf,
   emptyBlock,
   galleryImages,
+  isListBlock,
+  lookOf,
   type Asset,
   type Block,
   type BlockType,
   type ContactBlock,
   type GalleryBlock,
+  type ResumeListBlock,
   type PageBlock,
+  type Portfolio,
+  type Resume,
   type Section,
 } from "@/lib/types";
 
@@ -30,14 +39,57 @@ import {
    component, and every component is the same panel — `PanelShell`: a mark,
    a name, what it holds, then the rows its kind needs and nothing else. A
    timeline asks for a date, a title and a line; a gallery for pictures and
-   how to lay them out; the built-in Experience component for roles and
-   their dates (its rows live in resume/ResumeContent.tsx, its shell here).
+   how to lay them out; an Experience component for roles and their dates
+   (its rows live in resume/ResumeContent.tsx, because they are the
+   resume's own data — the component only places the list and picks a look).
    ──────────────────────────────────────────────────────────────────────── */
 
 const EASE = [0.16, 1, 0.3, 1] as const;
 
+/** The resume's lists. */
+const LIST_ICON: Record<PageBlock, React.ReactNode> = {
+  experience: (
+    <>
+      <rect x="3.5" y="7.5" width="17" height="12" rx="1.5" />
+      <path d="M9 7.5V5.5h6v2M3.5 13h17" />
+    </>
+  ),
+  education: (
+    <>
+      <path d="m2.5 9.5 9.5-4.5 9.5 4.5-9.5 4.5-9.5-4.5Z" />
+      <path d="M6.5 11.8V16c1.5 1.4 3.4 2 5.5 2s4-.6 5.5-2v-4.2" />
+    </>
+  ),
+  skills: (
+    <>
+      <path d="M4 7h9M17 7h3M4 12h3M11 12h9M4 17h11M19 17h1" />
+      <circle cx="15" cy="7" r="2" />
+      <circle cx="9" cy="12" r="2" />
+      <circle cx="17" cy="17" r="2" />
+    </>
+  ),
+  certifications: (
+    <>
+      <circle cx="12" cy="9.5" r="5.5" />
+      <path d="m8.8 14 -1.3 6 4.5-2.4 4.5 2.4-1.3-6" />
+    </>
+  ),
+  languages: (
+    <>
+      <circle cx="12" cy="12" r="8.5" />
+      <path d="M3.5 12h17M12 3.5c2.6 2.4 3.8 5.2 3.8 8.5s-1.2 6.1-3.8 8.5c-2.6-2.4-3.8-5.2-3.8-8.5s1.2-6.1 3.8-8.5Z" />
+    </>
+  ),
+  awards: (
+    <>
+      <path d="M8 4.5h8v5a4 4 0 0 1-8 0v-5ZM8 6.5H5c0 2.5 1.2 4 3.2 4.3M16 6.5h3c0 2.5-1.2 4-3.2 4.3M12 13.5V17M8.5 19.5h7" />
+    </>
+  ),
+};
+
 /** One drawn mark per component, on the same 24px grid as the rest. */
 export const COMPONENT_ICON: Record<BlockType, React.ReactNode> = {
+  ...LIST_ICON,
   gallery: (
     <>
       <rect x="3.5" y="4.5" width="17" height="15" rx="1.5" />
@@ -94,54 +146,13 @@ export const COMPONENT_ICON: Record<BlockType, React.ReactNode> = {
   ),
 };
 
-/** The built-in components: the lists a resume prints, and its contact line. */
-export const BUILT_IN_ICON: Record<PageBlock | "contact", React.ReactNode> = {
-  experience: (
-    <>
-      <rect x="3.5" y="7.5" width="17" height="12" rx="1.5" />
-      <path d="M9 7.5V5.5h6v2M3.5 13h17" />
-    </>
-  ),
-  education: (
-    <>
-      <path d="m2.5 9.5 9.5-4.5 9.5 4.5-9.5 4.5-9.5-4.5Z" />
-      <path d="M6.5 11.8V16c1.5 1.4 3.4 2 5.5 2s4-.6 5.5-2v-4.2" />
-    </>
-  ),
-  skills: (
-    <>
-      <path d="M4 7h9M17 7h3M4 12h3M11 12h9M4 17h11M19 17h1" />
-      <circle cx="15" cy="7" r="2" />
-      <circle cx="9" cy="12" r="2" />
-      <circle cx="17" cy="17" r="2" />
-    </>
-  ),
-  certifications: (
-    <>
-      <circle cx="12" cy="9.5" r="5.5" />
-      <path d="m8.8 14 -1.3 6 4.5-2.4 4.5 2.4-1.3-6" />
-    </>
-  ),
-  languages: (
-    <>
-      <circle cx="12" cy="12" r="8.5" />
-      <path d="M3.5 12h17M12 3.5c2.6 2.4 3.8 5.2 3.8 8.5s-1.2 6.1-3.8 8.5c-2.6-2.4-3.8-5.2-3.8-8.5s1.2-6.1 3.8-8.5Z" />
-    </>
-  ),
-  awards: (
-    <>
-      <path d="M8 4.5h8v5a4 4 0 0 1-8 0v-5ZM8 6.5H5c0 2.5 1.2 4 3.2 4.3M16 6.5h3c0 2.5-1.2 4-3.2 4.3M12 13.5V17M8.5 19.5h7" />
-    </>
-  ),
-  contact: COMPONENT_ICON.contact,
-};
-
 export function componentName(type: BlockType): string {
   return BLOCK_TYPES.find((t) => t.id === type)?.name ?? type;
 }
 
 /** "3 milestones", "Email, phone" — what a closed card says about one. */
-export function componentSummary(b: Block): string {
+export function componentSummary(b: Block, resume?: Resume): string {
+  if (isListBlock(b)) return resume ? listSummary(resume, b.type) : "";
   if (b.type === "gallery") {
     const n = b.imageIds.length;
     return n === 0 ? "Empty" : `${n} ${n === 1 ? "picture" : "pictures"}`;
@@ -157,7 +168,7 @@ export function componentSummary(b: Block): string {
   return filled === 0 ? "Empty" : `${filled} ${filled === 1 ? noun[0] : noun[1]}`;
 }
 
-const ITEM_NOUN: Record<Exclude<BlockType, "contact" | "gallery">, [string, string]> = {
+const ITEM_NOUN: Record<Exclude<BlockType, "contact" | "gallery" | PageBlock>, [string, string]> = {
   timeline: ["milestone", "milestones"],
   testimonials: ["testimonial", "testimonials"],
   clients: ["client", "clients"],
@@ -409,12 +420,33 @@ function PicturesField({
 
 /* ── the picker ───────────────────────────────────────────────────────── */
 
-/** "Add a component": a disclosure that opens a grid of every kind. */
-export function ComponentPicker({ count, onAdd }: { count: number; onAdd: (type: BlockType) => void }) {
+/**
+ * "Add a component": a disclosure that opens every kind, in two groups —
+ * what the page adds, and the lists the resume already holds. A resume list
+ * is one list, so it can be placed once: a kind already in a section says
+ * which, and cannot be added again.
+ */
+export function ComponentPicker({
+  count,
+  resume,
+  placed,
+  onAdd,
+}: {
+  count: number;
+  resume: Resume;
+  /** The section each placed list sits in, by name. */
+  placed: Map<PageBlock, string>;
+  onAdd: (type: BlockType) => void;
+}) {
   const [open, setOpen] = useState(false);
   const panel = useId();
   const reduced = useReducedMotion();
   const full = count >= SECTION_BLOCKS_MAX;
+  const isList = (id: BlockType): id is PageBlock => (PAGE_BLOCKS as string[]).includes(id);
+  const groups = [
+    { title: "For the page", types: BLOCK_TYPES.filter((t) => !isList(t.id)) },
+    { title: "From your resume", types: BLOCK_TYPES.filter((t) => isList(t.id)) },
+  ];
 
   return (
     <div>
@@ -442,37 +474,49 @@ export function ComponentPicker({ count, onAdd }: { count: number; onAdd: (type:
             transition={{ duration: 0.3, ease: EASE }}
             className="overflow-hidden"
           >
-            <ul className="m-0 mt-3 grid list-none grid-cols-1 gap-2 p-0 sm:grid-cols-2">
-              {BLOCK_TYPES.map((t, i) => (
-                <motion.li
-                  key={t.id}
-                  initial={reduced ? false : { opacity: 0, y: 6 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.3, delay: i * 0.025, ease: EASE }}
-                >
-                  <button
-                    type="button"
-                    onClick={() => {
-                      onAdd(t.id);
-                      setOpen(false);
-                    }}
-                    className="flex w-full cursor-pointer items-start gap-3 rounded-xl p-3 text-left transition-colors hover:bg-[var(--color-neutral-100)]"
-                    style={{ boxShadow: "inset 0 0 0 1px var(--color-divider)" }}
-                  >
-                    <span
-                      className="grid h-9 w-9 flex-none place-items-center rounded-lg"
-                      style={{ background: "var(--color-neutral-100)", color: "var(--color-ink)" }}
-                    >
-                      <Icon d={COMPONENT_ICON[t.id]} size={18} />
-                    </span>
-                    <span className="min-w-0">
-                      <span className="block text-[13.5px] font-semibold">{t.name}</span>
-                      <span className="block text-[12.5px] leading-snug text-muted">{t.desc}</span>
-                    </span>
-                  </button>
-                </motion.li>
-              ))}
-            </ul>
+            {groups.map((g) => (
+              <div key={g.title} className="mt-4">
+                <p className="m-0 mb-2 text-[12px] font-medium" style={{ color: "var(--color-neutral-600)" }}>
+                  {g.title}
+                </p>
+                <ul className="m-0 grid list-none grid-cols-1 gap-2 p-0 sm:grid-cols-2">
+                  {g.types.map((t) => {
+                    const where = isList(t.id) ? placed.get(t.id) : undefined;
+                    const saved = isList(t.id) && resume[t.id].length > 0 ? listSummary(resume, t.id) : "";
+                    return (
+                      <li key={t.id}>
+                        <button
+                          type="button"
+                          disabled={where !== undefined}
+                          onClick={() => {
+                            onAdd(t.id);
+                            setOpen(false);
+                          }}
+                          className="flex w-full cursor-pointer items-start gap-3 rounded-xl p-3 text-left transition-colors hover:bg-[var(--color-neutral-100)] disabled:cursor-not-allowed disabled:opacity-55 disabled:hover:bg-transparent"
+                          style={{ boxShadow: "inset 0 0 0 1px var(--color-divider)" }}
+                        >
+                          <span
+                            className="grid h-9 w-9 flex-none place-items-center rounded-lg"
+                            style={{ background: "var(--color-neutral-100)", color: "var(--color-ink)" }}
+                          >
+                            <Icon d={COMPONENT_ICON[t.id]} size={18} />
+                          </span>
+                          <span className="min-w-0">
+                            <span className="block text-[13.5px] font-semibold">
+                              {t.name}
+                              {saved && !where && <span className="ml-2 font-normal text-muted">{saved} saved</span>}
+                            </span>
+                            <span className="block text-[12.5px] leading-snug text-muted">
+                              {where !== undefined ? `Already in “${where || "Untitled section"}”. A list is placed once.` : t.desc}
+                            </span>
+                          </span>
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            ))}
           </motion.div>
         )}
       </AnimatePresence>
@@ -489,7 +533,7 @@ export function newComponent(type: BlockType): Block {
 
 type Field = { key: string; label: string; placeholder: string; long?: boolean; narrow?: boolean };
 
-const FIELDS: Record<Exclude<BlockType, "contact" | "gallery">, { fields: Field[]; add: string }> = {
+const FIELDS: Record<Exclude<BlockType, "contact" | "gallery" | PageBlock>, { fields: Field[]; add: string }> = {
   timeline: {
     add: "Add a milestone",
     fields: [
@@ -607,18 +651,21 @@ export function ComponentChip({ icon, name, summary }: { icon: React.ReactNode; 
 export function ComponentPanel({
   block,
   section,
+  p,
   first,
   last,
   onSection,
 }: {
   block: Block;
   section: Section;
+  /** The portfolio: a resume list's entries are its resume's, not the block's. */
+  p: Portfolio;
   first: boolean;
   last: boolean;
   onSection: (recipe: (s: Section) => Section) => void;
 }) {
   const [confirming, setConfirming] = useState(false);
-  const empty = !componentHasContent(block);
+  const empty = !componentHasContent(block, p.resume);
   const name = componentName(block.type);
 
   const onChange = (next: Block) => onSection((s) => ({ ...s, blocks: s.blocks.map((x) => (x.id === block.id ? next : x)) }));
@@ -647,7 +694,7 @@ export function ComponentPanel({
     <PanelShell
       icon={COMPONENT_ICON[block.type]}
       name={name}
-      summary={empty ? "Empty — not shown yet" : componentSummary(block)}
+      summary={empty ? "Empty — not shown yet" : componentSummary(block, p.resume)}
       tools={
         <>
           <IconButton label={`Move ${name} up`} onClick={() => !first && onMove(-1)}>
@@ -687,7 +734,19 @@ export function ComponentPanel({
           onChange={(e) => onChange({ ...block, title: e.target.value })}
         />
       </div>
-      {block.type === "gallery" ? (
+      {isListBlock(block) ? (
+        <>
+          {LIST_LOOKS[block.type].length > 1 && (
+            <ChoiceField
+              label="Look on the page"
+              value={lookOf(block)}
+              options={LIST_LOOKS[block.type].map((id) => ({ id, ...LOOK_NAME[id] }))}
+              onChange={(look) => onChange({ ...block, look })}
+            />
+          )}
+          <ResumeListRows p={p} block={block.type} />
+        </>
+      ) : block.type === "gallery" ? (
         <GalleryFields block={block} section={section} onChange={onChange} onSection={onSection} />
       ) : block.type === "contact" ? (
         <ContactFields block={block} onChange={onChange} />
@@ -695,6 +754,51 @@ export function ComponentPanel({
         <ItemRows block={block} onChange={onChange} />
       )}
     </PanelShell>
+  );
+}
+
+/** A handful of looks to pick one from, each with a line saying what it is. */
+function ChoiceField<T extends string>({
+  label,
+  value,
+  options,
+  onChange,
+}: {
+  label: string;
+  value: T;
+  options: Array<{ id: T; name: string; desc: string }>;
+  onChange: (next: T) => void;
+}) {
+  // The builder mounts some controls twice; a radio name has to be unique.
+  const group = useId();
+  return (
+    <div className="field">
+      <label id={`${group}-label`}>{label}</label>
+      <div role="radiogroup" aria-labelledby={`${group}-label`} className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+        {options.map((o) => {
+          const on = value === o.id;
+          return (
+            <label
+              key={o.id}
+              className="flex cursor-pointer items-start gap-2.5 rounded-lg p-2.5"
+              style={{ boxShadow: `inset 0 0 0 ${on ? "1.5px var(--color-ink)" : "1px var(--color-divider)"}` }}
+            >
+              <input
+                type="radio"
+                name={`choice-${group}`}
+                className="mt-0.5 h-4 w-4 flex-none accent-[var(--color-ink)]"
+                checked={on}
+                onChange={() => onChange(o.id)}
+              />
+              <span className="min-w-0">
+                <span className="block text-[13px] font-semibold">{o.name}</span>
+                <span className="block text-[12px] leading-snug text-muted">{o.desc}</span>
+              </span>
+            </label>
+          );
+        })}
+      </div>
+    </div>
   );
 }
 
@@ -709,7 +813,6 @@ function GalleryFields({
   onChange: (next: Block) => void;
   onSection: (recipe: (s: Section) => Section) => void;
 }) {
-  const group = useId();
   // One change for both halves: the pictures the section holds and the ids
   // this gallery names. Run against the latest section, not this render's,
   // because several uploads land one after another.
@@ -737,39 +840,19 @@ function GalleryFields({
 
   return (
     <>
-      <div className="field">
-        <label id={`${group}-label`}>Layout</label>
-        <div role="radiogroup" aria-labelledby={`${group}-label`} className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-          {GALLERY_LAYOUTS.map((l) => {
-            const on = block.layout === l.id;
-            return (
-              <label
-                key={l.id}
-                className="flex cursor-pointer items-start gap-2.5 rounded-lg p-2.5"
-                style={{ boxShadow: `inset 0 0 0 ${on ? "1.5px var(--color-ink)" : "1px var(--color-divider)"}` }}
-              >
-                <input
-                  type="radio"
-                  name={`layout-${group}`}
-                  className="mt-0.5 h-4 w-4 flex-none accent-[var(--color-ink)]"
-                  checked={on}
-                  onChange={() => onChange({ ...block, layout: l.id })}
-                />
-                <span className="min-w-0">
-                  <span className="block text-[13px] font-semibold">{l.name}</span>
-                  <span className="block text-[12px] leading-snug text-muted">{l.desc}</span>
-                </span>
-              </label>
-            );
-          })}
-        </div>
-      </div>
+      <ChoiceField label="Layout" value={block.layout} options={GALLERY_LAYOUTS} onChange={(layout) => onChange({ ...block, layout })} />
       <PicturesField images={galleryImages(section, block)} room={SECTION_IMAGES_MAX - section.images.length} onChange={setPictures} />
     </>
   );
 }
 
 const HEADING_HINT: Record<BlockType, string> = {
+  experience: "Where I’ve worked",
+  education: "Education",
+  skills: "What I’m good at",
+  certifications: "Certifications",
+  languages: "Languages",
+  awards: "Recognition",
   gallery: "A closer look",
   timeline: "How it grew",
   testimonials: "Kind words",
@@ -781,7 +864,7 @@ const HEADING_HINT: Record<BlockType, string> = {
   contact: "Get in touch",
 };
 
-type ListBlock = Exclude<Block, ContactBlock | GalleryBlock>;
+type ListBlock = Exclude<Block, ContactBlock | GalleryBlock | ResumeListBlock>;
 
 function ItemRows({ block, onChange }: { block: ListBlock; onChange: (next: Block) => void }) {
   const config = FIELDS[block.type];

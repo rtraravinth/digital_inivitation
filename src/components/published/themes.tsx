@@ -1,6 +1,6 @@
 "use client";
 
-import { withPageBlocks } from "@/lib/resume";
+import { withPlacedLists } from "@/lib/resume";
 import type { Portfolio } from "@/lib/types";
 import { Arcade } from "./themes/arcade";
 import { Aurora } from "./themes/aurora";
@@ -19,7 +19,7 @@ export { Arcade, Aurora, Bio, Journey, Meridian, Stage };
  * the sections — once, for all five themes.
  */
 export function PublishedBody({ p: raw }: { p: Portfolio }) {
-  const p = withPageBlocks(raw);
+  const p = withPlacedLists(raw);
   switch (p.theme) {
     case "meridian":
       return <Meridian p={p} />;

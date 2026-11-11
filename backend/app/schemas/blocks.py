@@ -15,6 +15,12 @@ a wordmark, and a gallery only *names* pictures by id — the pictures
 themselves are the section's ``section_images`` rows, and an id the section
 does not hold draws nothing. That keeps every asset reference a foreign key,
 which is what asset release and the public asset route rely on.
+
+The resume's lists — experience, education, skills, certifications,
+languages, awards — are components in the same way a gallery is: the
+component only *places* the list in a section and picks its look. The
+entries stay in ``portfolios.resume``, structured, because a resume template
+and a later ATS check read a role and its dates from there.
 """
 
 from __future__ import annotations
@@ -99,6 +105,32 @@ class GalleryBlock(_Block):
     )
 
 
+#: The resume lists that can be placed on the page. Mirrors ``PAGE_BLOCKS``
+#: in src/lib/types.ts.
+RESUME_LIST_TYPES: tuple[str, ...] = (
+    "experience",
+    "education",
+    "skills",
+    "certifications",
+    "languages",
+    "awards",
+)
+
+
+class ResumeListBlock(_Block):
+    """One of the resume's lists, shown in this section.
+
+    Holds no entries: they are ``portfolios.resume[type]``. A list reaches a
+    visitor only while a component of its type sits in a section that is on
+    the page — see ``public_resume``.
+    """
+
+    type: Literal["experience", "education", "skills", "certifications", "languages", "awards"]
+    #: How the page draws it. Not every look suits every list; the page
+    #: falls back to the list's own default rather than refusing one here.
+    look: Literal["list", "cards", "timeline", "tags"] = "list"
+
+
 class TimelineBlock(_Block):
     type: Literal["timeline"]
     items: list[TimelineItem] = Field(default_factory=list, max_length=BLOCK_ITEMS_MAX)
@@ -163,6 +195,7 @@ Block = Annotated[
     | StatsBlock
     | ServicesBlock
     | FaqBlock
-    | ContactBlock,
+    | ContactBlock
+    | ResumeListBlock,
     Field(discriminator="type"),
 ]

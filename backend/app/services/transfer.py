@@ -148,6 +148,7 @@ class TransferService:
     ) -> Portfolio:
         header_raw = raw.get("header") or {}
         sections_raw = [s for s in (raw.get("sections") or []) if isinstance(s, dict)]
+        sections_raw = _page_block_sections(raw.get("resume")) + sections_raw
 
         portfolio = Portfolio(
             user_id=user.id,
@@ -290,6 +291,44 @@ class _MemoryUpload:
 
 
 _BLOCK = TypeAdapter(Block)
+
+#: What an older export's page-enabled resume lists become: the look each
+#: gets by default, and the name its section takes. The same table as
+#: migration a7d3e1c95f42, which did this to the rows already stored.
+_LIST_LOOK = {
+    "experience": "timeline",
+    "education": "list",
+    "skills": "tags",
+    "certifications": "list",
+    "languages": "tags",
+    "awards": "list",
+}
+
+
+def _page_block_sections(resume: Any) -> list[dict[str, Any]]:
+    """Sections for the lists an older export had switched on for the page.
+
+    Exports written before resume lists were components carry
+    ``resume.pageBlocks``; the page drew those lists ahead of its own
+    sections. Each one that has entries becomes a section holding the list's
+    component, so an imported page shows what it showed. A current export has
+    no such key and gets nothing added.
+    """
+    if not isinstance(resume, dict) or not isinstance(resume.get("pageBlocks"), list):
+        return []
+    on_page = resume["pageBlocks"]
+    order = [b for b in (resume.get("order") or []) if b in _LIST_LOOK]
+    order += [b for b in _LIST_LOOK if b not in order]
+    return [
+        {
+            "title": kind.capitalize(),
+            "tab": kind.capitalize(),
+            "onResume": False,
+            "blocks": [{"id": f"list-{kind}", "type": kind, "title": "", "look": _LIST_LOOK[kind]}],
+        }
+        for kind in order
+        if kind in on_page and resume.get(kind)
+    ]
 
 
 def _blocks_of(section: dict[str, Any]) -> list[dict[str, Any]]:

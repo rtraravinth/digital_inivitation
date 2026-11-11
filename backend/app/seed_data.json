@@ -232,12 +232,6 @@
         "awards"
       ],
       "hidden": [],
-      "pageBlocks": [
-        "education",
-        "skills",
-        "certifications",
-        "languages"
-      ],
       "style": {
         "template": "classic",
         "paper": "a4",
@@ -518,6 +512,44 @@
         "onResume": true
       },
       {
+        "id": "s8",
+        "title": "Background",
+        "description": "",
+        "tab": "Background",
+        "links": [],
+        "images": [],
+        "file": null,
+        "quote": null,
+        "blocks": [
+          {
+            "id": "s8b1",
+            "type": "education",
+            "title": "Education",
+            "look": "list"
+          },
+          {
+            "id": "s8b2",
+            "type": "skills",
+            "title": "Skills",
+            "look": "tags"
+          },
+          {
+            "id": "s8b3",
+            "type": "certifications",
+            "title": "Certifications",
+            "look": "list"
+          },
+          {
+            "id": "s8b4",
+            "type": "languages",
+            "title": "Languages",
+            "look": "tags"
+          }
+        ],
+        "hidden": false,
+        "onResume": false
+      },
+      {
         "id": "s7",
         "title": "Work with me",
         "description": "Advisory enquiries, speaking at your company or a conversation about the businesses. I read everything and answer within two working days.",
@@ -700,14 +732,6 @@
         "awards"
       ],
       "hidden": [],
-      "pageBlocks": [
-        "experience",
-        "education",
-        "skills",
-        "certifications",
-        "languages",
-        "awards"
-      ],
       "style": {
         "template": "classic",
         "paper": "a4",
@@ -863,14 +887,6 @@
         "awards"
       ],
       "hidden": [],
-      "pageBlocks": [
-        "experience",
-        "education",
-        "skills",
-        "certifications",
-        "languages",
-        "awards"
-      ],
       "style": {
         "template": "classic",
         "paper": "a4",
@@ -999,14 +1015,6 @@
         "awards"
       ],
       "hidden": [],
-      "pageBlocks": [
-        "experience",
-        "education",
-        "skills",
-        "certifications",
-        "languages",
-        "awards"
-      ],
       "style": {
         "template": "classic",
         "paper": "a4",
@@ -1170,14 +1178,6 @@
         "awards"
       ],
       "hidden": [],
-      "pageBlocks": [
-        "experience",
-        "education",
-        "skills",
-        "certifications",
-        "languages",
-        "awards"
-      ],
       "style": {
         "template": "classic",
         "paper": "a4",

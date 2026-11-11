@@ -8,13 +8,13 @@ import { PortfolioExtras, PortraitField, SectionExtras } from "./SectionExtras";
 import { PublishedLock } from "./PublishedLock";
 import { TabField } from "./TabField";
 import { TagEditor } from "./TagEditor";
-import { ResumeBlockCard, ResumeContactCard } from "./resume/ResumeContent";
+import { ResumeContactFields, listSummary } from "./resume/ResumeContent";
 import { Card, Placeholder } from "./editor/card";
 import { COMPONENT_ICON, ComponentChip, ComponentPanel, ComponentPicker, CoverField, componentName, componentSummary, newComponent } from "./editor/components";
 import { ICON, Icon, IconButton, LookToggles, StatusPill } from "./ui";
 import { Glyph } from "@/lib/glyphs";
 import { LinkIcon, iconFor } from "@/lib/icons";
-import { BLOCK_LABEL, blockHasContent, resumePrintPath } from "@/lib/resume";
+import { BLOCK_LABEL, placedLists, resumePrintPath } from "@/lib/resume";
 import { usePortfolios } from "@/lib/store";
 import {
   PAGE_BLOCKS,
@@ -24,6 +24,7 @@ import {
   type LinkItem,
   type Portfolio,
   type PageBlock,
+  type Resume,
   type Footer,
   type PortfolioHeader,
   type Section,
@@ -34,10 +35,11 @@ import {
    A section is a heading and its components, and every one is the same
    card — closed it reads like the page, open it is a form with a Done.
 
-   The header, then the built-in sections (Contact details, Experience,
-   Education, Skills and the rest — each holds the one component the resume
-   prints, stored as structured facts), then the author's own sections,
-   which take any components, then the footer. Every card carries Page and
+   The header (which also holds the resume's private contact line), the
+   sections, the footer. Experience, Education, Skills and the other resume
+   lists are components like a gallery or a timeline: placed in whichever
+   section their author likes, in a look they pick, with the entries still
+   stored as the resume's structured facts. Every section carries Page and
    Resume switches, so nothing is typed twice. An outline beside them on a
    desk jumps to any card. Every change saves as you type.
    ──────────────────────────────────────────────────────────────────────── */
@@ -103,8 +105,11 @@ export function Editor({ id }: { id: string }) {
   }
 
   const p: Portfolio = portfolio;
-  // The structured blocks, in the order the author arranged them.
-  const blocks = p.resume.order.filter((b): b is PageBlock => (PAGE_BLOCKS as string[]).includes(b));
+  // Which section each resume list sits in. A list is one list, so it is
+  // placed once; the ones not placed yet are offered under the sections.
+  const placedIn = placedLists(p);
+  const placed = new Map([...placedIn].map(([list, section]) => [list, section.title] as const));
+  const unplaced = PAGE_BLOCKS.filter((list) => !placedIn.has(list));
   // Hidden sections count: their tab is still one the author is using.
   const pageTabs = [...new Set(p.sections.map((s) => s.tab.trim()).filter(Boolean))];
   const hidden = p.sections.filter((s) => s.hidden).length;
@@ -119,6 +124,21 @@ export function Editor({ id }: { id: string }) {
     const added = await addSectionAsync(p.id);
     if (!added) return;
     justAdded.current = added;
+    setOpen(added);
+  }
+
+  /** A new section holding one of the resume's lists, named after it. */
+  async function addList(list: PageBlock) {
+    const added = await addSectionAsync(p.id);
+    if (!added) return;
+    updateSection(p.id, added, (s) => ({
+      ...s,
+      title: BLOCK_LABEL[list],
+      tab: BLOCK_LABEL[list],
+      // The resume prints the list itself; the section is its place on the page.
+      onResume: false,
+      blocks: [newComponent(list)],
+    }));
     setOpen(added);
   }
 
@@ -230,7 +250,7 @@ export function Editor({ id }: { id: string }) {
               </motion.p>
             </div>
             <span className="ml-auto font-mono text-[12px]" style={{ color: "var(--color-neutral-600)" }}>
-              1 header · {blocks.length + 1} built-in · {p.sections.length} of your own
+              1 header · {p.sections.length} {p.sections.length === 1 ? "section" : "sections"}
               {hidden > 0 && ` · ${hidden} off the page`}
             </span>
           </div>
@@ -249,25 +269,6 @@ export function Editor({ id }: { id: string }) {
                   sub="Header"
                   onPick={() => setOpen(HEADER)}
                 />
-                <OutlineItem
-                  on={open === "r-contact"}
-                  number="—"
-                  title="Contact details"
-                  sub={p.resume.email || p.resume.phone ? "Resume only" : "Empty"}
-                  dim={!(p.resume.email || p.resume.phone)}
-                  onPick={() => setOpen("r-contact")}
-                />
-                {blocks.map((b) => (
-                  <OutlineItem
-                    key={b}
-                    on={open === `r-${b}`}
-                    number="—"
-                    title={BLOCK_LABEL[b]}
-                    sub={lookLabel(p.resume.pageBlocks.includes(b), !p.resume.hidden.includes(b), blockHasContent(p, b))}
-                    dim={!blockHasContent(p, b)}
-                    onPick={() => setOpen(`r-${b}`)}
-                  />
-                ))}
                 {p.sections.map((s, i) => (
                   <OutlineItem
                     key={s.id}
@@ -303,31 +304,13 @@ export function Editor({ id }: { id: string }) {
                 onOpen={() => setOpen(HEADER)}
                 onClose={() => setOpen(null)}
                 onChange={setHeader}
+                p={p}
               />
 
               <div className="mt-4 flex flex-wrap items-baseline gap-x-3 gap-y-1 px-1">
-                <h2 className="m-0 text-[16px] tracking-[-0.01em]">Built-in sections</h2>
+                <h2 className="m-0 text-[16px] tracking-[-0.01em]">Sections</h2>
                 <span className="text-[12.5px] text-muted">
-                  The facts a resume is read for. Each holds one component, kept as a list so your resume can print it.
-                </span>
-              </div>
-
-              <ResumeContactCard p={p} open={open === "r-contact"} onOpen={() => setOpen("r-contact")} onClose={() => setOpen(null)} />
-              {blocks.map((b) => (
-                <ResumeBlockCard
-                  key={b}
-                  p={p}
-                  block={b}
-                  open={open === `r-${b}`}
-                  onOpen={() => setOpen(`r-${b}`)}
-                  onClose={() => setOpen(null)}
-                />
-              ))}
-
-              <div className="mt-4 flex flex-wrap items-baseline gap-x-3 gap-y-1 px-1">
-                <h2 className="m-0 text-[16px] tracking-[-0.01em]">Your sections</h2>
-                <span className="text-[12.5px] text-muted">
-                  Anything else — a project, a cause, a role told your way. A heading, a cover, and any components under it.
+                  A heading, a cover, and any components under it — a timeline, a gallery, your experience.
                 </span>
               </div>
 
@@ -348,6 +331,9 @@ export function Editor({ id }: { id: string }) {
                       first={i === 0}
                       last={i === p.sections.length - 1}
                       tabOptions={pageTabs}
+                      resume={p.resume}
+                      placed={placed}
+                      p={p}
                       open={open === s.id}
                       onOpen={() => setOpen(s.id)}
                       onClose={() => setOpen(null)}
@@ -397,6 +383,8 @@ export function Editor({ id }: { id: string }) {
                 Add section
               </motion.button>
 
+              {unplaced.length > 0 && <AddLists resume={p.resume} lists={unplaced} onAdd={addList} />}
+
               <div className="mt-4 flex items-baseline gap-3 px-1">
                 <h2 className="m-0 text-[16px] tracking-[-0.01em]">Footer</h2>
                 <span className="text-[12.5px] text-muted">How the page ends — a last call to action and the small print.</span>
@@ -413,6 +401,36 @@ export function Editor({ id }: { id: string }) {
         </main>
       </div>
     </>
+  );
+}
+
+/**
+ * The resume's lists that are in no section yet, each one click from being
+ * one. It is also where a list goes when its component is removed: the
+ * entries are the resume's and stay, so this says they are still there.
+ */
+function AddLists({ resume, lists, onAdd }: { resume: Resume; lists: PageBlock[]; onAdd: (list: PageBlock) => void }) {
+  const saved = lists.filter((list) => resume[list].length > 0);
+  return (
+    <div className="rounded-2xl px-5 py-4 sm:px-6" style={{ border: "1px solid var(--color-divider)", background: "var(--color-bg)" }}>
+      <p className="m-0 text-[13px] font-semibold">Add a section from your resume</p>
+      <p className="m-0 mt-0.5 max-w-[64ch] text-[12.5px] leading-snug text-muted">
+        {saved.length > 0
+          ? "These lists have entries but are in no section, so the page does not show them. Your resume still prints them."
+          : "Roles, schools, skills — typed once, shown on your page and printed on your resume."}
+      </p>
+      <ul className="m-0 mt-3 flex list-none flex-wrap gap-2 p-0">
+        {lists.map((list) => (
+          <li key={list}>
+            <button type="button" className="btn btn-secondary" style={{ marginTop: 0, minHeight: 34 }} onClick={() => onAdd(list)}>
+              <Icon d={COMPONENT_ICON[list]} size={14} />
+              {BLOCK_LABEL[list]}
+              {resume[list].length > 0 && <span className="font-normal text-muted">{listSummary(resume, list)}</span>}
+            </button>
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }
 
@@ -505,7 +523,10 @@ function HeaderCard({
   onOpen,
   onClose,
   onChange,
+  p,
 }: {
+  /** For the resume's contact line, which is the resume's, not the header's. */
+  p: Portfolio;
   header: PortfolioHeader;
   open: boolean;
   onOpen: () => void;
@@ -605,6 +626,13 @@ function HeaderCard({
         </div>
       </Grouped>
 
+      <Grouped
+        title="Resume contact details"
+        hint="Printed under your name on the resume and never shown on your page. To put a way to reach you on the page, add a Contact component to a section."
+      >
+        <ResumeContactFields p={p} />
+      </Grouped>
+
       <Grouped title="Photo">
         <PortraitField portrait={header.portrait} onChange={(portrait) => onChange((h) => ({ ...h, portrait }))} />
       </Grouped>
@@ -629,6 +657,9 @@ function SectionCard({
   first,
   last,
   tabOptions,
+  resume,
+  placed,
+  p,
   open,
   onOpen,
   onClose,
@@ -638,6 +669,9 @@ function SectionCard({
   onToggleResume,
   onDelete,
 }: {
+  resume: Resume;
+  placed: Map<PageBlock, string>;
+  p: Portfolio;
   section: Section;
   number: string;
   first: boolean;
@@ -714,7 +748,7 @@ function SectionCard({
             <ul className="m-0 mt-3 flex list-none flex-wrap gap-1.5 p-0">
               {s.blocks.map((b) => (
                 <li key={b.id} className="inline-flex">
-                  <ComponentChip icon={COMPONENT_ICON[b.type]} name={componentName(b.type)} summary={componentSummary(b)} />
+                  <ComponentChip icon={COMPONENT_ICON[b.type]} name={componentName(b.type)} summary={componentSummary(b, resume)} />
                 </li>
               ))}
             </ul>
@@ -775,7 +809,7 @@ function SectionCard({
 
       <Grouped
         title="Components"
-        hint="Everything else this section shows on your page, in this order. The resume prints the title, description and links only."
+        hint="Everything else this section shows on your page, in this order. Of these the resume prints only its own lists — experience, education, skills and the rest."
       >
         {s.blocks.length > 0 && (
           <div className="flex flex-col gap-3">
@@ -789,13 +823,13 @@ function SectionCard({
                   exit={{ opacity: 0, scale: 0.98, transition: { duration: 0.15 } }}
                   transition={{ duration: 0.4, ease: EASE }}
                 >
-                  <ComponentPanel block={b} section={s} first={i === 0} last={i === s.blocks.length - 1} onSection={onChange} />
+                  <ComponentPanel block={b} section={s} p={p} first={i === 0} last={i === s.blocks.length - 1} onSection={onChange} />
                 </motion.div>
               ))}
             </AnimatePresence>
           </div>
         )}
-        <ComponentPicker count={s.blocks.length} onAdd={(type) => onChange((x) => ({ ...x, blocks: [...x.blocks, newComponent(type)] }))} />
+        <ComponentPicker count={s.blocks.length} resume={resume} placed={placed} onAdd={(type) => onChange((x) => ({ ...x, blocks: [...x.blocks, newComponent(type)] }))} />
       </Grouped>
 
       {/* Draws its own rule and "Attach (optional)" label. */}

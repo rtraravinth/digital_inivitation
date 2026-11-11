@@ -1,7 +1,8 @@
 import {
   FONTS,
-  PAGE_BLOCKS,
+  isListBlock,
   type FontId,
+  type PageBlock,
   type Paper,
   type Portfolio,
   type Resume,
@@ -652,6 +653,10 @@ export function sectionGroups(p: Portfolio): Array<{ tab: string; items: Project
   const groups = new Map<string, ProjectItem[]>();
   for (const s of p.sections) {
     if (!s.onResume || !(s.title.trim() || s.description.trim())) continue;
+    // A section that only holds a resume list is that list's place on the
+    // page. The resume prints the list itself; its bare title would be a
+    // second heading with nothing under it.
+    if (!s.description.trim() && s.links.length === 0 && s.blocks.some(isListBlock)) continue;
     const tab = s.tab.trim() || "Work";
     if (!groups.has(tab)) groups.set(tab, []);
     groups.get(tab)!.push({
@@ -702,95 +707,102 @@ export function visibleBlocks(p: Portfolio): ResumeBlock[] {
   return p.resume.order.filter((b) => !p.resume.hidden.includes(b) && blockHasContent(p, b));
 }
 
-/* ── structured blocks on the page ──────────────────────────────────────
-   A block switched on for the page reaches the themes as ordinary
-   sections, one per entry, filed under the block's name as their tab. The
-   themes then draw them like anything else — tab row, cards, detail view —
-   and none of the five has to learn what a role or a degree is.
+/* ── the resume's lists on the page ─────────────────────────────────────
+   A list reaches the page through a component placed in a section
+   (`ResumeListBlock`). The component holds no entries, so the page asks
+   here for them, already in the one shape every look draws: a title, the
+   line under it, a date, any further lines, and tags.
    ──────────────────────────────────────────────────────────────────────── */
 
-function synthetic(id: string, tab: string, title: string, description: string, url = ""): Section {
-  return {
-    id,
-    title,
-    description,
-    tab,
-    links: url.trim() ? [{ id: `${id}-link`, label: "Credential", url: url.trim() }] : [],
-    images: [],
-    file: null,
-    quote: null,
-    blocks: [],
-    hidden: false,
-    onResume: false,
-  };
-}
+export type ListEntry = {
+  id: string;
+  title: string;
+  /** Where or from whom: the company, the school, the issuer. */
+  sub: string;
+  /** When. */
+  date: string;
+  /** Bullet points or a detail line. */
+  lines: string[];
+  /** Skills in a group, or languages with their level. */
+  tags: string[];
+  url: string;
+};
 
 const line = (...parts: string[]) => parts.map((s) => s.trim()).filter(Boolean).join(" · ");
+const entry = (e: Partial<ListEntry> & { id: string; title: string }): ListEntry => ({ sub: "", date: "", lines: [], tags: [], url: "", ...e });
 
-/** The sections the page's structured blocks add, in resume order. */
-export function pageBlockSections(p: Portfolio): Section[] {
-  const r = p.resume;
-  const out: Section[] = [];
-  for (const block of r.order) {
-    if (!PAGE_BLOCKS.includes(block as (typeof PAGE_BLOCKS)[number])) continue;
-    if (!r.pageBlocks.includes(block as (typeof PAGE_BLOCKS)[number])) continue;
-    const tab = BLOCK_LABEL[block];
-    switch (block) {
-      case "experience":
-        for (const e of r.experience) {
-          if (!e.role.trim() && !e.company.trim()) continue;
-          const bullets = e.bullets.filter((b) => b.trim()).map((b) => `• ${b.trim().replace(/^[-•*]\s*/, "")}`);
-          out.push(
-            synthetic(`resume-experience-${e.id}`, tab, e.role.trim() || e.company.trim(), [line(e.role.trim() ? e.company : "", e.location, dateRange(e.start, e.end, e.current)), ...bullets].filter(Boolean).join("\n")),
-          );
-        }
-        break;
-      case "education":
-        for (const e of r.education) {
-          if (!e.degree.trim() && !e.school.trim()) continue;
-          out.push(
-            synthetic(`resume-education-${e.id}`, tab, e.degree.trim() || e.school.trim(), [line(e.degree.trim() ? e.school : "", e.location, dateRange(e.start, e.end)), e.detail.trim()].filter(Boolean).join("\n")),
-          );
-        }
-        break;
-      case "skills":
-        for (const g of r.skills) {
-          const items = g.items.filter((i) => i.trim());
-          if (items.length) out.push(synthetic(`resume-skills-${g.id}`, tab, g.name.trim() || "Skills", items.join(" · ")));
-        }
-        break;
-      case "certifications":
-        for (const c of r.certifications) {
-          if (c.name.trim()) out.push(synthetic(`resume-cert-${c.id}`, tab, c.name.trim(), line(c.issuer, c.date), c.url));
-        }
-        break;
-      case "languages": {
-        const langs = r.languages.filter((l) => l.name.trim());
-        if (langs.length) {
-          out.push(synthetic("resume-languages", tab, "Languages", langs.map((l) => (l.level.trim() ? `${l.name.trim()} — ${l.level.trim()}` : l.name.trim())).join("\n")));
-        }
-        break;
-      }
-      case "awards":
-        for (const a of r.awards) {
-          if (a.title.trim()) out.push(synthetic(`resume-award-${a.id}`, tab, a.title.trim(), [line(a.issuer, a.date), a.detail.trim()].filter(Boolean).join("\n")));
-        }
-        break;
-    }
+/** One list's entries as the page draws them; blank rows drop out. */
+export function listEntries(resume: Resume, list: PageBlock): ListEntry[] {
+  switch (list) {
+    case "experience":
+      return resume.experience
+        .filter((e) => e.role.trim() || e.company.trim())
+        .map((e) =>
+          entry({
+            id: e.id,
+            title: e.role.trim() || e.company.trim(),
+            sub: line(e.role.trim() ? e.company : "", e.location),
+            date: dateRange(e.start, e.end, e.current),
+            lines: e.bullets.map((b) => b.trim().replace(/^[-•*]\s*/, "")).filter(Boolean),
+          }),
+        );
+    case "education":
+      return resume.education
+        .filter((e) => e.degree.trim() || e.school.trim())
+        .map((e) =>
+          entry({
+            id: e.id,
+            title: e.degree.trim() || e.school.trim(),
+            sub: line(e.degree.trim() ? e.school : "", e.location),
+            date: dateRange(e.start, e.end),
+            lines: e.detail.trim() ? [e.detail.trim()] : [],
+          }),
+        );
+    case "skills":
+      return resume.skills
+        .map((g) => entry({ id: g.id, title: g.name.trim(), tags: g.items.map((i) => i.trim()).filter(Boolean) }))
+        .filter((g) => g.tags.length > 0);
+    case "certifications":
+      return resume.certifications
+        .filter((c) => c.name.trim())
+        .map((c) => entry({ id: c.id, title: c.name.trim(), sub: c.issuer.trim(), date: c.date.trim(), url: c.url.trim() }));
+    case "languages":
+      return resume.languages
+        .filter((l) => l.name.trim())
+        .map((l) => entry({ id: l.id, title: l.name.trim(), sub: l.level.trim() }));
+    case "awards":
+      return resume.awards
+        .filter((a) => a.title.trim())
+        .map((a) =>
+          entry({ id: a.id, title: a.title.trim(), sub: a.issuer.trim(), date: a.date.trim(), lines: a.detail.trim() ? [a.detail.trim()] : [] }),
+        );
   }
-  return out;
+}
+
+/** The section each list's component sits in, if it has one. */
+export function placedLists(p: Portfolio): Map<PageBlock, Section> {
+  const placed = new Map<PageBlock, Section>();
+  for (const s of p.sections) {
+    for (const b of s.blocks) if (isListBlock(b) && !placed.has(b.type)) placed.set(b.type, s);
+  }
+  return placed;
 }
 
 /**
- * The portfolio as the page draws it: the structured blocks switched on for
- * the page first, then the page's own sections. Applied where the page is
- * rendered — never in the editor, which edits the blocks as blocks.
+ * The portfolio as the page draws it: a list component whose list has
+ * nothing to show is left out, so a section is a band only when it has
+ * something for one. Applied where the page is rendered — never in the
+ * editor, which keeps an empty component so it can be filled. Idempotent.
  */
-export function withPageBlocks(p: Portfolio): Portfolio {
-  // Idempotent: the detail view and the body can both be handed it.
-  if (p.sections.some((s) => s.id.startsWith("resume-"))) return p;
-  const extra = pageBlockSections(p);
-  return extra.length ? { ...p, sections: [...extra, ...p.sections] } : p;
+export function withPlacedLists(p: Portfolio): Portfolio {
+  const empty = (s: Section) => s.blocks.some((b) => isListBlock(b) && listEntries(p.resume, b.type).length === 0);
+  if (!p.sections.some(empty)) return p;
+  return {
+    ...p,
+    sections: p.sections.map((s) =>
+      empty(s) ? { ...s, blocks: s.blocks.filter((b) => !isListBlock(b) || listEntries(p.resume, b.type).length > 0) } : s,
+    ),
+  };
 }
 
 export function resumeFileName(p: Portfolio): string {

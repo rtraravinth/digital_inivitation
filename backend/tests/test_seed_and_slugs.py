@@ -159,7 +159,7 @@ async def test_the_seeds_live_pages_publish_and_serve(auth_client, client):
 
     detail = (await auth_client.get(f"/api/v1/portfolios/{full['id']}")).json()
     assert detail["header"]["name"] == "Rohan Mehta"
-    assert len(detail["sections"]) == 7
+    assert len(detail["sections"]) == 8
     assert detail["sections"][0]["title"] == "Northwell Kitchens"
     assert detail["header"]["numbers"][0]["value"] == "11"
 

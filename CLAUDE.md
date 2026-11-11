@@ -28,7 +28,7 @@ because the connection never arrives. Pass flags through when you need them:
 ```
 npm run build
 npm run lint
-cd backend && .venv/bin/python -m pytest    # 334 tests (.venv/Scripts on Windows)
+cd backend && .venv/bin/python -m pytest    # 340 tests (.venv/Scripts on Windows)
 ```
 
 `NEXT_PUBLIC_API_URL` points the frontend at the API; see
@@ -199,13 +199,23 @@ chrome — that inconsistency is what this replaced.
   the cover and all galleries share the twelve-picture allowance.
   `sectionOf()` in `normalize()` gives pictures stored before this (cover
   first, the rest loose) a gallery with a derived id — no migration.
-- **The resume's lists are built-in sections.** Contact details, Experience,
-  Education, Skills, Certifications, Languages and Awards are drawn as the
-  same card holding exactly one component of their own kind
-  (`resume/ResumeContent.tsx`). They are still stored in `p.resume`, not in
-  a section's `blocks` — see "The resume" for why — so a built-in section
-  cannot take other components and its component cannot move to another
-  section. Changing that is a storage change, not an editor one.
+- **The resume's lists are components too, and they place rather than
+  hold.** Experience, Education, Skills, Certifications, Languages and
+  Awards are `ResumeListBlock`s: `{type, look}` and nothing else. The
+  entries stay in `p.resume[type]` — see "The resume" for why — and the
+  component's panel edits them there (`ResumeListRows` in
+  `resume/ResumeContent.tsx`). **The component is the only thing that puts a
+  list on the page**: there is no Page switch for a list any more. A list is
+  one list, so it is placed at most once per portfolio — the picker disables
+  a kind that is already in a section and says which. Removing the component
+  keeps the entries; the editor's "Add a section from your resume" row is
+  where an unplaced list shows up again. `LIST_LOOKS` in `types.ts` says
+  which looks each list has (the first is its default) and `lookOf()` falls
+  back to it; the backend accepts any look so adding one is frontend-only.
+- **There are no built-in cards.** The editor is header, sections, footer.
+  The resume's private contact line lives in the header card ("Resume
+  contact details"). It is deliberately *not* a component: it never leaves
+  the account, and the page has its own Contact component.
 
 **Every section files under exactly one tab, and the tab is required.** The
 tab row on a published page is `tabs(p)` in `published/themes.tsx` — every
@@ -242,14 +252,15 @@ pairings are read off the same list, so adding a profession extends all three.
 
 **One content list, two looks: the page it publishes and the resume it
 downloads.** Nothing is typed twice. Edit text is a single list — the
-header, the resume-only contact details, the structured blocks (Experience,
-Education, Skills, Certifications, Languages, Awards, always listed), then
-the page's own sections — and every card carries **Page** and **Resume**
-switches (`LookToggles` in `ui.tsx`). There used to be a separate Resume
-view of the editor; two places to type one person's history is exactly what
-this replaced, so do not bring it back. The builder still has a **Page /
-Resume** switch (`/builder/<id>?mode=resume`), because the two *looks* are
-styled separately.
+header (with the resume-only contact details in it), then sections — and
+every section carries **Page** and **Resume** switches (`LookToggles` in
+`ui.tsx`). The resume's structured lists are edited inside the component
+that places them in a section. There used to be a separate Resume view of
+the editor, and then a row of built-in cards; two places to type one
+person's history is exactly what this replaced, so do not bring either
+back. The builder still has a **Page / Resume** switch
+(`/builder/<id>?mode=resume`), because the two *looks* are styled
+separately.
 
 - **The header is the resume's top.** Its name, current line and About are
   the resume's name, headline and summary; there is no resume-only copy.
@@ -260,27 +271,32 @@ styled separately.
   skill groups, certifications, languages and awards, plus the template and
   its style. Structured so a later ATS check can read a role and its dates
   without parsing text — keep it that way.
-- **Switches.** A structured block is on the page when it is in
-  `resume.pageBlocks` and on the resume unless it is in `resume.hidden`. A
-  section is on the page unless `hidden` and on the resume while
+- **Switches.** A structured list is on the page while a component of its
+  type sits in a section that is not `hidden`, and on the resume unless it
+  is in `resume.hidden` ("Print on your resume" in the component's panel).
+  A section is on the page unless `hidden` and on the resume while
   `onResume` (a column, `sections.on_resume`). On the resume, sections print
-  grouped under their **Section title** — the field that used to be labelled
-  "Tab", now first in the card — via `sectionGroups()`.
-- **Structured blocks reach the page as sections.** `withPageBlocks()` in
-  `lib/resume.ts` turns each entry of a page-enabled block into a synthetic
-  section (id `resume-…`, tab = the block's name) ahead of the page's own
-  sections. It runs in `PublishedBody` and wherever `?section=` is looked
-  up, never in the editor; it is idempotent. The themes therefore know
-  nothing about roles or degrees, and section descriptions are
-  `whitespace-pre-line` so a role's bullet points keep their lines.
+  grouped under their **Section title** via `sectionGroups()`, which skips a
+  section that is only a list's place on the page — the resume prints the
+  list itself.
+- **Lists reach the page as components, not as sections.** `listEntries()`
+  in `lib/resume.ts` hands any of the six lists over in one shape (title,
+  sub, date, lines, tags) and `ResumeListView` in `published/components.tsx`
+  draws it in the component's look, so the themes know nothing about roles
+  or degrees. `withPlacedLists()` drops a list component whose list is empty
+  before the page is drawn; it runs in `PublishedBody` and the previews,
+  never in the editor. Migration `a7d3e1c95f42` turned every list that was
+  on the page (`resume.pageBlocks`, now gone) into a section holding its
+  component, and the import does the same for an older export.
 - **It is one JSONB column, `portfolios.resume`, sent whole** with `PUT
   /portfolios/{id}/resume`, validated by `app/schemas/resume.py`. `{}` is a
   valid resume, and `resume_from_stored()` turns anything that no longer
   validates into the defaults rather than failing the portfolio read.
-- **Only page-enabled blocks ever leave the account.** `PublicPortfolioOut`
-  carries `public_resume()` — the blocks in `pageBlocks` and their order,
-  nothing else: no email, phone, location, website or style.
-  `tests/test_resume.py` pins that.
+- **Only lists placed on the page ever leave the account.**
+  `PublicPortfolioOut` carries `public_resume()` — the lists that have a
+  component in a section a visitor can see, nothing else: no email, phone,
+  location, website or style, and not a list whose only component is in a
+  hidden section. `tests/test_resume.py` pins that.
 - **A live page freezes what can reach it.** `PUT /resume` takes
   `OwnedPortfolio` so the builder can restyle a live page's resume, but
   while live it answers 409 `portfolio_published` to any change outside
@@ -631,7 +647,7 @@ claim to be the live page.
 - **Slugs are global.** Two accounts cannot both hold `rohan`, because the
   address is `facet.page/<slug>` with nothing in front of it. The create
   dialog surfaces the 409 as a message.
-- **The frontend has no test runner.** The backend has 334 pytest tests;
+- **The frontend has no test runner.** The backend has 340 pytest tests;
   changes here are checked with `npm run lint`, `npm run build` and by
   actually opening the app.
 

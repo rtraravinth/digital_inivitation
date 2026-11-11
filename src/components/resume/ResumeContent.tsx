@@ -3,11 +3,9 @@
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { useId, useState, type ReactNode } from "react";
 import { TagEditor } from "../TagEditor";
-import { Card, Placeholder } from "../editor/card";
-import { BUILT_IN_ICON, ComponentChip, PanelShell } from "../editor/components";
-import { IconButton, LookToggles } from "../ui";
+import { IconButton } from "../ui";
 import { Glyph } from "@/lib/glyphs";
-import { BLOCK_LABEL, dateRange } from "@/lib/resume";
+import { dateRange } from "@/lib/resume";
 import { newId, usePortfolios } from "@/lib/store";
 import type {
   Award,
@@ -21,15 +19,15 @@ import type {
   SkillGroup,
 } from "@/lib/types";
 
-/* ── the built-in sections in the content list ───────────────────────────
-   The facts a resume is read for — roles with dates, schools, skills — as
-   sections like any other in the one content list: the same card, the same
-   Page / Resume switches, and inside it the same component panel. What
-   makes them built in is that each holds exactly one component, of its own
-   kind, and that component is stored as structured facts in `p.resume`
-   rather than in a section's `blocks` — a resume template and a later ATS
-   check have to read a role and its dates without parsing prose. Entries
-   open in place and save as they are typed.
+/* ── the resume's facts in the editor ────────────────────────────────────
+   The rows behind the six list components — roles with dates, schools,
+   skills — and the resume's contact line. A list component in a section
+   (editor/components.tsx) shows `ResumeListRows` as its body, so the entries
+   are typed where the list sits on the page; the header card shows
+   `ResumeContactFields`. Neither stores anything in a section: both write
+   `p.resume`, structured, because a resume template and a later ATS check
+   have to read a role and its dates without parsing prose. Entries open in
+   place and save as they are typed.
    ──────────────────────────────────────────────────────────────────────── */
 
 const EASE = [0.16, 1, 0.3, 1] as const;
@@ -44,110 +42,82 @@ function useResume(p: Portfolio) {
   return { change, set };
 }
 
-/** Email, phone, place and site — printed on the resume, never on the page. */
-type CardState = { open: boolean; onOpen: () => void; onClose: () => void };
+/** What one row of each list is called. */
+const LIST_NOUN: Record<PageBlock, [string, string]> = {
+  experience: ["role", "roles"],
+  education: ["entry", "entries"],
+  skills: ["group", "groups"],
+  certifications: ["certification", "certifications"],
+  languages: ["language", "languages"],
+  awards: ["award", "awards"],
+};
 
-function Done({ onClose }: { onClose: () => void }) {
-  return (
-    <button type="button" className="btn btn-primary ml-1" style={{ marginTop: 0, minHeight: 32, fontSize: 13 }} onClick={onClose}>
-      Done
-    </button>
-  );
+/** "4 roles", "Empty" — what a closed card says about a list. */
+export function listSummary(resume: Resume, list: PageBlock): string {
+  const n = resume[list].length;
+  return n === 0 ? "Empty" : `${n} ${n === 1 ? LIST_NOUN[list][0] : LIST_NOUN[list][1]}`;
 }
 
-export function ResumeContactCard({ p, open, onOpen, onClose }: { p: Portfolio } & CardState) {
+/** Email, phone, place and site — printed on the resume, never on the page. */
+export function ResumeContactFields({ p }: { p: Portfolio }) {
   const { set } = useResume(p);
   const r = p.resume;
-  const filled = [r.email, r.phone, r.location, r.website].filter((v) => v.trim());
-  const summary = filled.length === 0 ? "Empty — not printed yet" : `${filled.length} of 4 details`;
   return (
-    <Card
-      id="r-contact"
-      open={open}
-      onOpen={onOpen}
-      dim={filled.length === 0}
-      label="Contact details — built in, resume only"
-      tools={
-        <span className="flex flex-wrap items-center justify-end gap-1">
-          <LookToggles name="contact details" page={false} resume />
-          {open && <Done onClose={onClose} />}
-        </span>
-      }
-      preview={
-        <>
-          <div className="text-[19px] leading-snug font-semibold tracking-[-0.015em]">Contact details</div>
-          <p className="m-0 mt-1.5 max-w-[64ch] text-[14px] leading-relaxed text-muted">
-            {filled.length > 0 ? filled.join(" · ") : <Placeholder>Email, phone, place and site — the line under your name on the resume</Placeholder>}
-          </p>
-          <div className="mt-3">
-            <ComponentChip icon={BUILT_IN_ICON.contact} name="Contact details" summary={filled.length === 0 ? "Empty" : `${filled.length} of 4`} />
-          </div>
-        </>
-      }
-    >
-      <p className="m-0 mb-4 max-w-[64ch] text-[13px] leading-snug text-muted">
-        Printed at the top of your resume and never shown on your page. Your page’s links print beside them. To
-        put a way to reach you on the page, add a Contact component to one of your sections.
-      </p>
-      <PanelShell icon={BUILT_IN_ICON.contact} name="Contact details" summary={summary}>
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <Field label="Email">
-          {(id) => <input id={id} className="input" type="email" autoComplete="email" value={r.email} placeholder="you@example.com" onChange={(e) => set("email", e.target.value)} />}
-        </Field>
-        <Field label="Phone">
-          {(id) => <input id={id} className="input" type="tel" autoComplete="tel" value={r.phone} placeholder="+1 555 010 2030" onChange={(e) => set("phone", e.target.value)} />}
-        </Field>
-        <Field label="Location">
-          {(id) => <input id={id} className="input" value={r.location} placeholder="City, Country" onChange={(e) => set("location", e.target.value)} />}
-        </Field>
-        <Field label="Website">
-          {(id) => <input id={id} className="input" value={r.website} placeholder="yourname.com" onChange={(e) => set("website", e.target.value)} />}
-        </Field>
-      </div>
-      </PanelShell>
-      <div className="mt-6 flex justify-end">
-        <button type="button" className="btn btn-primary" style={{ marginTop: 0 }} onClick={onClose}>
-          Done
-        </button>
-      </div>
-    </Card>
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+      <Field label="Email">
+        {(id) => <input id={id} className="input" type="email" autoComplete="email" value={r.email} placeholder="you@example.com" onChange={(e) => set("email", e.target.value)} />}
+      </Field>
+      <Field label="Phone">
+        {(id) => <input id={id} className="input" type="tel" autoComplete="tel" value={r.phone} placeholder="+1 555 010 2030" onChange={(e) => set("phone", e.target.value)} />}
+      </Field>
+      <Field label="Location">
+        {(id) => <input id={id} className="input" value={r.location} placeholder="City, Country" onChange={(e) => set("location", e.target.value)} />}
+      </Field>
+      <Field label="Website">
+        {(id) => <input id={id} className="input" value={r.website} placeholder="yourname.com" onChange={(e) => set("website", e.target.value)} />}
+      </Field>
+    </div>
   );
 }
 
-/** One structured block — Experience, Education and so on — as a card. */
-export function ResumeBlockCard({ p, block, open, onOpen, onClose }: { p: Portfolio; block: PageBlock } & CardState) {
+/**
+ * One list's rows, and whether the resume prints it. The body of a list
+ * component: what is typed here is the resume's own data, so it is the same
+ * list wherever the component sits and whether or not the page shows it.
+ */
+export function ResumeListRows({ p, block }: { p: Portfolio; block: PageBlock }) {
   const { change, set } = useResume(p);
   const r = p.resume;
-  const onPage = r.pageBlocks.includes(block);
   const onResume = !r.hidden.includes(block);
-  const toggles = (
-    <LookToggles
-      name={BLOCK_LABEL[block]}
-      page={onPage}
-      resume={onResume}
-      onPage={() =>
-        change((prev) => ({
-          ...prev,
-          pageBlocks: prev.pageBlocks.includes(block) ? prev.pageBlocks.filter((b) => b !== block) : [...prev.pageBlocks, block],
-        }))
-      }
-      onResume={() =>
-        change((prev) => ({
-          ...prev,
-          hidden: prev.hidden.includes(block) ? prev.hidden.filter((b) => b !== block) : [...prev.hidden, block],
-        }))
-      }
-    />
-  );
-  const common = { block, toggles, dim: !onPage && !onResume, open, onOpen, onClose };
+  const common = {
+    footer: (
+      <label className="flex cursor-pointer items-start gap-3 text-[13.5px]">
+        <input
+          type="checkbox"
+          className="mt-0.5 h-4 w-4 flex-none accent-[var(--color-ink)]"
+          checked={onResume}
+          onChange={() =>
+            change((prev) => ({
+              ...prev,
+              hidden: prev.hidden.includes(block) ? prev.hidden.filter((b) => b !== block) : [...prev.hidden, block],
+            }))
+          }
+        />
+        <span>
+          <span className="font-medium">Print on your resume</span>
+          <span className="block text-[12.5px] text-muted">
+            The resume sets this list in its own template, whatever look the page gives it.
+          </span>
+        </span>
+      </label>
+    ),
+  };
 
   switch (block) {
     case "experience":
       return (
         <ListCard<ExperienceItem>
           {...common}
-          noun={["role", "roles"]}
-          empty="Roles with their dates, most recent first"
           hint="Most recent first. Start each point with what you did, end it with the result."
           items={r.experience}
           onItems={(experience) => set("experience", experience)}
@@ -194,8 +164,6 @@ export function ResumeBlockCard({ p, block, open, onOpen, onClose }: { p: Portfo
       return (
         <ListCard<EducationItem>
           {...common}
-          noun={["entry", "entries"]}
-          empty="Degrees and schools"
           items={r.education}
           onItems={(education) => set("education", education)}
           make={() => ({ id: newId(), degree: "", school: "", location: "", start: "", end: "", detail: "" })}
@@ -223,8 +191,6 @@ export function ResumeBlockCard({ p, block, open, onOpen, onClose }: { p: Portfo
       return (
         <ListCard<SkillGroup>
           {...common}
-          noun={["group", "groups"]}
-          empty="What you are good at, grouped if there are many"
           hint="Group them if you have many — “Design”, “Tools”. One unnamed group is fine too."
           items={r.skills}
           onItems={(skills) => set("skills", skills)}
@@ -248,8 +214,6 @@ export function ResumeBlockCard({ p, block, open, onOpen, onClose }: { p: Portfo
       return (
         <ListCard<Certification>
           {...common}
-          noun={["certification", "certifications"]}
-          empty="Qualifications and who issued them"
           items={r.certifications}
           onItems={(certifications) => set("certifications", certifications)}
           make={() => ({ id: newId(), name: "", issuer: "", date: "", url: "" })}
@@ -271,8 +235,6 @@ export function ResumeBlockCard({ p, block, open, onOpen, onClose }: { p: Portfo
       return (
         <ListCard<Language>
           {...common}
-          noun={["language", "languages"]}
-          empty="The languages you work in"
           items={r.languages}
           onItems={(languages) => set("languages", languages)}
           make={() => ({ id: newId(), name: "", level: "" })}
@@ -303,8 +265,6 @@ export function ResumeBlockCard({ p, block, open, onOpen, onClose }: { p: Portfo
       return (
         <ListCard<Award>
           {...common}
-          noun={["award", "awards"]}
-          empty="Recognition worth a line"
           items={r.awards}
           onItems={(awards) => set("awards", awards)}
           make={() => ({ id: newId(), title: "", issuer: "", date: "", detail: "" })}
@@ -337,15 +297,8 @@ function Field({ label, span, children }: { label: string; span?: boolean; child
 }
 
 function ListCard<T extends { id: string }>({
-  block,
-  noun,
-  empty,
   hint,
-  toggles,
-  dim,
-  open: cardOpen,
-  onOpen,
-  onClose,
+  footer,
   items,
   onItems,
   make,
@@ -354,14 +307,8 @@ function ListCard<T extends { id: string }>({
   summary,
   render,
 }: {
-  block: PageBlock;
-  /** What one row is called: ["role", "roles"]. */
-  noun: [string, string];
-  /** What the closed card says while there are no rows. */
-  empty: string;
   hint?: string;
-  toggles: ReactNode;
-  dim?: boolean;
+  footer: ReactNode;
   items: T[];
   onItems: (items: T[]) => void;
   make: () => T;
@@ -369,9 +316,7 @@ function ListCard<T extends { id: string }>({
   max: number;
   summary: (item: T) => { title: string; sub: string };
   render: (item: T, edit: (patch: Partial<T>) => void) => ReactNode;
-} & CardState) {
-  const title = BLOCK_LABEL[block];
-  const count = items.length === 0 ? "Empty" : `${items.length} ${items.length === 1 ? noun[0] : noun[1]}`;
+}) {
   const reduced = useReducedMotion();
   const [open, setOpen] = useState<string | null>(null);
 
@@ -386,47 +331,8 @@ function ListCard<T extends { id: string }>({
   };
 
   return (
-    <Card
-      id={`r-${block}`}
-      open={cardOpen}
-      onOpen={onOpen}
-      dim={dim || items.length === 0}
-      label={`${title} — built in`}
-      tools={
-        <span className="flex flex-wrap items-center justify-end gap-1">
-          {toggles}
-          {cardOpen && <Done onClose={onClose} />}
-        </span>
-      }
-      preview={
-        <>
-          <div className="text-[19px] leading-snug font-semibold tracking-[-0.015em]">{title}</div>
-          {items.length === 0 ? (
-            <p className="m-0 mt-1.5 text-[14px] leading-relaxed">
-              <Placeholder>{empty}</Placeholder>
-            </p>
-          ) : (
-            <ul className="m-0 mt-1.5 flex list-none flex-col gap-0.5 p-0 text-[14px] leading-relaxed">
-              {items.slice(0, 3).map((item) => {
-                const line = summary(item);
-                return (
-                  <li key={item.id} className="truncate">
-                    <span className="font-medium">{line.title}</span>
-                    {line.sub && <span className="text-muted"> — {line.sub}</span>}
-                  </li>
-                );
-              })}
-              {items.length > 3 && <li className="text-muted">and {items.length - 3} more</li>}
-            </ul>
-          )}
-          <div className="mt-3">
-            <ComponentChip icon={BUILT_IN_ICON[block]} name={title} summary={count} />
-          </div>
-        </>
-      }
-    >
-      {hint && <p className="m-0 mb-4 max-w-[64ch] text-[13px] leading-snug text-muted">{hint}</p>}
-      <PanelShell icon={BUILT_IN_ICON[block]} name={title} summary={items.length === 0 ? "Empty — not shown yet" : count}>
+    <div className="flex flex-col gap-4">
+      {hint && <p className="m-0 max-w-[64ch] text-[13px] leading-snug text-muted">{hint}</p>}
       <div>
       <ul className="m-0 flex list-none flex-col gap-2 p-0">
         <AnimatePresence initial={false}>
@@ -516,12 +422,7 @@ function ListCard<T extends { id: string }>({
         {addLabel}
       </button>
       </div>
-      </PanelShell>
-      <div className="mt-6 flex justify-end">
-        <button type="button" className="btn btn-primary" style={{ marginTop: 0 }} onClick={onClose}>
-          Done
-        </button>
-      </div>
-    </Card>
+      {footer}
+    </div>
   );
 }

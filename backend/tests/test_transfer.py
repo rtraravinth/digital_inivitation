@@ -384,3 +384,32 @@ async def test_export_only_returns_my_portfolios(auth_client, other_auth_client,
 async def test_export_requires_a_token(client):
     client.headers.pop("Authorization", None)
     assert (await client.get("/api/v1/export")).status_code == 401
+
+
+async def test_an_older_exports_page_lists_become_sections(auth_client):
+    """Before resume lists were components, `pageBlocks` put them on the page."""
+    old = {
+        "name": "Old export",
+        "slug": "old-export",
+        "sections": [{"title": "A project", "tab": "Work"}],
+        "resume": {
+            "pageBlocks": ["skills", "experience", "awards"],
+            "experience": [{"id": "e", "role": "Founder", "company": "Northwell"}],
+            "skills": [{"id": "s", "name": "", "items": ["Hiring"]}],
+            "languages": [{"id": "l", "name": "Hindi", "level": "Native"}],
+        },
+    }
+    response = await auth_client.post("/api/v1/import", json={"mode": "merge", "portfolios": [old]})
+    assert response.status_code in (200, 201), response.text
+
+    listing = (await auth_client.get("/api/v1/portfolios")).json()
+    imported = next(p for p in listing if p["slug"] == "old-export")
+    detail = (await auth_client.get(f"/api/v1/portfolios/{imported['id']}")).json()
+    # Resume order, ahead of the page's own; awards was on but empty, and
+    # languages had entries but was never on the page.
+    assert [s["title"] for s in detail["sections"]] == ["Experience", "Skills", "A project"]
+    assert detail["sections"][0]["blocks"] == [
+        {"id": "list-experience", "type": "experience", "title": "", "look": "timeline"}
+    ]
+    assert detail["sections"][0]["onResume"] is False
+    assert "pageBlocks" not in detail["resume"]

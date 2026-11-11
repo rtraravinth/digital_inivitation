@@ -95,7 +95,25 @@ export const GALLERY_LAYOUTS: Array<{ id: GalleryLayout; name: string; desc: str
  */
 export type GalleryBlock = BlockBase & { type: "gallery"; layout: GalleryLayout; imageIds: string[] };
 
+/** How the page draws one of the resume's lists. */
+export type ListLook = "list" | "cards" | "timeline" | "tags";
+export const LOOK_NAME: Record<ListLook, { name: string; desc: string }> = {
+  timeline: { name: "Timeline", desc: "Dates down a rail, most recent first." },
+  list: { name: "List", desc: "Ruled rows, one entry each." },
+  cards: { name: "Cards", desc: "A grid of cards." },
+  tags: { name: "Tags", desc: "Short labels in a row." },
+};
+/**
+ * One of the resume's lists, shown in this section. Like a gallery, it
+ * holds nothing itself: the entries are `p.resume[type]`, structured, where
+ * the resume templates read them. The component is what puts the list on
+ * the page — there is no other switch — so each list is placed at most once
+ * in a portfolio.
+ */
+export type ResumeListBlock = BlockBase & { type: PageBlock; look: ListLook };
+
 export type Block =
+  | ResumeListBlock
   | GalleryBlock
   | TimelineBlock
   | TestimonialsBlock
@@ -118,6 +136,12 @@ export const BLOCK_TYPES: Array<{ id: BlockType; name: string; desc: string }> =
   { id: "services", name: "Services", desc: "What you offer, with a price if you like." },
   { id: "faq", name: "Questions", desc: "The questions people ask before they reach out." },
   { id: "contact", name: "Contact", desc: "Email, phone, a booking link and a message form." },
+  { id: "experience", name: "Experience", desc: "Your roles, with their dates and what you did." },
+  { id: "education", name: "Education", desc: "Degrees, schools and the years." },
+  { id: "skills", name: "Skills", desc: "What you are good at, grouped if there are many." },
+  { id: "certifications", name: "Certifications", desc: "Qualifications and who issued them." },
+  { id: "languages", name: "Languages", desc: "The languages you work in, and how well." },
+  { id: "awards", name: "Awards", desc: "Recognition worth a line." },
 ];
 
 /** Mirrors SECTION_IMAGES_MAX / SECTION_BLOCKS_MAX on the API. */
@@ -128,6 +152,13 @@ export const SECTION_BLOCKS_MAX = 12;
 export function emptyBlock(type: BlockType, id: string, itemId: string): Block {
   const base = { id, title: "" };
   switch (type) {
+    case "experience":
+    case "education":
+    case "skills":
+    case "certifications":
+    case "languages":
+    case "awards":
+      return { ...base, type, look: LIST_LOOKS[type][0] };
     case "gallery":
       return { ...base, type, layout: "mosaic", imageIds: [] };
     case "timeline":
@@ -150,8 +181,11 @@ export function emptyBlock(type: BlockType, id: string, itemId: string): Block {
 }
 
 /** Whether a component has anything a visitor would see. Empty ones stay in
- *  the editor and off the page, the same as an empty section field. */
-export function componentHasContent(b: Block): boolean {
+ *  the editor and off the page, the same as an empty section field. A
+ *  resume list's entries are not in the component, so it answers for them
+ *  only when handed the resume. */
+export function componentHasContent(b: Block, resume?: Resume): boolean {
+  if (isListBlock(b)) return resume ? resume[b.type].length > 0 : true;
   if (b.type === "gallery") return b.imageIds.length > 0;
   if (b.type === "contact") return Boolean(b.email || b.phone || b.location || b.ctaUrl || b.text);
   const items = b.items as Array<Record<string, string>>;
@@ -1103,8 +1137,9 @@ export const NEEDS_SERVER = {
    the page's own sections print under their tabs. What lives here are the
    facts a page section has no fields for — a role's company and dates, a
    school, a list of skills — structured, so a later ATS check can read them
-   without parsing prose. Each structured block can also go on the page
-   (`pageBlocks`). Mirrors backend/app/schemas/resume.py.
+   without parsing prose. Each structured list can also go on the page, by
+   placing its component in a section (`ResumeListBlock`). Mirrors
+   backend/app/schemas/resume.py.
    ──────────────────────────────────────────────────────────────────────── */
 
 /** Every template, in catalogue order. `lib/resume.ts` describes each one. */
@@ -1179,9 +1214,29 @@ export type ResumeBlock =
   | "languages"
   | "awards";
 
-/** The structured blocks — the ones with a Page switch of their own. */
+/** The structured lists — the ones a component can place on the page. */
 export type PageBlock = "experience" | "education" | "skills" | "certifications" | "languages" | "awards";
 export const PAGE_BLOCKS: PageBlock[] = ["experience", "education", "skills", "certifications", "languages", "awards"];
+
+/** The looks each list can take on the page; the first is its default.
+ *  A stored look a list does not have falls back to that default. */
+export const LIST_LOOKS: Record<PageBlock, ListLook[]> = {
+  experience: ["timeline", "cards", "list"],
+  education: ["list", "cards", "timeline"],
+  skills: ["tags", "list"],
+  certifications: ["list", "cards"],
+  languages: ["tags", "list"],
+  awards: ["list", "cards", "timeline"],
+};
+
+export function isListBlock(b: Block): b is ResumeListBlock {
+  return (PAGE_BLOCKS as string[]).includes(b.type);
+}
+
+/** The look a list component draws in: its own, if its list has it. */
+export function lookOf(b: ResumeListBlock): ListLook {
+  return LIST_LOOKS[b.type].includes(b.look) ? b.look : LIST_LOOKS[b.type][0];
+}
 
 export const RESUME_BLOCKS: ResumeBlock[] = [
   "summary",
@@ -1243,12 +1298,10 @@ export type Resume = {
   certifications: Certification[];
   languages: Language[];
   awards: Award[];
-  /** Block order on the sheet, and of the structured blocks on the page. */
+  /** Block order on the sheet. */
   order: ResumeBlock[];
   /** Blocks left off the resume. */
   hidden: ResumeBlock[];
-  /** Structured blocks shown on the published page too. */
-  pageBlocks: PageBlock[];
   style: ResumeStyle;
 };
 
@@ -1281,7 +1334,6 @@ export function defaultResume(): Resume {
     awards: [],
     order: [...RESUME_BLOCKS],
     hidden: [],
-    pageBlocks: [...PAGE_BLOCKS],
     style: defaultResumeStyle(),
   };
 }
@@ -1289,10 +1341,17 @@ export function defaultResume(): Resume {
 /** Backfills a resume from any build, and keeps every block in the order once. */
 export function normalizeResume(raw: Partial<Resume> | null | undefined): Resume {
   const base = defaultResume();
-  // `headline` and `summary` moved to the header; a stale copy is dropped.
-  const { headline: _h, summary: _s, ...rest } = (raw ?? {}) as Partial<Resume> & { headline?: string; summary?: string };
+  // `headline` and `summary` moved to the header, and `pageBlocks` gave way
+  // to components placed in sections; a stale copy of any is dropped — the
+  // API refuses a key it no longer has.
+  const { headline: _h, summary: _s, pageBlocks: _p, ...rest } = (raw ?? {}) as Partial<Resume> & {
+    headline?: string;
+    summary?: string;
+    pageBlocks?: string[];
+  };
   void _h;
   void _s;
+  void _p;
   const r = { ...base, ...rest };
   const known = new Set<string>(RESUME_BLOCKS);
   const order = [...new Set((r.order ?? []).filter((b) => known.has(b)))] as ResumeBlock[];
@@ -1307,7 +1366,6 @@ export function normalizeResume(raw: Partial<Resume> | null | undefined): Resume
     awards: r.awards ?? [],
     order,
     hidden: (r.hidden ?? []).filter((b) => known.has(b)) as ResumeBlock[],
-    pageBlocks: [...new Set((r.pageBlocks ?? PAGE_BLOCKS).filter((b) => PAGE_BLOCKS.includes(b)))],
     style: normalizeResumeStyle({ ...base.style, ...(r.style ?? {}) }),
   };
 }

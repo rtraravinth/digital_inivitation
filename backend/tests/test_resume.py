@@ -31,7 +31,6 @@ FULL_RESUME = {
     "order": ["experience", "summary", "education", "projects", "skills",
               "certifications", "languages", "awards"],
     "hidden": ["awards"],
-    "pageBlocks": ["experience", "skills"],
     "style": {
         "template": "sidebar",
         "paper": "letter",
@@ -94,19 +93,55 @@ async def test_a_live_portfolio_refuses_edits_that_reach_the_page(auth_client, p
     new_role = {**FULL_RESUME, "experience": [{**FULL_RESUME["experience"][0], "role": "CEO"}]}
     assert (await auth_client.put(url, json=new_role)).status_code == 409
 
-    on_page = {**FULL_RESUME, "pageBlocks": ["experience", "skills", "languages"]}
-    response = await auth_client.put(url, json=on_page)
+    reordered = {**FULL_RESUME, "order": list(reversed(FULL_RESUME["order"]))}
+    response = await auth_client.put(url, json=reordered)
     assert response.status_code == 409
     assert response.json()["error"]["code"] == "portfolio_published"
 
 
-async def test_the_public_page_gets_only_its_blocks(client, auth_client, portfolio):
+def _list(kind: str, look: str = "list") -> dict:
+    return {"id": f"c-{kind}", "type": kind, "title": "", "look": look}
+
+
+async def _place(auth_client, portfolio, index: int, kinds: list[str], **patch) -> None:
+    """Put resume-list components in one of the portfolio's sections."""
+    section = portfolio["sections"][index]
+    response = await auth_client.patch(
+        f"/api/v1/portfolios/{portfolio['id']}/sections/{section['id']}",
+        json={"blocks": [_list(kind) for kind in kinds], **patch},
+    )
+    assert response.status_code == 200, response.text
+
+
+async def test_a_resume_list_is_a_component(auth_client, portfolio):
+    section = portfolio["sections"][0]
+    response = await auth_client.patch(
+        f"/api/v1/portfolios/{portfolio['id']}/sections/{section['id']}",
+        json={"blocks": [_list("experience", "timeline"), {"id": "s", "type": "skills"}]},
+    )
+    assert response.status_code == 200, response.text
+    blocks = response.json()["blocks"]
+    assert blocks[0] == {"id": "c-experience", "type": "experience", "title": "", "look": "timeline"}
+    # The look has a default, and the component carries no entries of its own.
+    assert blocks[1] == {"id": "s", "type": "skills", "title": "", "look": "list"}
+
+
+async def test_a_resume_list_component_holds_no_entries(auth_client, portfolio):
+    section = portfolio["sections"][0]
+    response = await auth_client.patch(
+        f"/api/v1/portfolios/{portfolio['id']}/sections/{section['id']}",
+        json={"blocks": [{**_list("experience"), "items": FULL_RESUME["experience"]}]},
+    )
+    assert response.status_code == 422
+
+
+async def test_the_public_page_gets_only_the_lists_placed_on_it(client, auth_client, portfolio):
+    await _place(auth_client, portfolio, 0, ["experience", "skills"])
     live = await _publish_with_resume(auth_client, portfolio)
 
     response = await client.get(f"/api/v1/public/p/{TEST_HANDLE}/{live['slug']}")
     assert response.status_code == 200
     resume = response.json()["resume"]
-    assert resume["pageBlocks"] == ["experience", "skills"]
     assert resume["experience"][0]["company"] == "Northwell Kitchens"
     assert resume["skills"][0]["items"] == ["P&L", "Hiring"]
     # Kept to the resume, so absent from the page.
@@ -116,6 +151,38 @@ async def test_the_public_page_gets_only_its_blocks(client, auth_client, portfol
     assert "email" not in resume and "style" not in resume
     assert "rohan@example.com" not in response.text
     assert "+91 98000" not in response.text
+
+
+async def test_a_list_placed_nowhere_never_leaves_the_account(client, auth_client, portfolio):
+    live = await _publish_with_resume(auth_client, portfolio)
+
+    response = await client.get(f"/api/v1/public/p/{TEST_HANDLE}/{live['slug']}")
+    assert all(entries == [] for entries in response.json()["resume"].values())
+    assert "Northwell Kitchens" not in response.text
+
+
+async def test_a_list_in_a_hidden_section_never_leaves_the_account(client, auth_client, portfolio):
+    """The component is what places a list on the page, and a hidden section
+    is not on the page."""
+    await _place(auth_client, portfolio, 0, ["experience"], hidden=True)
+    live = await _publish_with_resume(auth_client, portfolio)
+
+    response = await client.get(f"/api/v1/public/p/{TEST_HANDLE}/{live['slug']}")
+    assert response.json()["resume"]["experience"] == []
+    assert "Northwell Kitchens" not in response.text
+
+
+async def test_a_stored_page_blocks_key_does_not_break_a_read(auth_client, portfolio, db_session):
+    """`pageBlocks` was how a list reached the page before components did."""
+    from sqlalchemy import text
+
+    await db_session.execute(
+        text("UPDATE portfolios SET resume = CAST(:r AS jsonb) WHERE id = :id"),
+        {"r": '{"pageBlocks": ["experience"], "email": "kept@example.com"}', "id": portfolio["id"]},
+    )
+    resume = (await auth_client.get(f"/api/v1/portfolios/{portfolio['id']}")).json()["resume"]
+    assert resume["email"] == "kept@example.com"
+    assert "pageBlocks" not in resume
 
 
 async def test_old_headline_and_summary_keys_do_not_break_a_read(auth_client, portfolio, db_session):

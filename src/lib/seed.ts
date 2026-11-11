@@ -76,9 +76,6 @@ const RAW: SeedPortfolio[] = [
     // The full page is also the full resume: the roles behind the page's
     // sections, with the dates and results a page has no fields for.
     resume: {
-      // The page already tells the businesses as sections, so the roles stay
-      // on the resume; the facts a page has no other home for go on both.
-      pageBlocks: ["education", "skills", "certifications", "languages"],
       email: "rohan@northwell.in",
       phone: "+91 98450 12345",
       location: "Bengaluru, India",
@@ -305,6 +302,23 @@ const RAW: SeedPortfolio[] = [
         tab: "Community",
         links: [
           { id: "s6l1", label: "Trust", url: "sanjeevanitrust.org", icon: "globe" },
+        ],
+      },
+      // The page already tells the businesses as sections, so the roles stay
+      // on the resume. The facts a page has no other home for go on both: one
+      // section holding four of the resume's lists as components.
+      {
+        id: "s8",
+        title: "Background",
+        description: "",
+        tab: "Background",
+        links: [],
+        onResume: false,
+        blocks: [
+          { id: "s8b1", type: "education", title: "Education", look: "list" },
+          { id: "s8b2", type: "skills", title: "Skills", look: "tags" },
+          { id: "s8b3", type: "certifications", title: "Certifications", look: "list" },
+          { id: "s8b4", type: "languages", title: "Languages", look: "tags" },
         ],
       },
       {

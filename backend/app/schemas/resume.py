@@ -8,13 +8,16 @@ job's company and dates, a degree's school, a list of skills. Structured
 rather than free text, so a later ATS check can read a role and its dates
 without parsing prose.
 
-Each structured block can also appear on the published page
-(``page_blocks``). Only those blocks ever leave the owner's account — see
-``public_resume`` — because the rest carries an email and a phone number.
+Each structured list can also appear on the published page, by placing a
+component of its type in a section (``ResumeListBlock`` in
+app/schemas/blocks.py). Only lists placed in a section a visitor can see
+ever leave the owner's account — see ``public_resume`` — because the rest
+carries an email and a phone number.
 """
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from typing import Any, Literal
 
 from pydantic import Field, ValidationError
@@ -195,12 +198,10 @@ class Resume(StrictCamelModel):
     languages: list[Language] = Field(default_factory=list, max_length=20)
     awards: list[Award] = Field(default_factory=list, max_length=40)
 
-    #: Block order — on the sheet, and for the structured blocks on the page.
+    #: Block order on the sheet.
     order: list[ResumeBlock] = Field(default_factory=lambda: list(DEFAULT_ORDER), max_length=8)
     #: Blocks left off the resume.
     hidden: list[ResumeBlock] = Field(default_factory=list, max_length=8)
-    #: Structured blocks shown on the published page too.
-    page_blocks: list[PageBlock] = Field(default_factory=lambda: list(PAGE_BLOCKS), max_length=6)
     style: ResumeStyle = Field(default_factory=ResumeStyle)
 
 
@@ -242,16 +243,13 @@ def resume_from_stored(raw: Any) -> Resume:
     order = list(dict.fromkeys(resume.order))
     order += [block for block in DEFAULT_ORDER if block not in order]
     resume.order = order  # type: ignore[assignment]
-    resume.page_blocks = list(dict.fromkeys(resume.page_blocks))  # type: ignore[assignment]
     return resume
 
 
 class PublicResume(CamelModel):
-    """The resume blocks a visitor may see: only those switched on for the
-    page, and never the contact details or the style."""
+    """The resume lists a visitor may see: only those placed in a section
+    that is on the page, and never the contact details or the style."""
 
-    order: list[ResumeBlock]
-    page_blocks: list[PageBlock]
     experience: list[ExperienceItem]
     education: list[EducationItem]
     skills: list[SkillGroup]
@@ -260,11 +258,22 @@ class PublicResume(CamelModel):
     awards: list[Award]
 
 
-def public_resume(raw: Any) -> PublicResume:
+def placed_lists(sections_blocks: Iterable[list | None]) -> set[str]:
+    """The resume lists that have a component among these sections' blocks.
+
+    Hand it the blocks of the sections a visitor will see — a list whose
+    only component sits in a hidden section stays in the account.
+    """
+    return {
+        block.get("type")
+        for blocks in sections_blocks
+        for block in (blocks or [])
+        if isinstance(block, dict) and block.get("type") in PAGE_BLOCKS
+    }
+
+
+def public_resume(raw: Any, placed: set[str]) -> PublicResume:
     resume = resume_from_stored(raw)
-    shown = set(resume.page_blocks)
     return PublicResume(
-        order=resume.order,
-        page_blocks=resume.page_blocks,
-        **{block: getattr(resume, block) if block in shown else [] for block in PAGE_BLOCKS},
+        **{block: getattr(resume, block) if block in placed else [] for block in PAGE_BLOCKS},
     )

@@ -33,7 +33,7 @@ from app.schemas.publish import (
     RecordClickRequest,
     RecordViewRequest,
 )
-from app.schemas.resume import public_resume
+from app.schemas.resume import placed_lists, public_resume
 from app.services.analytics import AnalyticsService
 from app.services.portfolio import footer_out, header_out, section_out
 
@@ -119,7 +119,12 @@ async def read_published(
             for section in portfolio.sections
             if not section.hidden
         ],
-        resume=public_resume(portfolio.resume),
+        # A resume list leaves the account only while a component places it
+        # in one of the sections above.
+        resume=public_resume(
+            portfolio.resume,
+            placed_lists(section.blocks for section in portfolio.sections if not section.hidden),
+        ),
         published_at=portfolio.published_at,
         noindex=not indexable,
         badge=badge,

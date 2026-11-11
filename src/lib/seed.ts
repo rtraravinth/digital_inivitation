@@ -7,7 +7,7 @@ import {
 } from "./types";
 
 /** Optional fields fall back to the defaults in normalize(). */
-type Opt = "images" | "file" | "quote" | "blocks" | "hidden" | "onResume";
+type Opt = "images" | "file" | "quote" | "blocks" | "hidden" | "onResume" | "tab";
 type SeedSection = Omit<Section, Opt> & Partial<Pick<Section, Opt>>;
 
 type HeaderOpt = "portrait" | "numbers" | "dates";
@@ -175,7 +175,6 @@ const RAW: SeedPortfolio[] = [
         title: "Northwell Kitchens",
         description:
           "A cloud-kitchen company running eleven brands out of four Bengaluru facilities. Founded 2019, profitable since 2022, forty-two people on payroll.",
-        tab: "Operating",
         links: [
           { id: "s1l1", label: "Company", url: "northwell.in", icon: "globe" },
           { id: "s1l2", label: "Press", url: "northwell.in/press", icon: "document" },
@@ -199,7 +198,6 @@ const RAW: SeedPortfolio[] = [
         title: "Meridian Supply Co.",
         description:
           "Cold-chain logistics for small food businesses that cannot afford their own fleet. Started as Northwell's own supply arm and spun out in 2023.",
-        tab: "Operating",
         links: [
           { id: "s2l1", label: "Company", url: "meridiansupply.in", icon: "globe" },
         ],
@@ -209,7 +207,6 @@ const RAW: SeedPortfolio[] = [
         title: "The Slow Compounding letter",
         description:
           "A fortnightly letter on household finance for people who don't work in finance. Eighty-two issues, 14,200 subscribers, no advertising.",
-        tab: "Writing",
         links: [
           { id: "s3l1", label: "Read the letter", url: "slowcompounding.in", icon: "globe" },
           { id: "s3l2", label: "Subscribe", url: "slowcompounding.in/join", icon: "globe" },
@@ -236,7 +233,6 @@ const RAW: SeedPortfolio[] = [
         title: "Advisory practice",
         description:
           "SEBI-registered investment adviser to sixty households, fee-only, no commissions and no product sales. Taking four new families a year.",
-        tab: "Advisory",
         links: [
           {
             id: "s4l1",
@@ -284,7 +280,6 @@ const RAW: SeedPortfolio[] = [
         title: "The Sunday clinic",
         description:
           "A free money clinic for gig workers, every Sunday morning in Indiranagar. Two hours, no appointment, whatever you want to ask. Running since 2022.",
-        tab: "Community",
         links: [
           {
             id: "s5l1",
@@ -299,7 +294,6 @@ const RAW: SeedPortfolio[] = [
         title: "Trustee, Sanjeevani Schools Trust",
         description:
           "On the board of a trust running three low-fee schools in north Karnataka. I chair the finance committee.",
-        tab: "Community",
         links: [
           { id: "s6l1", label: "Trust", url: "sanjeevanitrust.org", icon: "globe" },
         ],
@@ -311,7 +305,6 @@ const RAW: SeedPortfolio[] = [
         id: "s8",
         title: "Background",
         description: "",
-        tab: "Background",
         links: [],
         onResume: false,
         blocks: [
@@ -326,7 +319,6 @@ const RAW: SeedPortfolio[] = [
         title: "Work with me",
         description:
           "Advisory enquiries, speaking at your company or a conversation about the businesses. I read everything and answer within two working days.",
-        tab: "Contact",
         links: [],
         onResume: false,
         blocks: [
@@ -376,7 +368,6 @@ const RAW: SeedPortfolio[] = [
         title: "Northwell Kitchens",
         description:
           "Eleven brands, four facilities, profitable since 2022. ₹18 Cr revenue run rate.",
-        tab: "Operating",
         links: [
           { id: "i1l1", label: "Deck", url: "northwell.in/deck", icon: "document" },
         ],
@@ -386,7 +377,6 @@ const RAW: SeedPortfolio[] = [
         title: "Meridian Supply Co.",
         description:
           "Cold-chain logistics, spun out of Northwell in 2023. Two hundred and forty customers.",
-        tab: "Operating",
         links: [
           { id: "i2l1", label: "Deck", url: "meridiansupply.in/deck", icon: "document" },
         ],
@@ -396,7 +386,6 @@ const RAW: SeedPortfolio[] = [
         title: "How I work",
         description:
           "Operator first. I stay close to the kitchens and the trucks, and I do not raise for the sake of raising.",
-        tab: "How I work",
         links: [{ id: "i3l1", label: "Book a call", url: "cal.com/rohanmehta" }],
       },
     ],
@@ -428,7 +417,6 @@ const RAW: SeedPortfolio[] = [
         title: "Advisory practice",
         description:
           "Fee-only, SEBI-registered, sixty households. Taking four new families a year.",
-        tab: "Advisory",
         links: [
           {
             id: "a1l1",
@@ -442,7 +430,6 @@ const RAW: SeedPortfolio[] = [
         id: "a2",
         title: "The Slow Compounding letter",
         description: "A fortnightly letter on household finance. Eighty-two issues.",
-        tab: "Writing",
         links: [
           { id: "a2l1", label: "Read", url: "slowcompounding.in", icon: "globe" },
         ],
@@ -451,7 +438,6 @@ const RAW: SeedPortfolio[] = [
         id: "a3",
         title: "The Sunday clinic",
         description: "Free, every Sunday morning in Indiranagar. No appointment.",
-        tab: "Community",
         links: [
           {
             id: "a3l1",
@@ -486,7 +472,6 @@ const RAW: SeedPortfolio[] = [
         id: "w1",
         title: "The Slow Compounding letter",
         description: "Eighty-two issues, 14,200 subscribers, no advertising.",
-        tab: "The letter",
         links: [
           {
             id: "w1l1",
@@ -501,7 +486,6 @@ const RAW: SeedPortfolio[] = [
         title: "Elsewhere",
         description:
           "Occasional columns on household finance, and a standing offer to come on your podcast and argue about index funds.",
-        tab: "Elsewhere",
         links: [{ id: "w2l1", label: "Email", url: "rohan@slowcompounding.in" }],
       },
     ],
@@ -542,7 +526,6 @@ const RAW: SeedPortfolio[] = [
         title: "Sanjeevani Schools Trust",
         description:
           "Three low-fee schools in north Karnataka. Trustee since 2020, chair of the finance committee since 2022.",
-        tab: "The trust",
         links: [
           { id: "b1l1", label: "Trust", url: "sanjeevanitrust.org", icon: "globe" },
         ],
@@ -552,7 +535,6 @@ const RAW: SeedPortfolio[] = [
         title: "What I bring",
         description:
           "Operating experience in a low-margin business, and a reasonable tolerance for reading an audit file end to end.",
-        tab: "What I bring",
         links: [],
       },
     ],

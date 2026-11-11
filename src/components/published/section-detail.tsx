@@ -29,7 +29,7 @@ export function SectionDetail({ p, section }: { p: Portfolio; section: Section }
   const index = all.findIndex((s) => s.id === section.id);
   const total = all.length;
   const no = index >= 0 ? String(index + 1).padStart(2, "0") : "—";
-  const [filed, medium, credit] = captionCredit(section);
+  const [medium, credit] = captionCredit(section);
   const reduced = useReducedMotion();
 
   const prev = index > 0 ? all[index - 1] : undefined;
@@ -53,7 +53,7 @@ export function SectionDetail({ p, section }: { p: Portfolio; section: Section }
               <span className="plate-no">{String(total).padStart(2, "0")}</span>
             </>
           ) : (
-            filed
+            "Plate"
           )}
         </span>
       </div>
@@ -128,7 +128,7 @@ export function SectionDetail({ p, section }: { p: Portfolio; section: Section }
               </h1>
             </div>
             <div className="caption-credit">
-              {filed} · {medium} · {credit}
+              {medium} · {credit}
             </div>
             {section.description && (
               <p className="m-0 max-w-[62ch] whitespace-pre-line text-[16px] leading-[1.65] text-muted">
@@ -212,9 +212,6 @@ export function SectionDetail({ p, section }: { p: Portfolio; section: Section }
                   </span>
                   <span className="font-heading min-w-0 flex-1 truncate text-[17px]">
                     {s.title}
-                  </span>
-                  <span className="caption-credit" style={{ color: "inherit" }}>
-                    {s.tab}
                   </span>
                 </Link>
               </li>

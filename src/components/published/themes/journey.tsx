@@ -23,10 +23,9 @@ import {
   UiIcon,
   allDates,
   allNumbers,
-  chaptersOf,
   headline,
 } from "../shared";
-import { FeatureBand, FooterBody, footerHeadline, footerNote, splitFeatures } from "../components";
+import { FeatureBand, FooterBody, footerHeadline, footerNote, runsOf } from "../components";
 
 /* ── Journey ──────────────────────────────────────────────────────────────
    A warm page told as a story. The tags ring the portrait in a slow 3D
@@ -49,7 +48,9 @@ const STACK_TOP = 96;
 const STACK_STEP = 18;
 
 export function Journey({ p }: { p: Portfolio }) {
-  const chapters = chaptersOf(p);
+  // Runs, not chapters: a stack of cards and the bands after it, with no
+  // heading over them — each section carries its own title.
+  const runs = runsOf(p, "journey");
   const numbers = allNumbers(p);
   const dates = allDates(p);
   const contactId = `journey-${p.id}-contact`;
@@ -93,33 +94,14 @@ export function Journey({ p }: { p: Portfolio }) {
         </section>
       )}
 
-      {chapters.map((c, ci) => (
-        <section key={c.tab} className={`px-5 md:px-10 ${CHAPTER_PAD[p.layout.density]}`}>
+      {runs.map((run) => (
+        <section key={run.id} id={run.id} className={`scroll-mt-6 px-5 md:px-10 ${CHAPTER_PAD[p.layout.density]}`}>
           <div className="mx-auto max-w-[1080px]">
-            <div className="mb-10 text-center md:mb-14">
-              <Reveal
-                as="span"
-                kind="scale"
-                className="inline-block rounded-full px-4 py-1.5 text-[13px]"
-                style={{
-                  background: "color-mix(in srgb, var(--color-accent) 12%, var(--color-bg))",
-                  color: "var(--color-mark)",
-                }}
-              >
-                Chapter {nn(ci)}
-              </Reveal>
-              <Words
-                as="h2"
-                text={c.tab}
-                className="m-0 mt-4"
-                style={{ ...headline("clamp(36px, 5.6vw, 68px)"), lineHeight: 1 }}
-              />
-            </div>
-            {splitFeatures(c.sections).cards.length > 0 && <Stack p={p} sections={splitFeatures(c.sections).cards} />}
+            {run.cards.length > 0 && <Stack p={p} sections={run.cards} />}
             {/* Bands sit after the stack: a timeline or a form has no place
                 in a card that pins and shrinks under the next one. */}
-            {splitFeatures(c.sections).features.map((s) => (
-              <Reveal key={s.id} kind="up" className="mt-6 md:mt-8">
+            {run.features.map((s, i) => (
+              <Reveal key={s.id} kind="up" className={i > 0 || run.cards.length > 0 ? "mt-6 md:mt-8" : ""}>
                 <FeatureBand
                   p={p}
                   section={s}

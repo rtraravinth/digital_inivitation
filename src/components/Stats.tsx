@@ -94,7 +94,7 @@ export function Stats() {
         .map((s) => ({
           id: s.id,
           label: s.title || "Untitled section",
-          note: s.tab,
+          note: "",
           value: analytics.clicks[selected.slug]?.[s.id] ?? 0,
           hasLink: s.links.length > 0,
         }))
@@ -345,7 +345,7 @@ export function Stats() {
                                     rows={sectionRows.map((r) => ({
                                       id: r.id,
                                       label: r.label,
-                                      note: r.hasLink ? r.note : `${r.note} · no link`,
+                                      note: r.hasLink ? r.note : "No link",
                                       value: r.value,
                                     }))}
                                   />

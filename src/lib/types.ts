@@ -215,22 +215,33 @@ export function emptyFooter(): Footer {
 }
 
 /**
- * What a section files under when the page has no tabs yet. Mirrors
- * DEFAULT_TAB in backend/app/models/enums.py.
+ * What an untitled section is called on the page's menu.
  */
-export const DEFAULT_TAB = "Work";
+export const DEFAULT_TAB = "Untitled";
 
-/** As long as a tab name may be. Mirrors TAB_MAX_LENGTH on the API. */
+/** As long as a stored tab may be. Mirrors TAB_MAX_LENGTH on the API. */
 export const TAB_MAX_LENGTH = 60;
 
 /**
- * Every section is the same fields — title, description, tab, links and a
- * cover picture — so there is nothing to learn twice. Components and the
- * rest below that are opt-in.
+ * A section's place on the page's menu: its own title. A section is one
+ * thing with one name — there is no second field to file it under. The API
+ * still stores a `tab` per section (required, at most sixty characters), so
+ * this is what is sent for it, and what every theme reads instead of the
+ * stored value, which lags the title while a save is on its way.
+ */
+export function tabOf(section: Pick<Section, "title">): string {
+  return (section.title ?? "").trim().slice(0, TAB_MAX_LENGTH).trim() || DEFAULT_TAB;
+}
+
+/**
+ * Every section is the same fields — title, description, links and a cover
+ * picture — so there is nothing to learn twice. Components and the rest
+ * below that are opt-in.
  *
- * `tab` is the exception: a visitor reaches a section through its tab and
- * nowhere else, so it is required and never blank. One tab per section, and
- * the page's tab row is the distinct set of them.
+ * `tab` is the wire format's name for the section's menu label. It is not a
+ * field anyone fills in: it is the title, derived by `tabOf()`. It used to
+ * be a second name that grouped several sections under one tab; a section
+ * now holds components, so what belongs together goes in one section.
  *
  * Numbers and the timeline are not here: the page draws one of each, from
  * the header. See `PortfolioHeader`.
@@ -852,9 +863,8 @@ function sectionOf(raw: Section & { image?: Asset | null }): Section {
       images,
       blocks,
       links: s.links ?? [],
-      // A section written before tabs existed carries none. It would be
-      // unreachable with a blank one, so it lands on the default.
-      tab: s.tab?.trim() || DEFAULT_TAB,
+      // Whatever was stored, the menu label is the title.
+      tab: tabOf({ title: s.title ?? "" }),
       hidden: s.hidden ?? false,
       onResume: s.onResume ?? true,
   };

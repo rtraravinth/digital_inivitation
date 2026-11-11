@@ -6,7 +6,6 @@ import { useEffect, useRef, useState } from "react";
 import { LinkEditor } from "./LinkEditor";
 import { PortfolioExtras, PortraitField, SectionExtras } from "./SectionExtras";
 import { PublishedLock } from "./PublishedLock";
-import { TabField } from "./TabField";
 import { TagEditor } from "./TagEditor";
 import { ResumeContactFields, listSummary } from "./resume/ResumeContent";
 import { Card, Placeholder } from "./editor/card";
@@ -110,8 +109,6 @@ export function Editor({ id }: { id: string }) {
   const placedIn = placedLists(p);
   const placed = new Map([...placedIn].map(([list, section]) => [list, section.title] as const));
   const unplaced = PAGE_BLOCKS.filter((list) => !placedIn.has(list));
-  // Hidden sections count: their tab is still one the author is using.
-  const pageTabs = [...new Set(p.sections.map((s) => s.tab.trim()).filter(Boolean))];
   const hidden = p.sections.filter((s) => s.hidden).length;
 
   const setHeader = (recipe: (h: PortfolioHeader) => PortfolioHeader) =>
@@ -134,7 +131,6 @@ export function Editor({ id }: { id: string }) {
     updateSection(p.id, added, (s) => ({
       ...s,
       title: BLOCK_LABEL[list],
-      tab: BLOCK_LABEL[list],
       // The resume prints the list itself; the section is its place on the page.
       onResume: false,
       blocks: [newComponent(list)],
@@ -275,7 +271,7 @@ export function Editor({ id }: { id: string }) {
                     on={open === s.id}
                     number={nn(i)}
                     title={s.title || "Untitled section"}
-                    sub={`${s.tab} · ${lookLabel(!s.hidden, s.onResume, true)}`}
+                    sub={lookLabel(!s.hidden, s.onResume, true)}
                     dim={s.hidden && !s.onResume}
                     onPick={() => setOpen(s.id)}
                   />
@@ -310,7 +306,7 @@ export function Editor({ id }: { id: string }) {
               <div className="mt-4 flex flex-wrap items-baseline gap-x-3 gap-y-1 px-1">
                 <h2 className="m-0 text-[16px] tracking-[-0.01em]">Sections</h2>
                 <span className="text-[12.5px] text-muted">
-                  A heading, a cover, and any components under it — a timeline, a gallery, your experience.
+                  Each is one thing with one title: a cover, a description, and any components under it.
                 </span>
               </div>
 
@@ -330,7 +326,6 @@ export function Editor({ id }: { id: string }) {
                       number={nn(i)}
                       first={i === 0}
                       last={i === p.sections.length - 1}
-                      tabOptions={pageTabs}
                       resume={p.resume}
                       placed={placed}
                       p={p}
@@ -656,7 +651,6 @@ function SectionCard({
   number,
   first,
   last,
-  tabOptions,
   resume,
   placed,
   p,
@@ -676,7 +670,6 @@ function SectionCard({
   number: string;
   first: boolean;
   last: boolean;
-  tabOptions: string[];
   open: boolean;
   onOpen: () => void;
   onClose: () => void;
@@ -699,7 +692,7 @@ function SectionCard({
       label={
         <span className="flex items-center gap-2">
           <span className="font-mono">{number}</span>
-          <span className="truncate">{s.tab}</span>
+          <span className="truncate">Section</span>
         </span>
       }
       tools={
@@ -753,28 +746,20 @@ function SectionCard({
               ))}
             </ul>
           )}
-          <div className="mt-3 flex flex-wrap items-center gap-1.5">
-            <span className="tag tag-neutral">{s.tab}</span>
-            {extras.map((x) => (
-              <span key={x} className="tag tag-neutral">
-                {x}
-              </span>
-            ))}
-          </div>
+          {extras.length > 0 && (
+            <div className="mt-3 flex flex-wrap items-center gap-1.5">
+              {extras.map((x) => (
+                <span key={x} className="tag tag-neutral">
+                  {x}
+                </span>
+              ))}
+            </div>
+          )}
           <LinkList links={s.links} />
         </>
       }
     >
       <div className="flex flex-col gap-4">
-        {/* The section title comes first: it is the group this entry files
-            under — a tab on the page, a heading on the resume. */}
-        <div className="field">
-          <label htmlFor={`tab-${s.id}`}>Section title</label>
-          <TabField id={`tab-${s.id}`} value={s.tab} options={tabOptions} onChange={(tab) => onChange((x) => ({ ...x, tab }))} />
-          <p className="m-0 mt-1.5 text-[12px] text-muted">
-            Groups this entry — a tab on your page, a heading on your resume. Pick one you already use, or name a new one.
-          </p>
-        </div>
         <div className="field">
           <label htmlFor={`title-${s.id}`}>Title</label>
           <input
@@ -785,6 +770,9 @@ function SectionCard({
             value={s.title}
             onChange={(e) => onChange((x) => ({ ...x, title: e.target.value }))}
           />
+          <p className="m-0 mt-1.5 text-[12px] text-muted">
+            The section’s name: its heading on your page and its place on the page’s menu.
+          </p>
         </div>
         <div className="field">
           <label htmlFor={`desc-${s.id}`}>Description</label>

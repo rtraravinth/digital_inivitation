@@ -31,7 +31,7 @@ import {
   tabs,
   useTabFilter,
 } from "../shared";
-import { FeatureBand, FooterBody, footerHeadline, footerNote, splitFeatures } from "../components";
+import { FeatureBand, FooterBody, footerHeadline, footerNote, runsOf, splitFeatures } from "../components";
 
 /* ── Meridian ─────────────────────────────────────────────────────────────
    For the people a visitor has to trust before anything else: a doctor, an
@@ -52,7 +52,10 @@ const WORK_PAD: Record<Density, string> = {
 };
 
 export function Meridian({ p }: { p: Portfolio }) {
-  const { tab, setTab, shown, nav, chapters, gated } = useTabFilter(p);
+  const { tab, setTab, shown, nav, gated } = useTabFilter(p);
+  // "One long page": runs of cards and the bands after them, no headings —
+  // each section carries its own title.
+  const runs = nav === "scroll" ? runsOf(p, "meridian") : [];
   const numbers = allNumbers(p);
   const dates = allDates(p);
   const contactId = `meridian-${p.id}-contact`;
@@ -133,17 +136,18 @@ export function Meridian({ p }: { p: Portfolio }) {
           >
             {nav === "scroll" ? (
               <div className="flex flex-col gap-20">
-                {chapters.map((c, ci) => (
-                  <div key={c.tab}>
-                    <ChapterHead index={ci} title={c.tab} count={c.sections.length} />
-                    <div className={`grid gap-5 ${gridCols(p)}`}>
-                      {splitFeatures(c.sections).cards.map((s, i) => (
-                        <Reveal key={s.id} kind="flip" delay={Math.min(i, 6) * 70}>
-                          <Entry p={p} section={s} />
-                        </Reveal>
-                      ))}
-                    </div>
-                    <Bands p={p} sections={splitFeatures(c.sections).features} afterCards={splitFeatures(c.sections).cards.length > 0} />
+                {runs.map((run) => (
+                  <div key={run.id}>
+                    {run.cards.length > 0 && (
+                      <div className={`grid gap-5 ${gridCols(p)}`}>
+                        {run.cards.map((s, i) => (
+                          <Reveal key={s.id} kind="flip" delay={Math.min(i, 6) * 70}>
+                            <Entry p={p} section={s} />
+                          </Reveal>
+                        ))}
+                      </div>
+                    )}
+                    <Bands p={p} sections={run.features} afterCards={run.cards.length > 0} />
                   </div>
                 ))}
               </div>
@@ -454,9 +458,6 @@ function Entry({ p, section }: { p: Portfolio; section: Section }) {
         </div>
       )}
       <div className="flex min-w-0 flex-col items-start gap-3">
-        <span className="mono-label" style={{ color: "var(--color-mark)" }}>
-          {section.tab}
-        </span>
         <SectionTitleLink
           p={p}
           section={section}

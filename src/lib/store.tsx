@@ -2,7 +2,7 @@
 
 import { useSyncExternalStore } from "react";
 import { ApiError, api, messageFor } from "./api";
-import { normalize, type Portfolio, type Resume, type Section } from "./types";
+import { normalize, tabOf, type Portfolio, type Resume, type Section } from "./types";
 
 export function newId(): string {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
@@ -307,7 +307,8 @@ function sectionPayload(section: Section) {
   return {
     title: section.title,
     description: section.description,
-    tab: section.tab,
+    // Not a field of its own any more: the menu label is the title.
+    tab: tabOf(section),
     links: section.links,
     quote: section.quote,
     hidden: section.hidden,

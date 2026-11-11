@@ -20,6 +20,7 @@ import {
   type Section,
   assetSrc,
   coverOf,
+  tabOf,
   pageAddress,
   pagePath,
   previewPath,
@@ -323,8 +324,8 @@ export function tabs(p: Portfolio): string[] {
   const seen: string[] = [];
   for (const s of p.sections) {
     if (s.hidden) continue;
-    const tab = s.tab.trim();
-    if (tab && !seen.includes(tab)) seen.push(tab);
+    const tab = tabOf(s);
+    if (!seen.includes(tab)) seen.push(tab);
   }
   return seen;
 }
@@ -339,7 +340,7 @@ export function tabs(p: Portfolio): string[] {
 export function chaptersOf(p: Portfolio): Array<{ tab: string; sections: Section[] }> {
   const all = visibleSections(p);
   return tabs(p)
-    .map((tab) => ({ tab, sections: all.filter((s) => s.tab === tab) }))
+    .map((tab) => ({ tab, sections: all.filter((s) => tabOf(s) === tab) }))
     .filter((c) => c.sections.length > 0);
 }
 
@@ -523,15 +524,14 @@ export function Plate({
 }
 
 /**
- * The three fields under every plate: how it is filed, what it is, and who is
- * credited for it.
+ * The two fields under every plate: what it is, and who is credited for it.
  *
- * Every field is read off the section the author actually filled in — the tab
- * it files under, the medium it carries, and the attribution on its quote.
+ * Both are read off the section the author actually filled in — the medium
+ * it carries, and the attribution on its quote.
  * None of them is invented, and an absent one shows as an em dash rather than
  * collapsing the line, so two plates' captions stay comparable down a column.
  */
-export function captionCredit(section: Section): [string, string, string] {
+export function captionCredit(section: Section): [string, string] {
   const medium = coverOf(section)
     ? "Reproduction"
     : section.file
@@ -539,7 +539,9 @@ export function captionCredit(section: Section): [string, string, string] {
       : section.quote?.text
         ? "Quotation"
         : "Text";
-  return [section.tab.trim() || "—", medium, section.quote?.attribution?.trim() || "—"];
+  // There was a third, first: the tab the section filed under. A section is
+  // filed under nothing but its own title now, which the plate already shows.
+  return [medium, section.quote?.attribution?.trim() || "—"];
 }
 
 /** The caption block: plate number, title, credit line, then the description. */
@@ -563,7 +565,7 @@ export function PlateCaption({
   titleOnPlate?: boolean;
   children?: React.ReactNode;
 }) {
-  const [filed, medium, credit] = captionCredit(section);
+  const [medium, credit] = captionCredit(section);
   return (
     <figcaption className="caption flex flex-col gap-2">
       <div className="flex items-baseline gap-3">
@@ -585,7 +587,7 @@ export function PlateCaption({
         )}
       </div>
       <div className="caption-credit">
-        {filed} · {medium} · {credit}
+        {medium} · {credit}
       </div>
       {section.description && (
         <p className="whitespace-pre-line m-0 text-[14px] leading-[1.55] text-muted">{section.description}</p>
@@ -716,7 +718,7 @@ export function useTabFilter(p: Portfolio) {
   // A tab the page no longer has — the last section under it was deleted or
   // hidden — falls back rather than showing an empty page.
   const tab = picked && options.includes(picked) ? picked : (options[0] ?? "");
-  const shown = tab ? all.filter((s) => s.tab === tab) : all;
+  const shown = tab ? all.filter((s) => tabOf(s) === tab) : all;
 
   const setTab = (next: string) => {
     setPicked(next);
@@ -767,7 +769,7 @@ export function LensGate({
           last row would otherwise show the divider colour as empty blocks. */}
       <div className="grid sm:grid-cols-2">
         {options.map((t, i) => {
-          const count = visibleSections(p).filter((s) => s.tab === t).length;
+          const count = visibleSections(p).filter((s) => tabOf(s) === t).length;
           return (
             <button
               key={t}
@@ -791,9 +793,8 @@ export function LensGate({
                   {t}
                 </span>
               </span>
-              <span className="caption-credit">
-                {count} {count === 1 ? "plate" : "plates"}
-              </span>
+              {/* Only worth a line when two sections share a name. */}
+              {count > 1 && <span className="caption-credit">{count} plates</span>}
             </button>
           );
         })}
@@ -880,7 +881,7 @@ export function Tabs({
         // The count is the one number the row earns beyond the plate number:
         // it says how much sits behind a tab before the visitor spends a tap
         // finding out.
-        const count = counts.filter((x) => x.tab === t).length;
+        const count = counts.filter((x) => tabOf(x) === t).length;
         return (
           <button
             key={t}
@@ -899,9 +900,12 @@ export function Tabs({
           >
             <span className="plate-no text-[12px] opacity-70">{no}</span>
             {t}
-            <span className="caption-credit" style={{ color: "inherit", opacity: 0.7 }}>
-              {count}
-            </span>
+            {/* One section, one name: a count only when two share it. */}
+            {count > 1 && (
+              <span className="caption-credit" style={{ color: "inherit", opacity: 0.7 }}>
+                {count}
+              </span>
+            )}
           </button>
         );
       })}

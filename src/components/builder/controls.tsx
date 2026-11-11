@@ -494,7 +494,7 @@ const IGNORED: Record<ThemeId, { nav?: string; grid?: string; density?: string }
     density: "Stage sets its own rhythm around the billboard and the rails.",
   },
   arcade: {
-    nav: "Arcade's tabs are its level-select menu.",
+    nav: "Arcade's sections are its level-select menu.",
     density: "Arcade sets its own spacing around the horizon.",
   },
   journey: {
@@ -528,7 +528,7 @@ export function LayoutControl({ p, onChange }: { p: Portfolio; onChange: Recipe 
   return (
     <>
       <h3 className="m-0 mb-1 text-[14px] tracking-[-0.01em]">Tab navigation</h3>
-      <p className="m-0 mb-3 text-[12.5px] text-muted">How visitors move between your tabs.</p>
+      <p className="m-0 mb-3 text-[12.5px] text-muted">How visitors move between your sections.</p>
       {ignored.nav && <IgnoredNote reason={ignored.nav} />}
       <div className={`mb-5 flex flex-col gap-2.5 ${ignored.nav ? "opacity-50" : ""}`}>
         {ROLE_NAVS.map((n) => (

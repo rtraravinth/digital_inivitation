@@ -644,30 +644,32 @@ export function contactItems(p: Portfolio): ContactItem[] {
 
 export type ProjectItem = { id: string; title: string; tab: string; description: string; url: string };
 
+/** What the resume calls the page's own sections. */
+export const PROJECTS_HEADING = "Projects";
+
 /**
- * The page's own sections switched on for the resume, grouped under their
- * section titles (the tab) in the order those first appear — so "Operating"
- * and "Writing" print as headings of their own rather than one "Projects".
+ * The page's own sections switched on for the resume, as entries under one
+ * heading. Still a list of groups, because that is the shape the sheet
+ * draws; there is one group now that a section is filed under nothing but
+ * its own title.
  */
 export function sectionGroups(p: Portfolio): Array<{ tab: string; items: ProjectItem[] }> {
-  const groups = new Map<string, ProjectItem[]>();
+  const items: ProjectItem[] = [];
   for (const s of p.sections) {
     if (!s.onResume || !(s.title.trim() || s.description.trim())) continue;
     // A section that only holds a resume list is that list's place on the
-    // page. The resume prints the list itself; its bare title would be a
-    // second heading with nothing under it.
+    // page. The resume prints the list itself; its bare title would be an
+    // entry with nothing under it.
     if (!s.description.trim() && s.links.length === 0 && s.blocks.some(isListBlock)) continue;
-    const tab = s.tab.trim() || "Work";
-    if (!groups.has(tab)) groups.set(tab, []);
-    groups.get(tab)!.push({
+    items.push({
       id: s.id,
       title: s.title.trim(),
-      tab,
+      tab: PROJECTS_HEADING,
       description: s.description.trim(),
       url: s.links[0]?.url ?? "",
     });
   }
-  return [...groups].map(([tab, items]) => ({ tab, items }));
+  return items.length > 0 ? [{ tab: PROJECTS_HEADING, items }] : [];
 }
 
 /** The header is the resume's top: no second copy to keep in step. */

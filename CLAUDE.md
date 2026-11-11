@@ -3,7 +3,8 @@
 # FACET
 
 A multi-role portfolio builder. One page per portfolio: a header, then N
-sections, each with the same four fields — title, description, tab, links.
+sections, each with the same fields — title, description, cover, links —
+and any components under them.
 Built from a Claude Design canvas (`Portfolio Page.dc.html`), which now runs
 to five turns. Every artboard in it is implemented; the map from artboard to
 code is under "Layout" below.
@@ -184,8 +185,8 @@ would beat a base rule, so the size has to be inline — that is why `headline()
 returns a style object rather than a class.
 
 **One kind of thing in the editor: a section, and under its heading,
-components.** A section is a section title (its tab), a title, a
-description, links and **one cover picture**; everything else it shows is a
+components.** A section is a title, a description, links and **one cover
+picture**; everything else it shows is a
 component, edited in the one frame `PanelShell` (`editor/components.tsx`)
 inside the one `Card` (`editor/card.tsx`). Do not add a second card or panel
 chrome — that inconsistency is what this replaced.
@@ -217,15 +218,32 @@ chrome — that inconsistency is what this replaced.
   contact details"). It is deliberately *not* a component: it never leaves
   the account, and the page has its own Contact component.
 
-**Every section files under exactly one tab, and the tab is required.** The
-tab row on a published page is `tabs(p)` in `published/themes.tsx` — every
-distinct tab its visible sections use, in section order, uncapped, because a
-tab is the only route to the sections under it. There is no "All work" tab
-and no "everything" state: one tab is always open, the first until the
-visitor picks another. The editor's `TabField` offers the page's existing
-tabs before letting you name a new one, so "Advisory" typed twice cannot
-become two tabs. The backend refuses a blank tab (`SectionPatch.tab`), and a
-new section starts on the page's first tab, or `Work` on an empty page.
+**A section is one thing with one title; there is no tab to file it
+under.** The tab used to be a second name that grouped several sections
+under one menu item. A section holds components now, so what belongs
+together goes in one section, and the field is gone from the editor. Do not
+bring it back as "group" or "category".
+
+- **`tab` is still on the wire, and it is derived.** The API stores a
+  required `tab` per section (at most sixty characters), so `tabOf()` in
+  `types.ts` sends the title for it (`Untitled` when blank) and
+  `normalize()` overwrites whatever was stored. Nothing on the backend
+  changed and there is no migration. **Read `tabOf(section)`, never
+  `section.tab`**: the stored value lags the title while a save is on its
+  way, and the builder's canvas draws from that in-flight state.
+- **The page's menu is one item per section**, by title. `tabs(p)` in
+  `published/shared.tsx` is that list. Two sections with the same title
+  share an item, which is the only way a count above one can appear.
+- **There are no chapter headings.** Aurora, Journey, Stage and Meridian's
+  "one long page" draw `runsOf()` (`published/components.tsx`): a grid of
+  cards and then the bands after it, a new run starting where a card
+  follows a band, so the page reads in the author's order while each theme
+  keeps drawing "cards, then bands". Every card and band shows its own
+  title; `FeatureBand`'s is the `h2`. `menuOf()` scrolls to a band itself
+  and to the run a card sits in. Meridian's tabs and Arcade's levels still
+  filter with `useTabFilter` — one section per pick.
+- **On the resume the sections are entries under one heading**,
+  `PROJECTS_HEADING` in `lib/resume.ts`.
 
 **`p.layout.roleNav` keeps its name, not its wording.** It is the wire
 format, a stored value and in tests, so it is still `roleNav`; every label it
@@ -276,8 +294,8 @@ separately.
   is in `resume.hidden` ("Print on your resume" in the component's panel).
   A section is on the page unless `hidden` and on the resume while
   `onResume` (a column, `sections.on_resume`). On the resume, sections print
-  grouped under their **Section title** via `sectionGroups()`, which skips a
-  section that is only a list's place on the page — the resume prints the
+  as entries under one "Projects" heading via `sectionGroups()`, which skips
+  a section that is only a list's place on the page — the resume prints the
   list itself.
 - **Lists reach the page as components, not as sections.** `listEntries()`
   in `lib/resume.ts` hands any of the six lists over in one shape (title,

@@ -13,7 +13,6 @@ import {
   ThemeControl,
   TypeControl,
 } from "./controls";
-import { tabs } from "../published/themes";
 import { PublishedLock } from "../PublishedLock";
 import { ResumeStudio } from "../resume/ResumeStudio";
 import { ICON, Icon, IconButton, Segmented, StatusPill } from "../ui";
@@ -364,14 +363,12 @@ function Chip({ children }: { children: React.ReactNode }) {
 function SectionRail({ p }: { p: Portfolio }) {
   const { addSection, moveSection, toggleSectionHidden } = usePortfolios();
   const reduced = useReducedMotion();
-  const pageTabs = tabs(p);
-
   return (
     <div className="flex flex-col">
       <div className="flex items-baseline px-4 pt-4 pb-2">
         <h2 className="m-0 text-[14px] tracking-[-0.01em]">Sections</h2>
         <span className="ml-auto font-mono text-[11px]" style={{ color: "var(--color-neutral-600)" }}>
-          {p.sections.length} · {pageTabs.length} {pageTabs.length === 1 ? "tab" : "tabs"}
+          {p.sections.length}
         </span>
       </div>
 
@@ -390,10 +387,7 @@ function SectionRail({ p }: { p: Portfolio }) {
               </span>
               <span className="flex min-w-0 flex-1 flex-col">
                 <span className="truncate text-[13px] font-medium">{s.title || "Untitled section"}</span>
-                <span className="truncate text-[11.5px] text-muted">
-                  {s.tab}
-                  {s.hidden && " · hidden"}
-                </span>
+                {s.hidden && <span className="truncate text-[11.5px] text-muted">Off the page</span>}
               </span>
               {/* The row's actions float over its right edge when the row is
                   pointed at or tabbed into, so a long title gets the whole row
@@ -440,19 +434,6 @@ function SectionRail({ p }: { p: Portfolio }) {
         </Link>
       </div>
 
-      <div className="mx-3 mb-4 rounded-xl p-3" style={{ background: "var(--color-surface)" }}>
-        <span className="text-[12.5px] font-medium">Tabs on this page</span>
-        <div className="mt-2 flex flex-wrap gap-1.5">
-          {pageTabs.map((t, i) => (
-            <span key={t} className={`tag ${i === 0 ? "tag-accent" : "tag-neutral"}`}>
-              {t}
-            </span>
-          ))}
-          {pageTabs.length === 0 && (
-            <span className="text-[12px] text-muted">Add a section and its tab becomes one a visitor can move along.</span>
-          )}
-        </div>
-      </div>
     </div>
   );
 }

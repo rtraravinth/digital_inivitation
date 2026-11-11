@@ -75,6 +75,54 @@ export function isFeature(section: Section): boolean {
   return shownBlocks(section).length > 0;
 }
 
+/**
+ * The page as runs: each one a grid of cards and then the bands that follow
+ * them, in the author's order. A run ends where a card comes after a band —
+ * so every theme can keep drawing "cards, then bands" and the page still
+ * reads top to bottom the way its sections are listed.
+ *
+ * There are no chapters. A section is one thing with one title and files
+ * under nothing else, so a run carries no heading: each card and each band
+ * shows its own.
+ */
+export type Run = { id: string; sections: Section[]; cards: Section[]; features: Section[] };
+
+export function runsOf(p: Portfolio, prefix: string): Run[] {
+  const runs: Run[] = [];
+  for (const s of p.sections) {
+    if (s.hidden) continue;
+    const feature = isFeature(s);
+    const last = runs[runs.length - 1];
+    const run = last && !(last.features.length > 0 && !feature) ? last : undefined;
+    if (run) {
+      run.sections.push(s);
+      (feature ? run.features : run.cards).push(s);
+    } else {
+      runs.push({ id: `${prefix}-${p.id}-${runs.length}`, sections: [s], cards: feature ? [] : [s], features: feature ? [s] : [] });
+    }
+  }
+  return runs;
+}
+
+/** Where a band sits on the page, for the menu to scroll to. */
+export function bandAnchor(section: Section): string {
+  return `section-${section.id}`;
+}
+
+/**
+ * The page's menu: one item per section, by its title. A band is scrolled
+ * to itself; a card to the run of cards it sits in, since they share a row.
+ */
+export function menuOf(runs: Run[]): Array<{ key: string; label: string; target: string }> {
+  return runs.flatMap((run) =>
+    run.sections.map((s) => ({
+      key: s.id,
+      label: s.title.trim() || "Untitled",
+      target: run.features.includes(s) ? bandAnchor(s) : run.id,
+    })),
+  );
+}
+
 /** Cards first, then bands, each keeping the author's order. */
 export function splitFeatures(sections: Section[]): { cards: Section[]; features: Section[] } {
   return {
@@ -101,12 +149,14 @@ export function FeatureBand({
   const media = cover !== null;
 
   return (
-    <article className={`fc-band ${className}`} style={style} aria-labelledby={`band-${section.id}`}>
+    <article id={bandAnchor(section)} className={`fc-band scroll-mt-20 ${className}`} style={style} aria-labelledby={`band-${section.id}`}>
       <div className={`grid grid-cols-1 gap-8 md:gap-12 ${media ? "lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:items-start" : ""}`}>
         <div className="flex min-w-0 flex-col items-start gap-4">
-          <h3 id={`band-${section.id}`} className="m-0" style={{ ...headline("clamp(28px, 3.4vw, 44px)"), lineHeight: 1.05 }}>
+          {/* The section's own title is the heading under the page's name:
+              there is no chapter heading above it any more. */}
+          <h2 id={`band-${section.id}`} className="m-0" style={{ ...headline("clamp(30px, 4vw, 52px)"), lineHeight: 1.03 }}>
             <SectionTitleLink p={p} section={section} className="font-heading fc-title-link" />
-          </h3>
+          </h2>
           {section.description && (
             <p className="text-muted m-0 max-w-[60ch] text-[16.5px] leading-[1.7] whitespace-pre-line">{section.description}</p>
           )}
@@ -191,9 +241,9 @@ export function ComponentView({ p, section, block }: { p: Portfolio; section: Se
   return (
     <section className="min-w-0" aria-label={block.title || undefined}>
       {block.title && (
-        <h4 className="m-0 mb-6 md:mb-8" style={{ ...headline("clamp(22px, 2.4vw, 30px)"), lineHeight: 1.1 }}>
+        <h3 className="m-0 mb-6 md:mb-8" style={{ ...headline("clamp(22px, 2.4vw, 30px)"), lineHeight: 1.1 }}>
           {block.title}
-        </h4>
+        </h3>
       )}
       {renderBlock(p, section, block)}
     </section>
@@ -588,7 +638,7 @@ function FaqView({ block }: { block: FaqBlock }) {
         const on = open === f.id;
         return (
           <li key={f.id} style={{ borderBottom: "1px solid var(--color-divider)" }}>
-            <h5 className="m-0">
+            <h4 className="m-0">
               <button
                 type="button"
                 id={`${base}-q-${i}`}
@@ -606,7 +656,7 @@ function FaqView({ block }: { block: FaqBlock }) {
                   <UiIcon id="plus" size={14} />
                 </span>
               </button>
-            </h5>
+            </h4>
             <AnimatePresence initial={false}>
               {on && (
                 <motion.div

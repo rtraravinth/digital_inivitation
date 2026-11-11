@@ -25,11 +25,10 @@ import {
   UiIcon,
   allDates,
   allNumbers,
-  chaptersOf,
   gridCols,
   headline,
 } from "../shared";
-import { FeatureBand, FooterBody, footerHeadline, footerNote, splitFeatures } from "../components";
+import { FeatureBand, FooterBody, footerHeadline, footerNote, menuOf, runsOf } from "../components";
 
 /* ── Aurora ───────────────────────────────────────────────────────────────
    A dark page lit from behind. Its one piece of depth is glass: the work
@@ -58,7 +57,10 @@ const ORBIT: Array<{ style: CSSProperties; z: number }> = [
 ];
 
 export function Aurora({ p }: { p: Portfolio }) {
-  const chapters = chaptersOf(p).map((c, i) => ({ ...c, id: `aurora-${p.id}-${i}` }));
+  // Runs, not chapters: a grid of cards and the bands after it, with no
+  // heading over them — each section carries its own title.
+  const runs = runsOf(p, "aurora");
+  const menu = menuOf(runs);
   const numbers = allNumbers(p);
   const dates = allDates(p);
   const contactId = `aurora-${p.id}-contact`;
@@ -119,15 +121,15 @@ export function Aurora({ p }: { p: Portfolio }) {
           <span className="font-heading truncate text-[16px]">{p.header.name}</span>
         </span>
         <div className="fx-rail ml-auto flex min-w-0 gap-1 overflow-x-auto">
-          {chapters.map((c) => (
+          {menu.map((m) => (
             <a
-              key={c.id}
-              href={`#${c.id}`}
-              onClick={(e) => jumpTo(e, c.id)}
+              key={m.key}
+              href={`#${m.target}`}
+              onClick={(e) => jumpTo(e, m.target)}
               className="flex min-h-[40px] flex-none items-center rounded-full px-3.5 text-[14px] no-underline transition-colors hover:bg-[color-mix(in_srgb,var(--color-ink)_8%,transparent)]"
               style={{ color: "var(--color-ink)" }}
             >
-              {c.tab}
+              {m.label}
             </a>
           ))}
           <a
@@ -165,53 +167,35 @@ export function Aurora({ p }: { p: Portfolio }) {
         </section>
       )}
 
-      {chapters.map((c, ci) => (
+      {runs.map((run) => (
         <section
-          key={c.id}
-          id={c.id}
+          key={run.id}
+          id={run.id}
           className={`relative scroll-mt-20 px-5 md:px-10 ${CHAPTER_PAD[p.layout.density]}`}
         >
-          <div className="mx-auto max-w-[1200px]">
-            <div className="mb-10 flex flex-wrap items-end justify-between gap-4 md:mb-14">
-              <div>
-                <Reveal kind="left" className="mono-label mb-3 flex items-center gap-3">
-                  <span
-                    className="h-px w-8"
-                    style={{ background: "var(--color-mark)" }}
-                  />
-                  <span style={{ color: "var(--color-mark)" }}>{nn(ci)}</span>
-                  <span>
-                    {c.sections.length} {c.sections.length === 1 ? "entry" : "entries"}
-                  </span>
-                </Reveal>
-                <Words
-                  as="h2"
-                  text={c.tab}
-                  className="m-0"
-                  style={{ ...headline("clamp(36px, 5.4vw, 72px)"), lineHeight: 0.98 }}
-                />
+          <div className="mx-auto flex max-w-[1200px] flex-col gap-5">
+            {run.cards.length > 0 && (
+              <div className={`grid gap-4 md:gap-5 ${gridCols(p)}`}>
+                {run.cards.map((s, i, cards) => {
+                  // The run's first entry runs across two columns when it
+                  // has a picture to carry it and there is a second entry to
+                  // sit beside — a lone wide card is just a wide card.
+                  const wide = i === 0 && !!coverOf(s) && p.layout.grid > 1 && cards.length > 1;
+                  return (
+                    <Reveal
+                      key={s.id}
+                      kind="tilt"
+                      delay={Math.min(i, 6) * 80}
+                      className={wide ? "sm:col-span-2" : ""}
+                    >
+                      <Card p={p} section={s} index={i} wide={wide} />
+                    </Reveal>
+                  );
+                })}
               </div>
-            </div>
-            <div className={`grid gap-4 md:gap-5 ${gridCols(p)}`}>
-              {splitFeatures(c.sections).cards.map((s, i, cards) => {
-                // The chapter's first entry runs across two columns when it
-                // has a picture to carry it and there is a second entry to
-                // sit beside — a lone wide card is just a wide card.
-                const wide = i === 0 && !!coverOf(s) && p.layout.grid > 1 && cards.length > 1;
-                return (
-                  <Reveal
-                    key={s.id}
-                    kind="tilt"
-                    delay={Math.min(i, 6) * 80}
-                    className={wide ? "sm:col-span-2" : ""}
-                  >
-                    <Card p={p} section={s} index={i} wide={wide} />
-                  </Reveal>
-                );
-              })}
-            </div>
-            {splitFeatures(c.sections).features.map((s) => (
-              <Reveal key={s.id} kind="up" className="mt-5">
+            )}
+            {run.features.map((s) => (
+              <Reveal key={s.id} kind="up">
                 <FeatureBand p={p} section={s} className="fx-glass rounded-[28px] p-6 md:p-12" />
               </Reveal>
             ))}

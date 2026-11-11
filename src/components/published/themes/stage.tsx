@@ -26,11 +26,10 @@ import {
   UiIcon,
   allDates,
   allNumbers,
-  chaptersOf,
   headline,
   visibleSections,
 } from "../shared";
-import { FeatureBand, FooterBody, footerHeadline, footerNote, splitFeatures } from "../components";
+import { FeatureBand, FooterBody, footerHeadline, footerNote, menuOf, runsOf, type Run } from "../components";
 
 /* ── Stage ────────────────────────────────────────────────────────────────
    For people who perform. The portrait is a billboard that fills the first
@@ -43,7 +42,10 @@ import { FeatureBand, FooterBody, footerHeadline, footerNote, splitFeatures } fr
    ──────────────────────────────────────────────────────────────────────── */
 
 export function Stage({ p }: { p: Portfolio }) {
-  const chapters = chaptersOf(p).map((c, i) => ({ ...c, id: `stage-${p.id}-${i}` }));
+  // Runs, not chapters: a rail of posters and the bands after it, with no
+  // heading over them — each section carries its own title.
+  const runs = runsOf(p, "stage");
+  const menu = menuOf(runs);
   const all = visibleSections(p);
   const numbers = allNumbers(p);
   const dates = allDates(p);
@@ -66,21 +68,21 @@ export function Stage({ p }: { p: Portfolio }) {
           {p.header.name}
         </span>
         <div className="fx-rail ml-auto flex min-w-0 gap-5 overflow-x-auto">
-          {chapters.map((c) => (
+          {menu.map((m) => (
             <a
-              key={c.id}
-              href={`#${c.id}`}
-              onClick={(e) => jumpTo(e, c.id, 64)}
+              key={m.key}
+              href={`#${m.target}`}
+              onClick={(e) => jumpTo(e, m.target, 64)}
               className="flex min-h-[40px] flex-none items-center text-[14px] no-underline opacity-75 transition-opacity hover:opacity-100"
               style={{ color: "var(--color-ink)" }}
             >
-              {c.tab}
+              {m.label}
             </a>
           ))}
         </div>
       </nav>
 
-      <Billboard p={p} firstRail={chapters[0]?.id} />
+      <Billboard p={p} firstRail={runs[0]?.id} />
 
       {p.header.tags.length > 0 && (
         <div
@@ -113,8 +115,8 @@ export function Stage({ p }: { p: Portfolio }) {
         </section>
       )}
 
-      {chapters.map((c) => (
-        <Rail key={c.id} p={p} id={c.id} title={c.tab} sections={c.sections} all={all} />
+      {runs.map((run) => (
+        <Rail key={run.id} p={p} run={run} all={all} />
       ))}
 
       {dates.length > 0 && (
@@ -257,22 +259,10 @@ function Billboard({ p, firstRail }: { p: Portfolio; firstRail?: string }) {
   );
 }
 
-function Rail({
-  p,
-  id,
-  title,
-  sections,
-  all,
-}: {
-  p: Portfolio;
-  id: string;
-  title: string;
-  sections: Section[];
-  all: Section[];
-}) {
+function Rail({ p, run, all }: { p: Portfolio; run: Run; all: Section[] }) {
+  const { id, cards, features } = run;
   const trackId = `${id}-track`;
   // Posters for the plain entries; a feature runs as a band under the rail.
-  const { cards, features } = splitFeatures(sections);
 
   // Steps the rail by most of its own width, inside its own document, and
   // never the page: the rail is the only thing that scrolls sideways.
@@ -290,32 +280,29 @@ function Rail({
 
   return (
     <section id={id} className="scroll-mt-16 py-10 md:py-14">
-      <div className="mb-6 flex items-end gap-4 px-5 md:px-12">
-        <Words as="h2" text={title} className="m-0" style={{ ...headline("clamp(30px, 4vw, 52px)"), lineHeight: 1 }} />
-        <span className="text-muted mb-1.5 text-[13px]">{sections.length}</span>
-        {cards.length > 1 && (
-          <div className="ml-auto hidden gap-2 md:flex">
-            <button
-              type="button"
-              className="btn btn-secondary btn-icon"
-              aria-label={`Scroll ${title} back`}
-              onClick={(e) => step(e, -1)}
-              style={{ marginTop: 0 }}
-            >
-              <UiIcon id="back" size={16} />
-            </button>
-            <button
-              type="button"
-              className="btn btn-secondary btn-icon"
-              aria-label={`Scroll ${title} forward`}
-              onClick={(e) => step(e, 1)}
-              style={{ marginTop: 0 }}
-            >
-              <UiIcon id="chevron" size={16} />
-            </button>
-          </div>
-        )}
-      </div>
+      {/* No heading over the row: every poster carries its own title. */}
+      {cards.length > 1 && (
+        <div className="mb-4 hidden justify-end gap-2 px-12 md:flex">
+          <button
+            type="button"
+            className="btn btn-secondary btn-icon"
+            aria-label="Scroll the row back"
+            onClick={(e) => step(e, -1)}
+            style={{ marginTop: 0 }}
+          >
+            <UiIcon id="back" size={16} />
+          </button>
+          <button
+            type="button"
+            className="btn btn-secondary btn-icon"
+            aria-label="Scroll the row forward"
+            onClick={(e) => step(e, 1)}
+            style={{ marginTop: 0 }}
+          >
+            <UiIcon id="chevron" size={16} />
+          </button>
+        </div>
+      )}
       {cards.length > 0 && (
       <div
         id={trackId}
@@ -335,7 +322,7 @@ function Rail({
       </div>
       )}
       {features.map((s) => (
-        <Reveal key={s.id} kind="up" className="px-5 pt-8 md:px-12 md:pt-12">
+        <Reveal key={s.id} kind="up" className={`px-5 md:px-12 ${cards.length > 0 || features[0] !== s ? "pt-8 md:pt-12" : ""}`}>
           <FeatureBand p={p} section={s} className="fc-card p-6 md:p-12" />
         </Reveal>
       ))}
@@ -380,7 +367,7 @@ function Poster({ p, section, number }: { p: Portfolio; section: Section; number
           />
           <div className="absolute inset-x-0 bottom-0 flex flex-col gap-1.5 p-5" style={{ color: "#fff" }}>
             <span className="text-[11px] tracking-[0.18em] uppercase opacity-80">
-              {nn(number)} · {section.tab}
+              {nn(number)}
             </span>
             <SectionTitleLink
               p={p}

@@ -272,8 +272,7 @@ function Block({
       break;
 
     case "projects":
-      // The page's own sections, each section title a heading of its own —
-      // "Operating", "Writing" — where the page would show them as tabs.
+      // The page's own sections, as entries under one heading.
       return (
         <>
           {sectionGroups(p).map((g) => (
@@ -285,7 +284,7 @@ function Block({
                     <div key={s.id} className="r-entry">
                       <div className="r-what">
                         <div className="r-entry-head">
-                          <h3 className="r-title">{s.title || s.tab}</h3>
+                          <h3 className="r-title">{s.title}</h3>
                           {s.url && (
                             <a className="r-meta" href={hrefFor(s.url)}>
                               {bareUrl(s.url)}

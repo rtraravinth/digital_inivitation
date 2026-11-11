@@ -2,7 +2,7 @@
 
 import { motion, useTransform } from "motion/react";
 import { useCallback } from "react";
-import type { Portfolio, Section } from "@/lib/types";
+import { coverOf, type Portfolio, type Section } from "@/lib/types";
 import {
   CountUp,
   Marquee,
@@ -354,8 +354,8 @@ function Poster({ p, section, number }: { p: Portfolio; section: Section; number
             boxShadow: "0 30px 60px -30px color-mix(in srgb, #000 80%, transparent)",
           }}
         >
-          {section.images[0] ? (
-            <Photo asset={section.images[0]} className="absolute inset-0 h-full w-full object-cover" />
+          {coverOf(section) ? (
+            <Photo asset={coverOf(section)!} className="absolute inset-0 h-full w-full object-cover" />
           ) : (
             <div
               aria-hidden

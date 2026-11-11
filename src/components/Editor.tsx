@@ -9,8 +9,9 @@ import { PublishedLock } from "./PublishedLock";
 import { TabField } from "./TabField";
 import { TagEditor } from "./TagEditor";
 import { ResumeBlockCard, ResumeContactCard } from "./resume/ResumeContent";
-import { COMPONENT_ICON, ComponentPanel, ComponentPicker, PicturesField, componentName, componentSummary, newComponent } from "./editor/components";
-import { ICON, Icon, IconButton, LookToggles, StatusPill, TiltPanel } from "./ui";
+import { Card, Placeholder } from "./editor/card";
+import { COMPONENT_ICON, ComponentChip, ComponentPanel, ComponentPicker, CoverField, componentName, componentSummary, newComponent } from "./editor/components";
+import { ICON, Icon, IconButton, LookToggles, StatusPill } from "./ui";
 import { Glyph } from "@/lib/glyphs";
 import { LinkIcon, iconFor } from "@/lib/icons";
 import { BLOCK_LABEL, blockHasContent, resumePrintPath } from "@/lib/resume";
@@ -18,6 +19,7 @@ import { usePortfolios } from "@/lib/store";
 import {
   PAGE_BLOCKS,
   assetSrc,
+  coverOf,
   previewPath,
   type LinkItem,
   type Portfolio,
@@ -28,12 +30,16 @@ import {
 } from "@/lib/types";
 
 /* ── the editor ───────────────────────────────────────────────────────────
-   One content list for both looks. The header (the top of the page and of
-   the resume), the resume-only contact details, the structured blocks —
-   Experience, Education, Skills and the rest — and then the page's own
-   sections. Every card carries Page and Resume switches, so nothing is
-   typed twice and each piece shows where its author says. An outline
-   beside them on a desk jumps to any card. Every change saves as you type.
+   One content list for both looks, and one kind of thing in it: a section.
+   A section is a heading and its components, and every one is the same
+   card — closed it reads like the page, open it is a form with a Done.
+
+   The header, then the built-in sections (Contact details, Experience,
+   Education, Skills and the rest — each holds the one component the resume
+   prints, stored as structured facts), then the author's own sections,
+   which take any components, then the footer. Every card carries Page and
+   Resume switches, so nothing is typed twice. An outline beside them on a
+   desk jumps to any card. Every change saves as you type.
    ──────────────────────────────────────────────────────────────────────── */
 
 const HEADER = "header";
@@ -224,7 +230,7 @@ export function Editor({ id }: { id: string }) {
               </motion.p>
             </div>
             <span className="ml-auto font-mono text-[12px]" style={{ color: "var(--color-neutral-600)" }}>
-              1 header · {blocks.length} blocks · {p.sections.length} {p.sections.length === 1 ? "section" : "sections"}
+              1 header · {blocks.length + 1} built-in · {p.sections.length} of your own
               {hidden > 0 && ` · ${hidden} off the page`}
             </span>
           </div>
@@ -243,7 +249,14 @@ export function Editor({ id }: { id: string }) {
                   sub="Header"
                   onPick={() => setOpen(HEADER)}
                 />
-                <OutlineItem on={open === "r-contact"} number="—" title="Contact details" sub="Resume only" onPick={() => setOpen("r-contact")} />
+                <OutlineItem
+                  on={open === "r-contact"}
+                  number="—"
+                  title="Contact details"
+                  sub={p.resume.email || p.resume.phone ? "Resume only" : "Empty"}
+                  dim={!(p.resume.email || p.resume.phone)}
+                  onPick={() => setOpen("r-contact")}
+                />
                 {blocks.map((b) => (
                   <OutlineItem
                     key={b}
@@ -292,15 +305,29 @@ export function Editor({ id }: { id: string }) {
                 onChange={setHeader}
               />
 
-              <ResumeContactCard p={p} />
+              <div className="mt-4 flex flex-wrap items-baseline gap-x-3 gap-y-1 px-1">
+                <h2 className="m-0 text-[16px] tracking-[-0.01em]">Built-in sections</h2>
+                <span className="text-[12.5px] text-muted">
+                  The facts a resume is read for. Each holds one component, kept as a list so your resume can print it.
+                </span>
+              </div>
+
+              <ResumeContactCard p={p} open={open === "r-contact"} onOpen={() => setOpen("r-contact")} onClose={() => setOpen(null)} />
               {blocks.map((b) => (
-                <ResumeBlockCard key={b} p={p} block={b} />
+                <ResumeBlockCard
+                  key={b}
+                  p={p}
+                  block={b}
+                  open={open === `r-${b}`}
+                  onOpen={() => setOpen(`r-${b}`)}
+                  onClose={() => setOpen(null)}
+                />
               ))}
 
-              <div className="mt-4 flex items-baseline gap-3 px-1">
+              <div className="mt-4 flex flex-wrap items-baseline gap-x-3 gap-y-1 px-1">
                 <h2 className="m-0 text-[16px] tracking-[-0.01em]">Your sections</h2>
                 <span className="text-[12.5px] text-muted">
-                  Anything else — a project, a cause, a role told your way. Each files under a section title.
+                  Anything else — a project, a cause, a role told your way. A heading, a cover, and any components under it.
                 </span>
               </div>
 
@@ -443,73 +470,6 @@ function OutlineItem({
       </button>
     </li>
   );
-}
-
-/* ── cards ────────────────────────────────────────────────────────────── */
-
-/**
- * A card that reads like the page until it is opened, then holds the form.
- * Closed, the whole card is one big button; open, it is a form with a Done.
- */
-function Card({
-  id,
-  open,
-  onOpen,
-  label,
-  tools,
-  preview,
-  children,
-  dim,
-}: {
-  id: string;
-  open: boolean;
-  onOpen: () => void;
-  label: React.ReactNode;
-  tools?: React.ReactNode;
-  preview: React.ReactNode;
-  children: React.ReactNode;
-  dim?: boolean;
-}) {
-  return (
-    <TiltPanel
-      max={open ? 0 : 2.5}
-      lift={open ? 0 : 3}
-      className="scroll-mt-20 rounded-2xl"
-      style={open ? { border: "1.5px solid var(--color-ink)" } : undefined}
-    >
-      <div id={`card-${id}`} className="scroll-mt-20" />
-      <div className="flex items-center gap-2 px-5 pt-4 sm:px-6">
-        <span className="min-w-0 flex-1 text-[12px] font-medium" style={{ color: "var(--color-neutral-600)" }}>
-          {label}
-        </span>
-        {tools}
-      </div>
-      {open ? (
-        <div className="relative px-5 pt-3 pb-5 sm:px-6">{children}</div>
-      ) : (
-        <button
-          type="button"
-          onClick={onOpen}
-          aria-label="Edit"
-          className="relative block w-full cursor-pointer px-5 pt-2 pb-5 text-left sm:px-6"
-          style={{ opacity: dim ? 0.55 : 1 }}
-        >
-          {preview}
-          <span
-            className="mt-3 inline-flex items-center gap-1.5 text-[12.5px] font-medium"
-            style={{ color: "var(--color-neutral-700)" }}
-          >
-            <Icon d={ICON.pencil} size={12} />
-            Click to edit
-          </span>
-        </button>
-      )}
-    </TiltPanel>
-  );
-}
-
-function Placeholder({ children }: { children: React.ReactNode }) {
-  return <span style={{ color: "var(--color-neutral-500)" }}>{children}</span>;
 }
 
 function LinkList({ links }: { links: LinkItem[] }) {
@@ -694,16 +654,7 @@ function SectionCard({
 }) {
   const [confirming, setConfirming] = useState(false);
   const extras = [s.file && "File", s.quote?.text && "Quote"].filter(Boolean) as string[];
-  const setBlocks = (recipe: (b: Section["blocks"]) => Section["blocks"]) => onChange((x) => ({ ...x, blocks: recipe(x.blocks) }));
-  const moveBlock = (from: number, delta: -1 | 1) =>
-    setBlocks((list) => {
-      const to = from + delta;
-      if (to < 0 || to >= list.length) return list;
-      const next = [...list];
-      const [moved] = next.splice(from, 1);
-      next.splice(to, 0, moved);
-      return next;
-    });
+  const cover = coverOf(s);
 
   return (
     <Card
@@ -739,46 +690,31 @@ function SectionCard({
       }
       preview={
         <>
-          <div className="text-[19px] leading-snug font-semibold tracking-[-0.015em]">
-            {s.title || <Placeholder>Title</Placeholder>}
-          </div>
-          <p className="m-0 mt-1.5 line-clamp-3 max-w-[64ch] text-[14px] leading-relaxed text-muted">
-            {s.description || <Placeholder>What it is, in a few sentences</Placeholder>}
-          </p>
-          {s.images.length > 0 && (
-            <div className="mt-3 flex gap-2">
-              {s.images.slice(0, 5).map((img, i) => (
-                // An API URL — nothing for next/image to optimise.
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  key={img.id ?? i}
-                  src={assetSrc(img)}
-                  alt=""
-                  className="h-14 w-[4.6rem] flex-none rounded-lg object-cover"
-                  style={{ boxShadow: "inset 0 0 0 1px var(--color-divider)" }}
-                />
-              ))}
-              {s.images.length > 5 && (
-                <span
-                  className="grid h-14 w-14 flex-none place-items-center rounded-lg text-[12.5px] font-medium"
-                  style={{ background: "var(--color-neutral-100)" }}
-                >
-                  +{s.images.length - 5}
-                </span>
-              )}
+          <div className="flex items-start gap-4">
+            {cover && (
+              // An API URL — nothing for next/image to optimise.
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={assetSrc(cover)}
+                alt=""
+                className="h-16 w-[5.3rem] flex-none rounded-lg object-cover"
+                style={{ boxShadow: "inset 0 0 0 1px var(--color-divider)" }}
+              />
+            )}
+            <div className="min-w-0">
+              <div className="text-[19px] leading-snug font-semibold tracking-[-0.015em]">
+                {s.title || <Placeholder>Title</Placeholder>}
+              </div>
+              <p className="m-0 mt-1.5 line-clamp-3 max-w-[64ch] text-[14px] leading-relaxed text-muted">
+                {s.description || <Placeholder>What it is, in a few sentences</Placeholder>}
+              </p>
             </div>
-          )}
+          </div>
           {s.blocks.length > 0 && (
             <ul className="m-0 mt-3 flex list-none flex-wrap gap-1.5 p-0">
               {s.blocks.map((b) => (
-                <li
-                  key={b.id}
-                  className="inline-flex items-center gap-1.5 rounded-full py-1 pr-3 pl-2 text-[12.5px]"
-                  style={{ boxShadow: "inset 0 0 0 1px var(--color-divider)" }}
-                >
-                  <Icon d={COMPONENT_ICON[b.type]} size={13} />
-                  <span className="font-medium">{componentName(b.type)}</span>
-                  <span className="text-muted">{componentSummary(b)}</span>
+                <li key={b.id} className="inline-flex">
+                  <ComponentChip icon={COMPONENT_ICON[b.type]} name={componentName(b.type)} summary={componentSummary(b)} />
                 </li>
               ))}
             </ul>
@@ -829,8 +765,8 @@ function SectionCard({
         </div>
       </div>
 
-      <Grouped title="Pictures" hint="The first is the cover. Pick several at once.">
-        <PicturesField images={s.images} onChange={(recipe) => onChange((x) => ({ ...x, images: recipe(x.images) }))} />
+      <Grouped title="Cover picture" hint="One picture the page leads this section with. For a set of pictures, add a Gallery component below.">
+        <CoverField section={s} onChange={onChange} />
       </Grouped>
 
       <Grouped title="Links">
@@ -839,7 +775,7 @@ function SectionCard({
 
       <Grouped
         title="Components"
-        hint="Shown under this section on your page, in this order. The resume prints the title, description and links only."
+        hint="Everything else this section shows on your page, in this order. The resume prints the title, description and links only."
       >
         {s.blocks.length > 0 && (
           <div className="flex flex-col gap-3">
@@ -853,20 +789,13 @@ function SectionCard({
                   exit={{ opacity: 0, scale: 0.98, transition: { duration: 0.15 } }}
                   transition={{ duration: 0.4, ease: EASE }}
                 >
-                  <ComponentPanel
-                    block={b}
-                    first={i === 0}
-                    last={i === s.blocks.length - 1}
-                    onChange={(next) => setBlocks((list) => list.map((x) => (x.id === b.id ? next : x)))}
-                    onMove={(delta) => moveBlock(i, delta)}
-                    onRemove={() => setBlocks((list) => list.filter((x) => x.id !== b.id))}
-                  />
+                  <ComponentPanel block={b} section={s} first={i === 0} last={i === s.blocks.length - 1} onSection={onChange} />
                 </motion.div>
               ))}
             </AnimatePresence>
           </div>
         )}
-        <ComponentPicker count={s.blocks.length} onAdd={(type) => setBlocks((list) => [...list, newComponent(type)])} />
+        <ComponentPicker count={s.blocks.length} onAdd={(type) => onChange((x) => ({ ...x, blocks: [...x.blocks, newComponent(type)] }))} />
       </Grouped>
 
       {/* Draws its own rule and "Attach (optional)" label. */}

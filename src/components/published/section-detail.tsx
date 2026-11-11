@@ -2,8 +2,8 @@
 
 import { motion, useReducedMotion } from "motion/react";
 import Link from "next/link";
-import type { Portfolio, Section } from "@/lib/types";
-import { ComponentView, Gallery, shownBlocks } from "./components";
+import { coverOf, type Portfolio, type Section } from "@/lib/types";
+import { ComponentView, shownBlocks } from "./components";
 import {
   Media,
   SectionAside,
@@ -62,9 +62,9 @@ export function SectionDetail({ p, section }: { p: Portfolio; section: Section }
         <figure className="m-0">
           {/* No mount where there was never a plate: the caption below then
               sits on the board on its own, which is what a text entry is. */}
-          {section.images[0] ? (
+          {coverOf(section) ? (
             <Media
-              asset={section.images[0]}
+              asset={coverOf(section)!}
               className="aspect-[16/10] max-h-[620px] w-full"
               caption={`plate ${no}`}
               layoutId={`plate-${section.id}`}
@@ -121,8 +121,8 @@ export function SectionDetail({ p, section }: { p: Portfolio; section: Section }
                 {no}
               </span>
               <h1
-                className={section.images[0] ? "m-0 leading-[1.08]" : "sr-only"}
-                style={section.images[0] ? headline("clamp(28px, 5vw, 42px)") : undefined}
+                className={coverOf(section) ? "m-0 leading-[1.08]" : "sr-only"}
+                style={coverOf(section) ? headline("clamp(28px, 5vw, 42px)") : undefined}
               >
                 {section.title}
               </h1>
@@ -143,11 +143,10 @@ export function SectionDetail({ p, section }: { p: Portfolio; section: Section }
         </figure>
       </div>
 
-      {/* The rest of the pictures, then the section's components, at the
-          same measure as the caption above them. */}
-      {(section.images.length > 1 || shownBlocks(section).length > 0) && (
+      {/* The section's components, at the same measure as the caption
+          above them. */}
+      {shownBlocks(section).length > 0 && (
         <div className="mx-auto flex w-full max-w-[860px] flex-col gap-14 px-5 pb-14 md:px-8">
-          {section.images.length > 1 && <Gallery images={section.images.slice(1)} title={section.title} />}
           {shownBlocks(section).map((b) => (
             <ComponentView key={b.id} p={p} section={section} block={b} />
           ))}

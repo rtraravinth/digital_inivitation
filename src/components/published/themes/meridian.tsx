@@ -1,7 +1,7 @@
 "use client";
 
 import { AnimatePresence, motion, useTransform } from "motion/react";
-import type { Density, Portfolio, Section } from "@/lib/types";
+import { coverOf, type Density, type Portfolio, type Section } from "@/lib/types";
 import {
   CountUp,
   Photo,
@@ -440,7 +440,7 @@ function Entry({ p, section }: { p: Portfolio; section: Section }) {
   return (
     <article
       className={`flex h-full flex-col gap-5 rounded-[22px] p-5 md:p-6 ${
-        section.images[0] ? "sm:grid sm:grid-cols-[180px_minmax(0,1fr)] sm:items-start" : ""
+        coverOf(section) ? "sm:grid sm:grid-cols-[180px_minmax(0,1fr)] sm:items-start" : ""
       }`}
       style={{
         background: "color-mix(in srgb, var(--color-ink) 3%, var(--color-bg))",
@@ -448,9 +448,9 @@ function Entry({ p, section }: { p: Portfolio; section: Section }) {
         boxShadow: "0 1px 2px color-mix(in srgb, #000 6%, transparent)",
       }}
     >
-      {section.images[0] && (
+      {coverOf(section) && (
         <div className="aspect-[4/3] overflow-hidden rounded-[14px] sm:aspect-square">
-          <Photo asset={section.images[0]} className="h-full w-full object-cover" />
+          <Photo asset={coverOf(section)!} className="h-full w-full object-cover" />
         </div>
       )}
       <div className="flex min-w-0 flex-col items-start gap-3">

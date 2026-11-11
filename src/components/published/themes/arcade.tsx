@@ -2,7 +2,7 @@
 
 import { AnimatePresence, motion } from "motion/react";
 import type { CSSProperties } from "react";
-import type { Portfolio, Section } from "@/lib/types";
+import { coverOf, type Portfolio, type Section } from "@/lib/types";
 import {
   CountUp,
   Photo,
@@ -416,9 +416,9 @@ function Card({ p, section }: { p: Portfolio; section: Section }) {
           className="arcade-cut flex h-full flex-col overflow-hidden"
           style={{ background: "color-mix(in srgb, var(--color-ink) 4%, var(--color-bg))" }}
         >
-          {section.images[0] && (
+          {coverOf(section) && (
             <div className="relative aspect-[16/9] overflow-hidden">
-              <Photo asset={section.images[0]} className="h-full w-full object-cover" />
+              <Photo asset={coverOf(section)!} className="h-full w-full object-cover" />
               <div aria-hidden className="arcade-scanlines absolute inset-0" />
             </div>
           )}

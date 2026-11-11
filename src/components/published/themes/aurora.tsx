@@ -2,7 +2,7 @@
 
 import { motion, useTransform } from "motion/react";
 import type { CSSProperties } from "react";
-import type { Density, Portfolio, Section } from "@/lib/types";
+import { coverOf, type Density, type Portfolio, type Section } from "@/lib/types";
 import {
   CountUp,
   Photo,
@@ -197,7 +197,7 @@ export function Aurora({ p }: { p: Portfolio }) {
                 // The chapter's first entry runs across two columns when it
                 // has a picture to carry it and there is a second entry to
                 // sit beside — a lone wide card is just a wide card.
-                const wide = i === 0 && !!s.images[0] && p.layout.grid > 1 && cards.length > 1;
+                const wide = i === 0 && !!coverOf(s) && p.layout.grid > 1 && cards.length > 1;
                 return (
                   <Reveal
                     key={s.id}
@@ -375,8 +375,8 @@ function Card({
         }`}
       >
         <div className={`relative overflow-hidden ${wide ? "aspect-[16/10] md:aspect-auto md:min-h-[320px]" : "aspect-[16/10]"}`}>
-          {section.images[0] ? (
-            <Photo asset={section.images[0]} className="absolute inset-0 h-full w-full object-cover" />
+          {coverOf(section) ? (
+            <Photo asset={coverOf(section)!} className="absolute inset-0 h-full w-full object-cover" />
           ) : (
             <div
               aria-hidden

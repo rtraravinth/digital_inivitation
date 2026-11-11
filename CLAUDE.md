@@ -28,7 +28,7 @@ because the connection never arrives. Pass flags through when you need them:
 ```
 npm run build
 npm run lint
-cd backend && .venv/bin/python -m pytest    # 330 tests (.venv/Scripts on Windows)
+cd backend && .venv/bin/python -m pytest    # 334 tests (.venv/Scripts on Windows)
 ```
 
 `NEXT_PUBLIC_API_URL` points the frontend at the API; see
@@ -160,6 +160,30 @@ display heading multiplies its own size through `headline()`, and the heading
 rule in `globals.css` reads `--tracking`. A Tailwind `text-[64px]` utility
 would beat a base rule, so the size has to be inline — that is why `headline()`
 returns a style object rather than a class.
+
+**One kind of thing in the editor: a section, and under its heading,
+components.** A section is a section title (its tab), a title, a
+description, links and **one cover picture**; everything else it shows is a
+component, edited in the one frame `PanelShell` (`editor/components.tsx`)
+inside the one `Card` (`editor/card.tsx`). Do not add a second card or panel
+chrome — that inconsistency is what this replaced.
+
+- **A gallery is a component, and it names pictures rather than holding
+  them.** `GalleryBlock` is `{layout, imageIds}`; the bytes stay in
+  `section.images` (`section_images` rows), so every upload reference is
+  still a foreign key. The cover is the one picture no gallery names. Read
+  pictures through `coverOf()` and `galleryImages()` in `types.ts`, never
+  `images[0]`. Removing a gallery removes its pictures from the section;
+  the cover and all galleries share the twelve-picture allowance.
+  `sectionOf()` in `normalize()` gives pictures stored before this (cover
+  first, the rest loose) a gallery with a derived id — no migration.
+- **The resume's lists are built-in sections.** Contact details, Experience,
+  Education, Skills, Certifications, Languages and Awards are drawn as the
+  same card holding exactly one component of their own kind
+  (`resume/ResumeContent.tsx`). They are still stored in `p.resume`, not in
+  a section's `blocks` — see "The resume" for why — so a built-in section
+  cannot take other components and its component cannot move to another
+  section. Changing that is a storage change, not an editor one.
 
 **Every section files under exactly one tab, and the tab is required.** The
 tab row on a published page is `tabs(p)` in `published/themes.tsx` — every
@@ -585,7 +609,7 @@ claim to be the live page.
 - **Slugs are global.** Two accounts cannot both hold `rohan`, because the
   address is `facet.page/<slug>` with nothing in front of it. The create
   dialog surfaces the 409 as a message.
-- **The frontend has no test runner.** The backend has 330 pytest tests;
+- **The frontend has no test runner.** The backend has 334 pytest tests;
   changes here are checked with `npm run lint`, `npm run build` and by
   actually opening the app.
 

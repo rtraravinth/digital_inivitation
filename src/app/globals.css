@@ -1047,6 +1047,15 @@
     transform: scale(1.025);
   }
 
+  /* A gallery laid out as a strip scrolls inside its own box. The pixel of
+     padding keeps each frame's hairline from being clipped by the scroller. */
+  .fc-strip {
+    padding: 1px 1px 0.5rem;
+    scrollbar-width: thin;
+    scrollbar-color: var(--fc-line) transparent;
+    overscroll-behavior-x: contain;
+  }
+
   /* Timeline: a hairline rail with a dot per milestone. */
   .fc-timeline-item {
     position: relative;

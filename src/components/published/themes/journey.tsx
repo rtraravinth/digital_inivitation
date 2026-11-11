@@ -1,7 +1,7 @@
 "use client";
 
 import { motion, useTransform, type MotionValue } from "motion/react";
-import type { Density, Portfolio, Section } from "@/lib/types";
+import { coverOf, type Density, type Portfolio, type Section } from "@/lib/types";
 import {
   CountUp,
   Photo,
@@ -360,9 +360,9 @@ function StackCard({
           <SectionLinks p={p} section={section} />
         </div>
         <div className="relative min-h-[220px] p-3 md:p-4">
-          {section.images[0] ? (
+          {coverOf(section) ? (
             <div className="h-full overflow-hidden rounded-[22px]">
-              <Photo asset={section.images[0]} className="h-full min-h-[220px] w-full object-cover" />
+              <Photo asset={coverOf(section)!} className="h-full min-h-[220px] w-full object-cover" />
             </div>
           ) : (
             <div

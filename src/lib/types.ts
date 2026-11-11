@@ -43,10 +43,12 @@ export function assetSrc(asset: Asset | null | undefined): string | undefined {
 export type Quote = { text: string; attribution: string };
 
 /* ── components ───────────────────────────────────────────────────────────
-   What a section can carry under its title, description, links and
-   pictures: the shapes a visitor recognises from public portfolio pages.
-   Mirrors app/schemas/blocks.py. None of them holds an upload — a
-   testimonial shows initials and a client is a wordmark — so every upload
+   A section is a heading — section title, title, description, links, one
+   cover picture — and everything under that is a component: the shapes a
+   visitor recognises from public portfolio pages. Mirrors
+   app/schemas/blocks.py. None of them holds an upload: a testimonial shows
+   initials, a client is a wordmark, and a gallery only *names* pictures the
+   section already holds (`imageIds` into `section.images`), so every upload
    reference stays a section picture, a file or the portrait.
    ──────────────────────────────────────────────────────────────────────── */
 
@@ -79,7 +81,22 @@ export type ContactBlock = BlockBase & {
   form: boolean;
 };
 
+/** How a gallery lays its pictures out. */
+export type GalleryLayout = "mosaic" | "grid" | "strip";
+export const GALLERY_LAYOUTS: Array<{ id: GalleryLayout; name: string; desc: string }> = [
+  { id: "mosaic", name: "Mosaic", desc: "The first picture large, the rest in rows under it." },
+  { id: "grid", name: "Grid", desc: "Every picture the same size." },
+  { id: "strip", name: "Strip", desc: "One row a visitor swipes along." },
+];
+/**
+ * A set of the section's pictures, in the gallery's own order. The bytes
+ * stay in `section.images`; this holds their ids. A section's cover is the
+ * one picture no gallery names — see `coverOf()`.
+ */
+export type GalleryBlock = BlockBase & { type: "gallery"; layout: GalleryLayout; imageIds: string[] };
+
 export type Block =
+  | GalleryBlock
   | TimelineBlock
   | TestimonialsBlock
   | ClientsBlock
@@ -92,6 +109,7 @@ export type BlockType = Block["type"];
 
 /** Every component, in the order the "Add a component" menu offers them. */
 export const BLOCK_TYPES: Array<{ id: BlockType; name: string; desc: string }> = [
+  { id: "gallery", name: "Gallery", desc: "A set of pictures — as a mosaic, a grid or a strip." },
   { id: "timeline", name: "Timeline", desc: "Milestones in order — a career, a project, a year." },
   { id: "testimonials", name: "Testimonials", desc: "What clients and colleagues say about you." },
   { id: "clients", name: "Clients", desc: "A wall of the names you have worked with." },
@@ -110,6 +128,8 @@ export const SECTION_BLOCKS_MAX = 12;
 export function emptyBlock(type: BlockType, id: string, itemId: string): Block {
   const base = { id, title: "" };
   switch (type) {
+    case "gallery":
+      return { ...base, type, layout: "mosaic", imageIds: [] };
     case "timeline":
       return { ...base, type, items: [{ id: itemId, date: "", title: "", text: "" }] };
     case "testimonials":
@@ -132,6 +152,7 @@ export function emptyBlock(type: BlockType, id: string, itemId: string): Block {
 /** Whether a component has anything a visitor would see. Empty ones stay in
  *  the editor and off the page, the same as an empty section field. */
 export function componentHasContent(b: Block): boolean {
+  if (b.type === "gallery") return b.imageIds.length > 0;
   if (b.type === "contact") return Boolean(b.email || b.phone || b.location || b.ctaUrl || b.text);
   const items = b.items as Array<Record<string, string>>;
   return items.some((item) => Object.entries(item).some(([k, v]) => k !== "id" && typeof v === "string" && v.trim()));
@@ -169,9 +190,9 @@ export const DEFAULT_TAB = "Work";
 export const TAB_MAX_LENGTH = 60;
 
 /**
- * Every section is the same fields — title, description, tab, links and its
- * pictures — so there is nothing to learn twice. Components and the rest
- * below that are opt-in.
+ * Every section is the same fields — title, description, tab, links and a
+ * cover picture — so there is nothing to learn twice. Components and the
+ * rest below that are opt-in.
  *
  * `tab` is the exception: a visitor reaches a section through its tab and
  * nowhere else, so it is required and never blank. One tab per section, and
@@ -186,7 +207,8 @@ export type Section = {
   description: string;
   tab: string;
   links: LinkItem[];
-  /** In order; the first is the cover a theme leads with. */
+  /** Every picture the section holds: its cover and its galleries'. Read
+   *  them through `coverOf()` and `galleryImages()`, never by index. */
   images: Asset[];
   file: Asset | null;
   quote: Quote | null;
@@ -198,6 +220,24 @@ export type Section = {
    *  `hidden`: a section can be on the page, the resume, or both. */
   onResume: boolean;
 };
+
+/** The ids a section's galleries have claimed. */
+function galleryIds(section: Pick<Section, "blocks">): Set<string> {
+  return new Set((section.blocks ?? []).flatMap((b) => (b.type === "gallery" ? b.imageIds : [])));
+}
+
+/** The picture a theme leads a section with: the first one no gallery names. */
+export function coverOf(section: Pick<Section, "images" | "blocks">): Asset | null {
+  const claimed = galleryIds(section);
+  return (section.images ?? []).find((a) => !a.id || !claimed.has(a.id)) ?? null;
+}
+
+/** A gallery's pictures, in its order. An id the section no longer holds
+ *  draws nothing rather than a broken frame. */
+export function galleryImages(section: Pick<Section, "images">, block: GalleryBlock): Asset[] {
+  const byId = new Map((section.images ?? []).flatMap((a) => (a.id ? [[a.id, a] as const] : [])));
+  return block.imageIds.flatMap((id) => byId.get(id) ?? []);
+}
 
 /**
  * The header is a section with two extra lines: who you are, and what you're
@@ -761,14 +801,22 @@ export function normalize(p: Portfolio): Portfolio {
 }
 
 /** One section from any build: a single `image` from before pictures were a
- *  list becomes the first picture. */
+ *  list becomes the cover, and pictures stored before galleries were a
+ *  component — when everything after the first was "the gallery" — get the
+ *  gallery that says so. Its id is derived, so reading twice agrees. */
 function sectionOf(raw: Section & { image?: Asset | null }): Section {
   const { image, ...s } = raw;
+  const images = s.images ?? (image ? [image] : []);
+  let blocks = (s.blocks ?? []).map((b) => (b.type === "gallery" ? { ...b, layout: b.layout ?? "mosaic", imageIds: b.imageIds ?? [] } : b));
+  const loose = images.slice(1).flatMap((a) => (a.id ? [a.id] : []));
+  if (loose.length > 0 && blocks.length < SECTION_BLOCKS_MAX && !blocks.some((b) => b.type === "gallery")) {
+    blocks = [{ id: `gallery-${s.id}`, type: "gallery", title: "", layout: "mosaic", imageIds: loose }, ...blocks];
+  }
   return {
       ...emptySection(s.id),
       ...s,
-      images: s.images ?? (image ? [image] : []),
-      blocks: s.blocks ?? [],
+      images,
+      blocks,
       links: s.links ?? [],
       // A section written before tabs existed carries none. It would be
       // unreachable with a blank one, so it lands on the default.

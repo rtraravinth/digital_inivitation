@@ -157,10 +157,51 @@ async def test_every_component_type_is_accepted(auth_client, portfolio):
          "items": [{"id": "1", "title": "Audit", "text": "Two weeks.", "price": "From ₹40,000"}]},
         {"id": "h", "type": "faq", "items": [{"id": "1", "question": "Remote?", "answer": "Yes."}]},
         CONTACT,
+        {"id": "i", "type": "gallery", "title": "", "layout": "grid", "imageIds": []},
     ]
     response = await auth_client.patch(section_path(portfolio), json={"blocks": blocks})
     assert response.status_code == 200, response.text
-    assert len(response.json()["blocks"]) == 8
+    assert len(response.json()["blocks"]) == 9
+
+
+async def test_a_gallery_names_the_sections_pictures(auth_client, portfolio):
+    """The pictures stay the section's rows; the gallery holds their order."""
+    cover, one, two = [await upload(auth_client, (n, n, n)) for n in (1, 2, 3)]
+    gallery = {"id": "g", "type": "gallery", "title": "On site", "layout": "strip", "imageIds": [two, one]}
+    response = await auth_client.patch(
+        section_path(portfolio),
+        json={"imageAssetIds": [cover, one, two], "blocks": [gallery]},
+    )
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert [image["id"] for image in body["images"]] == [cover, one, two]
+    assert body["blocks"] == [gallery]
+
+
+async def test_a_gallery_defaults_to_a_mosaic(auth_client, portfolio):
+    response = await auth_client.patch(
+        section_path(portfolio), json={"blocks": [{"id": "g", "type": "gallery"}]}
+    )
+    assert response.status_code == 200, response.text
+    assert response.json()["blocks"][0] == {
+        "id": "g", "type": "gallery", "title": "", "layout": "mosaic", "imageIds": []
+    }
+
+
+async def test_an_unknown_gallery_layout_is_refused(auth_client, portfolio):
+    response = await auth_client.patch(
+        section_path(portfolio),
+        json={"blocks": [{"id": "g", "type": "gallery", "layout": "carousel", "imageIds": []}]},
+    )
+    assert response.status_code == 422
+
+
+async def test_a_gallery_holds_no_more_pictures_than_a_section(auth_client, portfolio):
+    response = await auth_client.patch(
+        section_path(portfolio),
+        json={"blocks": [{"id": "g", "type": "gallery", "imageIds": [str(n) for n in range(13)]}]},
+    )
+    assert response.status_code == 422
 
 
 async def test_an_unknown_component_type_is_refused(auth_client, portfolio):

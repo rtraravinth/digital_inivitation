@@ -6,11 +6,13 @@ import { LinkIcon, iconFor } from "@/lib/icons";
 import {
   assetSrc,
   componentHasContent,
-  type Asset,
+  coverOf,
+  galleryImages,
   type Block,
   type ClientsBlock,
   type ContactBlock,
   type FaqBlock,
+  type GalleryBlock,
   type Portfolio,
   type Section,
   type ServicesBlock,
@@ -40,9 +42,9 @@ import {
    timeline is a calm ruled list on Meridian and a neon one on Arcade without
    either theme learning what a timeline is.
 
-   A section with components or a set of pictures is a *feature*: it leaves
-   the theme's grid of cards and runs full width as a band after them, where
-   a gallery and a timeline have room. Plain sections stay cards.
+   A section with components is a *feature*: it leaves the theme's grid of
+   cards and runs full width as a band after them, where a gallery and a
+   timeline have room. Plain sections — a heading and a cover — stay cards.
 
    Motion is the quiet kind: a lift on hover, a photograph easing 2% inside
    its frame, an indicator sliding between tabs, an answer opening. Nothing
@@ -53,7 +55,11 @@ const EASE = [0.16, 1, 0.3, 1] as const;
 
 /** The components a visitor would actually see. */
 export function shownBlocks(section: Section): Block[] {
-  return (section.blocks ?? []).filter(componentHasContent).filter((b) => b.type !== "contact" || isContactShown(b));
+  return (section.blocks ?? [])
+    .filter(componentHasContent)
+    .filter((b) => b.type !== "contact" || isContactShown(b))
+    // A gallery whose pictures the section no longer holds has nothing to show.
+    .filter((b) => b.type !== "gallery" || galleryImages(section, b).length > 0);
 }
 
 function isContactShown(b: ContactBlock) {
@@ -62,7 +68,7 @@ function isContactShown(b: ContactBlock) {
 
 /** A section that runs as a full-width band rather than a card. */
 export function isFeature(section: Section): boolean {
-  return shownBlocks(section).length > 0 || (section.images?.length ?? 0) >= 2;
+  return shownBlocks(section).length > 0;
 }
 
 /** Cards first, then bands, each keeping the author's order. */
@@ -87,8 +93,8 @@ export function FeatureBand({
   style?: CSSProperties;
 }) {
   const blocks = shownBlocks(section);
-  const images = section.images ?? [];
-  const media = images.length > 0;
+  const cover = coverOf(section);
+  const media = cover !== null;
 
   return (
     <article className={`fc-band ${className}`} style={style} aria-labelledby={`band-${section.id}`}>
@@ -103,7 +109,13 @@ export function FeatureBand({
           <SectionAside p={p} section={section} />
           <SectionLinks p={p} section={section} />
         </div>
-        {media && <Gallery images={images} title={section.title} />}
+        {cover && (
+          <figure className="fc-frame m-0 aspect-[16/10]">
+            {/* An API URL — nothing for next/image to optimise. */}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={assetSrc(cover)} alt={section.title} className="published-photo fc-photo h-full w-full object-cover" />
+          </figure>
+        )}
       </div>
 
       {blocks.length > 0 && (
@@ -117,48 +129,54 @@ export function FeatureBand({
   );
 }
 
-/* ── pictures ─────────────────────────────────────────────────────────── */
+/* ── gallery ──────────────────────────────────────────────────────────── */
 
 /**
- * The cover runs full width; the rest share rows below it, each row growing
- * to fill its width so a count that does not divide by three never leaves a
- * hole. No captions — the section says what it is.
+ * A set of the section's pictures, laid out the way its author chose. No
+ * captions — the section says what it is.
+ *
+ * Mosaic: the first runs full width and the rest share rows below it, each
+ * row growing to fill its width so a count that does not divide by three
+ * never leaves a hole. Grid: every picture the same. Strip: one row that
+ * scrolls inside its own box — the page itself never scrolls sideways.
  */
-export function Gallery({ images, title }: { images: Asset[]; title: string }) {
-  if (images.length === 0) return null;
-  if (images.length === 2) {
+function GalleryView({ section, block }: { section: Section; block: GalleryBlock }) {
+  const images = galleryImages(section, block);
+  const alt = block.title || section.title;
+  const frame = (asset: (typeof images)[number], i: number, className: string) => (
+    <figure key={asset.id ?? i} className={`fc-frame m-0 ${className}`}>
+      {/* API URLs — nothing for next/image to optimise. */}
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={assetSrc(asset)}
+        alt={i === 0 ? alt : ""}
+        loading={i === 0 ? undefined : "lazy"}
+        className="published-photo fc-photo h-full w-full object-cover"
+      />
+    </figure>
+  );
+  const tile = "aspect-[4/3] max-h-[26rem] min-w-0 grow basis-[calc(50%-0.5rem)] sm:basis-[calc(33.333%-0.75rem)]";
+
+  if (block.layout === "strip") {
     return (
-      <div className="grid grid-cols-2 gap-2 md:gap-3">
-        {images.map((asset, i) => (
-          <figure key={asset.id ?? i} className="fc-frame m-0 aspect-[4/5]">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={assetSrc(asset)} alt={i === 0 ? title : ""} className="published-photo fc-photo h-full w-full object-cover" />
-          </figure>
-        ))}
+      <div className="fc-strip flex snap-x gap-2 overflow-x-auto pb-2 md:gap-3" tabIndex={0} role="group" aria-label={`${alt} — pictures`}>
+        {images.map((asset, i) => frame(asset, i, "aspect-[4/3] w-[78%] flex-none snap-start sm:w-[46%] lg:w-[36%]"))}
       </div>
     );
   }
-  const [cover, ...rest] = images;
+  if (block.layout === "grid") {
+    return (
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:gap-3">{images.map((asset, i) => frame(asset, i, "aspect-square"))}</div>
+    );
+  }
+  if (images.length === 2) {
+    return <div className="grid grid-cols-2 gap-2 md:gap-3">{images.map((asset, i) => frame(asset, i, "aspect-[4/5]"))}</div>;
+  }
+  const [lead, ...rest] = images;
   return (
     <div className="flex flex-col gap-2 md:gap-3">
-      <figure className="fc-frame m-0 aspect-[16/10]">
-        {/* API URLs — nothing for next/image to optimise. */}
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={assetSrc(cover)} alt={title} className="published-photo fc-photo h-full w-full object-cover" />
-      </figure>
-      {rest.length > 0 && (
-        <div className="flex flex-wrap gap-2 md:gap-3">
-          {rest.map((asset, i) => (
-            <figure
-              key={asset.id ?? i}
-              className="fc-frame m-0 aspect-[4/3] min-w-0 grow basis-[calc(50%-0.5rem)] sm:basis-[calc(33.333%-0.75rem)]"
-            >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={assetSrc(asset)} alt="" loading="lazy" className="published-photo fc-photo h-full w-full object-cover" />
-            </figure>
-          ))}
-        </div>
-      )}
+      {frame(lead, 0, "aspect-[16/9]")}
+      {rest.length > 0 && <div className="flex flex-wrap gap-2 md:gap-3">{rest.map((asset, i) => frame(asset, i + 1, tile))}</div>}
     </div>
   );
 }
@@ -180,6 +198,8 @@ export function ComponentView({ p, section, block }: { p: Portfolio; section: Se
 
 function renderBlock(p: Portfolio, section: Section, b: Block) {
   switch (b.type) {
+    case "gallery":
+      return <GalleryView section={section} block={b} />;
     case "timeline":
       return <TimelineView block={b} />;
     case "testimonials":

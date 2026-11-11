@@ -11,8 +11,10 @@ than saving as a component that renders nothing. Mirrors ``Block`` in
 src/lib/types.ts.
 
 None of them references an upload. A testimonial shows initials, a client is
-a wordmark — that keeps every asset reference a foreign key, which is what
-asset release and the public asset route rely on.
+a wordmark, and a gallery only *names* pictures by id — the pictures
+themselves are the section's ``section_images`` rows, and an id the section
+does not hold draws nothing. That keeps every asset reference a foreign key,
+which is what asset release and the public asset route rely on.
 """
 
 from __future__ import annotations
@@ -21,7 +23,7 @@ from typing import Annotated, Literal
 
 from pydantic import Field
 
-from app.models.enums import BLOCK_ITEMS_MAX
+from app.models.enums import BLOCK_ITEMS_MAX, SECTION_IMAGES_MAX
 from app.schemas.common import StrictCamelModel
 
 _ID = Field(max_length=64)
@@ -82,6 +84,21 @@ class _Block(StrictCamelModel):
     title: str = _SHORT
 
 
+class GalleryBlock(_Block):
+    """A set of the section's pictures, in the gallery's own order.
+
+    ``image_ids`` are ids into the section's own images, never references of
+    their own: the page resolves them against ``section.images`` and skips
+    any it cannot find. The section's cover is the picture no gallery names.
+    """
+
+    type: Literal["gallery"]
+    layout: Literal["mosaic", "grid", "strip"] = "mosaic"
+    image_ids: list[Annotated[str, Field(max_length=64)]] = Field(
+        default_factory=list, max_length=SECTION_IMAGES_MAX
+    )
+
+
 class TimelineBlock(_Block):
     type: Literal["timeline"]
     items: list[TimelineItem] = Field(default_factory=list, max_length=BLOCK_ITEMS_MAX)
@@ -138,7 +155,8 @@ class ContactBlock(_Block):
 
 
 Block = Annotated[
-    TimelineBlock
+    GalleryBlock
+    | TimelineBlock
     | TestimonialsBlock
     | ClientsBlock
     | TabsBlock

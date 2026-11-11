@@ -19,6 +19,7 @@ import {
   type Portfolio,
   type Section,
   assetSrc,
+  coverOf,
   pageAddress,
   pagePath,
   previewPath,
@@ -531,7 +532,7 @@ export function Plate({
  * collapsing the line, so two plates' captions stay comparable down a column.
  */
 export function captionCredit(section: Section): [string, string, string] {
-  const medium = section.images?.[0]
+  const medium = coverOf(section)
     ? "Reproduction"
     : section.file
       ? "Document"

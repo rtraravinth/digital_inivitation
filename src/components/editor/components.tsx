@@ -8,29 +8,43 @@ import { readImageAsset } from "@/lib/assets";
 import { newId } from "@/lib/store";
 import {
   BLOCK_TYPES,
+  GALLERY_LAYOUTS,
   SECTION_BLOCKS_MAX,
   SECTION_IMAGES_MAX,
   assetSrc,
   componentHasContent,
+  coverOf,
   emptyBlock,
+  galleryImages,
   type Asset,
   type Block,
   type BlockType,
   type ContactBlock,
+  type GalleryBlock,
+  type PageBlock,
+  type Section,
 } from "@/lib/types";
 
 /* ── components in the editor ─────────────────────────────────────────────
-   A section's pictures and its components. Pictures are a row of tiles, the
-   first one the cover a theme leads with. Components are panels in a list
-   under the section's own fields, each with the rows its kind needs and
-   nothing else — a timeline asks for a date, a title and a line; a
-   testimonial for the words and who said them.
+   A section is a heading and a cover picture; everything under that is a
+   component, and every component is the same panel — `PanelShell`: a mark,
+   a name, what it holds, then the rows its kind needs and nothing else. A
+   timeline asks for a date, a title and a line; a gallery for pictures and
+   how to lay them out; the built-in Experience component for roles and
+   their dates (its rows live in resume/ResumeContent.tsx, its shell here).
    ──────────────────────────────────────────────────────────────────────── */
 
 const EASE = [0.16, 1, 0.3, 1] as const;
 
 /** One drawn mark per component, on the same 24px grid as the rest. */
 export const COMPONENT_ICON: Record<BlockType, React.ReactNode> = {
+  gallery: (
+    <>
+      <rect x="3.5" y="4.5" width="17" height="15" rx="1.5" />
+      <circle cx="9" cy="10" r="1.6" />
+      <path d="m4 17 5-4.5 3.5 3 3-2.5 5 4" />
+    </>
+  ),
   timeline: (
     <>
       <path d="M6 4v16" />
@@ -80,12 +94,58 @@ export const COMPONENT_ICON: Record<BlockType, React.ReactNode> = {
   ),
 };
 
+/** The built-in components: the lists a resume prints, and its contact line. */
+export const BUILT_IN_ICON: Record<PageBlock | "contact", React.ReactNode> = {
+  experience: (
+    <>
+      <rect x="3.5" y="7.5" width="17" height="12" rx="1.5" />
+      <path d="M9 7.5V5.5h6v2M3.5 13h17" />
+    </>
+  ),
+  education: (
+    <>
+      <path d="m2.5 9.5 9.5-4.5 9.5 4.5-9.5 4.5-9.5-4.5Z" />
+      <path d="M6.5 11.8V16c1.5 1.4 3.4 2 5.5 2s4-.6 5.5-2v-4.2" />
+    </>
+  ),
+  skills: (
+    <>
+      <path d="M4 7h9M17 7h3M4 12h3M11 12h9M4 17h11M19 17h1" />
+      <circle cx="15" cy="7" r="2" />
+      <circle cx="9" cy="12" r="2" />
+      <circle cx="17" cy="17" r="2" />
+    </>
+  ),
+  certifications: (
+    <>
+      <circle cx="12" cy="9.5" r="5.5" />
+      <path d="m8.8 14 -1.3 6 4.5-2.4 4.5 2.4-1.3-6" />
+    </>
+  ),
+  languages: (
+    <>
+      <circle cx="12" cy="12" r="8.5" />
+      <path d="M3.5 12h17M12 3.5c2.6 2.4 3.8 5.2 3.8 8.5s-1.2 6.1-3.8 8.5c-2.6-2.4-3.8-5.2-3.8-8.5s1.2-6.1 3.8-8.5Z" />
+    </>
+  ),
+  awards: (
+    <>
+      <path d="M8 4.5h8v5a4 4 0 0 1-8 0v-5ZM8 6.5H5c0 2.5 1.2 4 3.2 4.3M16 6.5h3c0 2.5-1.2 4-3.2 4.3M12 13.5V17M8.5 19.5h7" />
+    </>
+  ),
+  contact: COMPONENT_ICON.contact,
+};
+
 export function componentName(type: BlockType): string {
   return BLOCK_TYPES.find((t) => t.id === type)?.name ?? type;
 }
 
 /** "3 milestones", "Email, phone" — what a closed card says about one. */
 export function componentSummary(b: Block): string {
+  if (b.type === "gallery") {
+    const n = b.imageIds.length;
+    return n === 0 ? "Empty" : `${n} ${n === 1 ? "picture" : "pictures"}`;
+  }
   if (b.type === "contact") {
     const parts = [b.email && "email", b.phone && "phone", b.ctaUrl && "booking link", b.form && "form"].filter(Boolean);
     return parts.length ? parts.join(", ") : "Empty";
@@ -97,7 +157,7 @@ export function componentSummary(b: Block): string {
   return filled === 0 ? "Empty" : `${filled} ${filled === 1 ? noun[0] : noun[1]}`;
 }
 
-const ITEM_NOUN: Record<Exclude<BlockType, "contact">, [string, string]> = {
+const ITEM_NOUN: Record<Exclude<BlockType, "contact" | "gallery">, [string, string]> = {
   timeline: ["milestone", "milestones"],
   testimonials: ["testimonial", "testimonials"],
   clients: ["client", "clients"],
@@ -110,20 +170,120 @@ const ITEM_NOUN: Record<Exclude<BlockType, "contact">, [string, string]> = {
 /* ── pictures ─────────────────────────────────────────────────────────── */
 
 /**
- * The section's pictures as tiles. Several can be picked at once; each
- * uploads on its own, so one unreadable file does not lose the others.
+ * The section's one cover picture: what a theme leads the section with. A
+ * set of pictures is a Gallery component, further down.
  */
-export function PicturesField({
+export function CoverField({ section, onChange }: { section: Section; onChange: (recipe: (s: Section) => Section) => void }) {
+  const input = useRef<HTMLInputElement>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const cover = coverOf(section);
+  const full = !cover && section.images.length >= SECTION_IMAGES_MAX;
+
+  async function pick(file: File) {
+    setError("");
+    setBusy(true);
+    try {
+      const asset = await readImageAsset(file);
+      // The cover leads the list; whatever it replaces leaves with it.
+      onChange((s) => {
+        const old = coverOf(s);
+        const rest = s.images.filter((a) => a !== old && a.id !== asset.id);
+        return { ...s, images: [asset, ...rest] };
+      });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "That picture could not be read.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div>
+      <div className="flex flex-wrap items-center gap-4">
+        {cover ? (
+          // An API URL — nothing for next/image to optimise.
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={assetSrc(cover)}
+            alt={cover.name}
+            className="block aspect-[4/3] w-40 flex-none rounded-xl object-cover"
+            style={{ boxShadow: "inset 0 0 0 1px var(--color-divider)", background: "var(--color-surface)", opacity: busy ? 0.5 : 1 }}
+          />
+        ) : (
+          <button
+            type="button"
+            disabled={busy || full}
+            onClick={() => input.current?.click()}
+            className={`flex aspect-[4/3] w-40 flex-none cursor-pointer flex-col items-center justify-center gap-2 rounded-xl text-[13px] font-medium transition-colors hover:bg-[var(--color-neutral-100)] disabled:cursor-not-allowed disabled:opacity-50 ${busy ? "animate-pulse" : ""}`}
+            style={{ border: "1.5px dashed var(--color-neutral-400)", color: "var(--color-neutral-700)" }}
+          >
+            <Glyph id="plus" size={18} />
+            {busy ? "Uploading…" : "Add a cover"}
+          </button>
+        )}
+        {cover && (
+          <span className="flex flex-wrap gap-2">
+            <button type="button" className="btn btn-secondary" style={{ marginTop: 0 }} disabled={busy} onClick={() => input.current?.click()}>
+              {busy ? "Uploading…" : "Replace"}
+            </button>
+            <button
+              type="button"
+              className="btn btn-ghost"
+              style={{ marginTop: 0 }}
+              disabled={busy}
+              onClick={() => onChange((s) => ({ ...s, images: s.images.filter((a) => a !== coverOf(s)) }))}
+            >
+              Remove
+            </button>
+          </span>
+        )}
+      </div>
+      <input
+        ref={input}
+        type="file"
+        accept="image/*"
+        className="sr-only"
+        tabIndex={-1}
+        aria-hidden
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          if (file) void pick(file);
+          e.target.value = "";
+        }}
+      />
+      {full && (
+        <p className="m-0 mt-2 text-[12.5px] text-muted">
+          This section already holds {SECTION_IMAGES_MAX} pictures in its galleries. Remove one to add a cover.
+        </p>
+      )}
+      {error && (
+        <p className="m-0 mt-2 text-[12.5px]" style={{ color: "var(--color-accent-700)" }} role="alert">
+          {error}
+        </p>
+      )}
+    </div>
+  );
+}
+
+/**
+ * A gallery's pictures as tiles. Several can be picked at once; each
+ * uploads on its own, so one unreadable file does not lose the others.
+ * `room` is how many more the section can hold — the cover and every
+ * gallery share one allowance.
+ */
+function PicturesField({
   images,
+  room,
   onChange,
 }: {
   images: Asset[];
+  room: number;
   onChange: (recipe: (images: Asset[]) => Asset[]) => void;
 }) {
   const input = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(0);
   const [error, setError] = useState("");
-  const room = SECTION_IMAGES_MAX - images.length;
   const reduced = useReducedMotion();
 
   async function pick(files: FileList) {
@@ -135,7 +295,7 @@ export function PicturesField({
       chosen.map(async (file) => {
         try {
           const asset = await readImageAsset(file);
-          onChange((list) => (list.length >= SECTION_IMAGES_MAX ? list : [...list, asset]));
+          onChange((list) => [...list, asset]);
         } catch (err) {
           setError(err instanceof Error ? `${file.name}: ${err.message}` : `${file.name} could not be read.`);
         } finally {
@@ -172,14 +332,12 @@ export function PicturesField({
               {/* An API URL — nothing for next/image to optimise. */}
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={assetSrc(asset)} alt={asset.name} className="block aspect-[4/3] w-full object-cover" />
-              {i === 0 && (
-                <span
-                  className="absolute top-2 left-2 rounded-full px-2 py-0.5 text-[11px] font-semibold"
-                  style={{ background: "var(--color-ink)", color: "var(--color-bg)" }}
-                >
-                  Cover
-                </span>
-              )}
+              <span
+                className="absolute top-2 left-2 rounded-full px-2 py-0.5 font-mono text-[11px] font-semibold"
+                style={{ background: "var(--color-ink)", color: "var(--color-bg)" }}
+              >
+                {i + 1}
+              </span>
               <div
                 className="flex items-center justify-between gap-1 px-1.5 py-1"
                 style={{ borderTop: "1px solid var(--color-divider)", background: "var(--color-bg)" }}
@@ -251,7 +409,7 @@ export function PicturesField({
 
 /* ── the picker ───────────────────────────────────────────────────────── */
 
-/** "Add a component": a disclosure that opens a grid of the eight kinds. */
+/** "Add a component": a disclosure that opens a grid of every kind. */
 export function ComponentPicker({ count, onAdd }: { count: number; onAdd: (type: BlockType) => void }) {
   const [open, setOpen] = useState(false);
   const panel = useId();
@@ -331,7 +489,7 @@ export function newComponent(type: BlockType): Block {
 
 type Field = { key: string; label: string; placeholder: string; long?: boolean; narrow?: boolean };
 
-const FIELDS: Record<Exclude<BlockType, "contact">, { fields: Field[]; add: string }> = {
+const FIELDS: Record<Exclude<BlockType, "contact" | "gallery">, { fields: Field[]; add: string }> = {
   timeline: {
     add: "Add a milestone",
     fields: [
@@ -386,25 +544,25 @@ const FIELDS: Record<Exclude<BlockType, "contact">, { fields: Field[]; add: stri
   },
 };
 
-export function ComponentPanel({
-  block,
-  first,
-  last,
-  onChange,
-  onMove,
-  onRemove,
+/**
+ * The one frame every component is edited in: its mark, its name, what it
+ * holds, the tools that act on it, then its rows. The components a section
+ * adds and the built-in ones the resume prints both sit in this.
+ */
+export function PanelShell({
+  icon,
+  name,
+  summary,
+  tools,
+  children,
 }: {
-  block: Block;
-  first: boolean;
-  last: boolean;
-  onChange: (next: Block) => void;
-  onMove: (delta: -1 | 1) => void;
-  onRemove: () => void;
+  icon: React.ReactNode;
+  name: string;
+  summary: string;
+  tools?: React.ReactNode;
+  children: React.ReactNode;
 }) {
-  const [confirming, setConfirming] = useState(false);
   const titleId = useId();
-  const empty = !componentHasContent(block);
-
   return (
     <section
       aria-labelledby={titleId}
@@ -412,23 +570,92 @@ export function ComponentPanel({
       style={{ boxShadow: "inset 0 0 0 1px var(--color-divider)", background: "var(--color-bg)" }}
     >
       <header className="flex flex-wrap items-center gap-2 px-3 py-2.5" style={{ borderBottom: "1px solid var(--color-divider)" }}>
-        <span
-          className="grid h-8 w-8 flex-none place-items-center rounded-lg"
-          style={{ background: "var(--color-neutral-100)" }}
-        >
-          <Icon d={COMPONENT_ICON[block.type]} size={16} />
+        <span className="grid h-8 w-8 flex-none place-items-center rounded-lg" style={{ background: "var(--color-neutral-100)" }}>
+          <Icon d={icon} size={16} />
         </span>
         <span id={titleId} className="text-[13.5px] font-semibold">
-          {componentName(block.type)}
+          {name}
         </span>
-        <span className="text-[12px] text-muted">{empty ? "Empty — not shown yet" : componentSummary(block)}</span>
-        <span className="ml-auto flex items-center">
-          <IconButton label={`Move ${componentName(block.type)} up`} onClick={() => !first && onMove(-1)}>
+        <span className="text-[12px] text-muted">{summary}</span>
+        {tools && <span className="ml-auto flex items-center">{tools}</span>}
+      </header>
+      <div className="flex flex-col gap-4 p-3 sm:p-4">{children}</div>
+    </section>
+  );
+}
+
+/** A small chip naming a component and what it holds — on a closed card. */
+export function ComponentChip({ icon, name, summary }: { icon: React.ReactNode; name: string; summary: string }) {
+  return (
+    <span
+      className="inline-flex items-center gap-1.5 rounded-full py-1 pr-3 pl-2 text-[12.5px]"
+      style={{ boxShadow: "inset 0 0 0 1px var(--color-divider)" }}
+    >
+      <Icon d={icon} size={13} />
+      <span className="font-medium">{name}</span>
+      <span className="text-muted">{summary}</span>
+    </span>
+  );
+}
+
+/**
+ * One of a section's components. It is handed the section, not only its
+ * own block, because a gallery's pictures are the section's: adding one
+ * writes the picture to `section.images` and its id to the gallery in the
+ * same change, and removing a gallery takes its pictures with it.
+ */
+export function ComponentPanel({
+  block,
+  section,
+  first,
+  last,
+  onSection,
+}: {
+  block: Block;
+  section: Section;
+  first: boolean;
+  last: boolean;
+  onSection: (recipe: (s: Section) => Section) => void;
+}) {
+  const [confirming, setConfirming] = useState(false);
+  const empty = !componentHasContent(block);
+  const name = componentName(block.type);
+
+  const onChange = (next: Block) => onSection((s) => ({ ...s, blocks: s.blocks.map((x) => (x.id === block.id ? next : x)) }));
+  const onMove = (delta: -1 | 1) =>
+    onSection((s) => {
+      const from = s.blocks.findIndex((x) => x.id === block.id);
+      const to = from + delta;
+      if (from < 0 || to < 0 || to >= s.blocks.length) return s;
+      const blocks = [...s.blocks];
+      const [moved] = blocks.splice(from, 1);
+      blocks.splice(to, 0, moved);
+      return { ...s, blocks };
+    });
+  const onRemove = () =>
+    onSection((s) => {
+      const gone = s.blocks.find((x) => x.id === block.id);
+      const theirs = new Set(gone?.type === "gallery" ? gone.imageIds : []);
+      return {
+        ...s,
+        blocks: s.blocks.filter((x) => x.id !== block.id),
+        images: s.images.filter((a) => !a.id || !theirs.has(a.id)),
+      };
+    });
+
+  return (
+    <PanelShell
+      icon={COMPONENT_ICON[block.type]}
+      name={name}
+      summary={empty ? "Empty — not shown yet" : componentSummary(block)}
+      tools={
+        <>
+          <IconButton label={`Move ${name} up`} onClick={() => !first && onMove(-1)}>
             <span style={{ opacity: first ? 0.3 : 1 }}>
               <Glyph id="up" size={14} />
             </span>
           </IconButton>
-          <IconButton label={`Move ${componentName(block.type)} down`} onClick={() => !last && onMove(1)}>
+          <IconButton label={`Move ${name} down`} onClick={() => !last && onMove(1)}>
             <span style={{ opacity: last ? 0.3 : 1 }}>
               <Glyph id="down" size={14} />
             </span>
@@ -443,35 +670,107 @@ export function ComponentPanel({
               </button>
             </span>
           ) : (
-            <IconButton label={`Remove ${componentName(block.type)}`} onClick={() => (empty ? onRemove() : setConfirming(true))}>
+            <IconButton label={`Remove ${name}`} onClick={() => (empty ? onRemove() : setConfirming(true))}>
               <Glyph id="close" size={14} />
             </IconButton>
           )}
-        </span>
-      </header>
-
-      <div className="flex flex-col gap-4 p-3 sm:p-4">
-        <div className="field">
-          <label htmlFor={`${block.id}-title`}>Heading (optional)</label>
-          <input
-            id={`${block.id}-title`}
-            className="input"
-            placeholder={HEADING_HINT[block.type]}
-            value={block.title}
-            onChange={(e) => onChange({ ...block, title: e.target.value })}
-          />
-        </div>
-        {block.type === "contact" ? (
-          <ContactFields block={block} onChange={onChange} />
-        ) : (
-          <ItemRows block={block} onChange={onChange} />
-        )}
+        </>
+      }
+    >
+      <div className="field">
+        <label htmlFor={`${block.id}-title`}>Heading (optional)</label>
+        <input
+          id={`${block.id}-title`}
+          className="input"
+          placeholder={HEADING_HINT[block.type]}
+          value={block.title}
+          onChange={(e) => onChange({ ...block, title: e.target.value })}
+        />
       </div>
-    </section>
+      {block.type === "gallery" ? (
+        <GalleryFields block={block} section={section} onChange={onChange} onSection={onSection} />
+      ) : block.type === "contact" ? (
+        <ContactFields block={block} onChange={onChange} />
+      ) : (
+        <ItemRows block={block} onChange={onChange} />
+      )}
+    </PanelShell>
+  );
+}
+
+function GalleryFields({
+  block,
+  section,
+  onChange,
+  onSection,
+}: {
+  block: GalleryBlock;
+  section: Section;
+  onChange: (next: Block) => void;
+  onSection: (recipe: (s: Section) => Section) => void;
+}) {
+  const group = useId();
+  // One change for both halves: the pictures the section holds and the ids
+  // this gallery names. Run against the latest section, not this render's,
+  // because several uploads land one after another.
+  const setPictures = (recipe: (images: Asset[]) => Asset[]) =>
+    onSection((s) => {
+      const mine = s.blocks.find((x) => x.id === block.id);
+      if (mine?.type !== "gallery") return s;
+      const before = galleryImages(s, mine);
+      const beforeIds = new Set(before.map((a) => a.id));
+      const elsewhere = new Set(s.images.flatMap((a) => (a.id && !beforeIds.has(a.id) ? [a.id] : [])));
+      let room = SECTION_IMAGES_MAX - s.images.length;
+      const after: Asset[] = [];
+      for (const a of recipe(before)) {
+        if (!a.id || elsewhere.has(a.id) || after.some((x) => x.id === a.id)) continue;
+        if (!beforeIds.has(a.id) && room-- <= 0) continue;
+        after.push(a);
+      }
+      const afterIds = new Set(after.map((a) => a.id));
+      return {
+        ...s,
+        images: [...s.images.filter((a) => !beforeIds.has(a.id) || afterIds.has(a.id)), ...after.filter((a) => !beforeIds.has(a.id))],
+        blocks: s.blocks.map((x) => (x.id === mine.id ? { ...mine, imageIds: after.flatMap((a) => (a.id ? [a.id] : [])) } : x)),
+      };
+    });
+
+  return (
+    <>
+      <div className="field">
+        <label id={`${group}-label`}>Layout</label>
+        <div role="radiogroup" aria-labelledby={`${group}-label`} className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+          {GALLERY_LAYOUTS.map((l) => {
+            const on = block.layout === l.id;
+            return (
+              <label
+                key={l.id}
+                className="flex cursor-pointer items-start gap-2.5 rounded-lg p-2.5"
+                style={{ boxShadow: `inset 0 0 0 ${on ? "1.5px var(--color-ink)" : "1px var(--color-divider)"}` }}
+              >
+                <input
+                  type="radio"
+                  name={`layout-${group}`}
+                  className="mt-0.5 h-4 w-4 flex-none accent-[var(--color-ink)]"
+                  checked={on}
+                  onChange={() => onChange({ ...block, layout: l.id })}
+                />
+                <span className="min-w-0">
+                  <span className="block text-[13px] font-semibold">{l.name}</span>
+                  <span className="block text-[12px] leading-snug text-muted">{l.desc}</span>
+                </span>
+              </label>
+            );
+          })}
+        </div>
+      </div>
+      <PicturesField images={galleryImages(section, block)} room={SECTION_IMAGES_MAX - section.images.length} onChange={setPictures} />
+    </>
   );
 }
 
 const HEADING_HINT: Record<BlockType, string> = {
+  gallery: "A closer look",
   timeline: "How it grew",
   testimonials: "Kind words",
   clients: "Trusted by",
@@ -482,7 +781,7 @@ const HEADING_HINT: Record<BlockType, string> = {
   contact: "Get in touch",
 };
 
-type ListBlock = Exclude<Block, ContactBlock>;
+type ListBlock = Exclude<Block, ContactBlock | GalleryBlock>;
 
 function ItemRows({ block, onChange }: { block: ListBlock; onChange: (next: Block) => void }) {
   const config = FIELDS[block.type];

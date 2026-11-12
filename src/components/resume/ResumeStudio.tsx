@@ -3,6 +3,7 @@
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import Link from "next/link";
 import { useId, useState, type ReactNode } from "react";
+import { AtsCheck } from "./AtsCheck";
 import { ResumeDocument } from "./ResumeDocument";
 import { ResumeSheet } from "./ResumeSheet";
 import { ColourPicker } from "../builder/ColourPicker";
@@ -40,8 +41,8 @@ import type { Paper, Portfolio, Resume, ResumeBlock, ResumeColumns, ResumeStyle,
    the freeze that protects it has nothing to protect here.
    ──────────────────────────────────────────────────────────────────────── */
 
-type Tab = "template" | "style";
-type SheetTab = "template" | "style" | "blocks";
+type Tab = "template" | "style" | "ats";
+type SheetTab = "template" | "style" | "ats" | "blocks";
 
 const EASE = [0.16, 1, 0.3, 1] as const;
 const DOWNLOAD = <path d="M12 4v11m0 0-4-4m4 4 4-4M5 20h14" />;
@@ -74,7 +75,9 @@ export function ResumeStudio({
   );
 
   const inspector = (which: Tab) =>
-    which === "template" ? (
+    which === "ats" ? (
+      <AtsCheck p={p} />
+    ) : which === "template" ? (
       <TemplatePicker p={p} onPick={(id) => style({ template: id, columns: "auto", ...TEMPLATE_DEFAULTS[id] })} />
     ) : (
       <StylePanel p={p} onStyle={style} />
@@ -190,6 +193,7 @@ export function ResumeStudio({
                   options={[
                     { id: "template", label: "Template" },
                     { id: "style", label: "Style" },
+                    { id: "ats", label: "ATS check" },
                   ]}
                 />
               </div>
@@ -235,6 +239,7 @@ export function ResumeStudio({
                   options={[
                     { id: "template", label: "Template" },
                     { id: "style", label: "Style" },
+                    { id: "ats", label: "ATS" },
                     { id: "blocks", label: "Blocks" },
                   ]}
                 />
@@ -584,11 +589,11 @@ function StylePanel({ p, onStyle }: { p: Portfolio; onStyle: (patch: Partial<Res
         </div>
       </Group>
 
-      <Group title="Background" note="Decoration behind the text, drawn at half strength. It is never part of the text, so an ATS reads the page the same.">
+      <Group title="Background" note="Decoration behind the text — at half strength in your text colour, or as picked in a colour of its own. It is never part of the text, so an ATS reads the page the same.">
         <div role="group" aria-label="Background" className="grid grid-cols-4 gap-2">
           {RESUME_BACKDROPS.map((b) => {
             const on = (s.backdrop ?? "none") === b.id;
-            const { page, corner } = backdropLayers(b.id, patternColour(s));
+            const { page, corner } = backdropLayers(b.id, patternColour(s), !s.backdropColor);
             return (
               <button
                 key={b.id}
@@ -681,8 +686,8 @@ const PATTERN_TINTS = ["#94a3b8", "#a8a29e", "#c4b5a0", "#9fb4a5", "#a3b1c6", "#
 
 /**
  * The pattern's colour: the accent (the default, and what every resume had
- * before this), or one of its own. Whichever it is, the pattern is drawn at
- * half strength, so a strong colour still stays a background.
+ * before this), drawn at half strength because it is also the headings'
+ * colour — or one of its own, drawn exactly as picked.
  */
 function PatternColour({
   s,

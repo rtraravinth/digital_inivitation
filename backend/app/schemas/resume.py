@@ -280,3 +280,42 @@ def public_resume(raw: Any, placed: set[str]) -> PublicResume:
     return PublicResume(
         **{block: getattr(resume, block) if block in placed else [] for block in PAGE_BLOCKS},
     )
+
+
+class AtsCheckIn(StrictCamelModel):
+    """A job description to check the resume against. Read, never stored."""
+
+    job_description: str = Field(min_length=40, max_length=20000)
+
+
+class AtsPart(CamelModel):
+    key: str
+    label: str
+    points: int
+    out_of: int
+    detail: str
+
+
+class AtsTerm(CamelModel):
+    term: str
+    kind: Literal["hard", "soft", "keyword"]
+    #: Where on the resume it was found: headline, summary, skills, experience…
+    where: list[str]
+
+
+class AtsSuggestion(CamelModel):
+    id: str
+    #: What clicking it does. "tip" only advises; the others change the resume.
+    kind: Literal["add_skill", "use_title", "show_block", "tip"]
+    title: str
+    detail: str
+    value: str = ""
+
+
+class AtsReport(CamelModel):
+    score: int
+    breakdown: list[AtsPart]
+    title: str
+    matched: list[AtsTerm]
+    missing: list[AtsTerm]
+    suggestions: list[AtsSuggestion]

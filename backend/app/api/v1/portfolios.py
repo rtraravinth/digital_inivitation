@@ -18,7 +18,8 @@ from app.schemas.portfolio import (
     SlugAvailableOut,
     SlugField,
 )
-from app.schemas.resume import Resume
+from app.schemas.resume import AtsCheckIn, AtsReport, Resume
+from app.services import ats
 from app.services.portfolio import PortfolioService
 
 router = APIRouter(
@@ -113,6 +114,28 @@ async def update_resume(
 ) -> PortfolioOut:
     service = PortfolioService(session)
     return service.to_out(await service.update_resume(portfolio, payload))
+
+
+@router.post(
+    "/{portfolio_id}/resume/ats-check",
+    response_model=AtsReport,
+    summary="Check the resume against a job description",
+    description=(
+        "Scores the resume this portfolio prints against one job description "
+        "and suggests changes. Rule-based and explainable: every point in the "
+        "score is in the breakdown. The description is read and not stored. "
+        "Allowed while live — it changes nothing."
+    ),
+)
+async def ats_check(
+    payload: AtsCheckIn, portfolio: OwnedPortfolio, session: SessionDep
+) -> AtsReport:
+    out = PortfolioService(session).to_out(portfolio).model_dump(by_alias=True)
+    report = ats.check(
+        ats.resume_text(out["header"], out["resume"], out["sections"]),
+        payload.job_description,
+    )
+    return AtsReport.model_validate(report.__dict__)
 
 
 @router.post("/{portfolio_id}/publish", response_model=PortfolioOut, summary="Publish")

@@ -52,3 +52,6 @@ ignore = ["B008"]
 [tool.ruff.lint.per-file-ignores]
 "tests/*" = ["E501"]
 "app/seed_data.py" = ["E501"]
+# The ATS check's suggestions are sentences a person reads, and its patterns
+# match the dashes and apostrophes job ads are written with.
+"app/services/ats.py" = ["E501", "RUF001"]

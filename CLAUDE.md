@@ -29,7 +29,7 @@ because the connection never arrives. Pass flags through when you need them:
 ```
 npm run build
 npm run lint
-cd backend && .venv/bin/python -m pytest    # 343 tests (.venv/Scripts on Windows)
+cd backend && .venv/bin/python -m pytest    # 356 tests (.venv/Scripts on Windows)
 ```
 
 `NEXT_PUBLIC_API_URL` points the frontend at the API; see
@@ -283,8 +283,9 @@ chrome — that inconsistency is what this replaced.
   the resume that way, with an off-page "Experience" section.
 - **Resume background patterns are drawn at half strength**
   (`PATTERN_STRENGTH` in `lib/resume-backdrops.ts`), full-page and corner
-  alike, in the accent or in their own colour (`style.backdropColor`;
-  empty means the accent — `patternColour()`), at 50%.
+  alike, when drawn in the accent (the headings' colour). A colour picked
+  for the pattern itself (`style.backdropColor`; empty means the accent —
+  `patternColour()`) is drawn at full strength, as picked.
 - **One Done per card, at its foot.** An open card's top bar carries only
   its switches and move buttons. The editor's top bar has "Open builder",
   "Preview" and "Publish"; the resume PDF is downloaded from the builder's
@@ -453,6 +454,40 @@ separately.
   ("Printing is not available") in both headless modes. Headless Chrome
   (`%LOCALAPPDATA%/Google/Chrome`) prints; sign in and move with
   `window.next.router.push` so the in-memory access token survives.
+
+## The ATS check
+
+The resume builder's third inspector tab ("ATS check",
+`resume/AtsCheck.tsx`): paste or drop a job description, Validate, and the
+panel becomes the result — a score, its breakdown, keywords found and
+missing, and suggestions. The scoring is `app/services/ats.py`, behind
+`POST /portfolios/{id}/resume/ats-check`.
+
+- **It is a real analysis, and says what it is.** No vendor publishes how
+  its ATS ranks a resume; what every account agrees on is parse, then
+  compare against the description, weighted towards hard skills, then the
+  job title, education and years asked for, then soft skills, plus whether
+  the resume can be parsed. That is the scoring, in plain Python with no
+  model and no network: n-gram terms weighted with BM25-style saturated term
+  frequency and boosted on requirement lines and for known skills, matched
+  after light stemming and synonym folding. The weights sum to 100 and every
+  point is in the breakdown. The panel calls it an estimate, never a
+  verdict. Do not replace it with a figure that is not computed this way.
+- **It reads the resume as it prints** (`resume_text()`): a list counts only
+  when a section places it and it is not switched off for the resume — the
+  same rule as `visibleBlocks()`. "Check again" calls `flushPendingSaves()`
+  first, because the check reads stored data.
+- **The description is not stored.** The API reads it and forgets it; the
+  panel keeps it in `sessionStorage` for the tab only. A test pins that.
+- **Suggestions that change the resume are explicit clicks**: add a skill
+  (to the first skill group, adding an off-page Skills section if no section
+  holds the list), lead the headline with the job title, print a list that
+  is switched off. Everything else is a tip. On a live page the actions are
+  disabled — its content is frozen. "Only add what is true of you" is on
+  every skill suggestion; keep it.
+- **The vocabulary is ours** (`KNOWN_SKILLS`, `SOFT_SKILLS`, `SYNONYMS`),
+  so extending it needs no licence. A larger list could come from ESCO or
+  O*NET, both CC BY 4.0 (commercial use with attribution).
 
 ## Motion
 
@@ -710,10 +745,6 @@ claim to be the live page.
 
 ## Known gaps
 
-- **No ATS score yet.** It is meant to be a feature of its own. The resume is
-  stored structured so one can read it; do not ship a score that is not a
-  real analysis — the same rule as the analytics.
-
 - **Artboard 3b — the block manager, at `/blocks/[id]` — is deliberately not
   built.** It listed the sections with reorder, hide and delete buttons, a
   click count each, a copy-address bar and a typed "+ Add block" picker.
@@ -741,7 +772,7 @@ claim to be the live page.
 - **Slugs are global.** Two accounts cannot both hold `rohan`, because the
   address is `facet.page/<slug>` with nothing in front of it. The create
   dialog surfaces the 409 as a message.
-- **The frontend has no test runner.** The backend has 343 pytest tests;
+- **The frontend has no test runner.** The backend has 356 pytest tests;
   changes here are checked with `npm run lint`, `npm run build` and by
   actually opening the app.
 

@@ -235,8 +235,15 @@ function softened(layer: BgLayer): BgLayer {
   return { ...layer, image };
 }
 
-export function backdropLayers(id: ResumeBackdrop, accent: string): { page: BgLayer[]; corner: BgLayer[] } {
-  return { page: pageLayers(id, accent).map(softened), corner: cornerLayers(id, accent).map(softened) };
+/**
+ * A background's layers in a colour. `soft` draws them at PATTERN_STRENGTH:
+ * right for the accent, which is also the headings' colour. A colour picked
+ * for the pattern itself is drawn as picked — its author chose how strong.
+ */
+export function backdropLayers(id: ResumeBackdrop, colour: string, soft = true): { page: BgLayer[]; corner: BgLayer[] } {
+  const page = pageLayers(id, colour);
+  const corner = cornerLayers(id, colour);
+  return soft ? { page: page.map(softened), corner: corner.map(softened) } : { page, corner };
 }
 
 /** The paper ground (`paperGround()`) as a bottom layer, so decoration can sit over it. */
@@ -280,6 +287,6 @@ export function patternColour(style: Resume["style"]): string {
 
 /** Every layer behind a resume, top first, ending with its paper ground. */
 export function sheetLayers(resume: Resume): BgLayer[] {
-  const { page, corner } = backdropLayers(resume.style.backdrop, patternColour(resume.style));
+  const { page, corner } = backdropLayers(resume.style.backdrop, patternColour(resume.style), !resume.style.backdropColor);
   return [...corner, ...page, ...groundLayer(paperGround(resume))];
 }

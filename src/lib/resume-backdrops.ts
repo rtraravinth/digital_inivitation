@@ -208,34 +208,35 @@ function cornerLayers(id: ResumeBackdrop, c: string): BgLayer[] {
 }
 
 /**
- * How strongly a full-page background is drawn, against what each pattern
- * was tuned at. They are drawn in the accent, which is also the colour of
- * the resume's headings, so at full strength a pattern behind every line
- * competed with the text it sits under. Corner graphics sit apart from the
- * text and keep their own strength.
+ * How strongly a background pattern is drawn, against what each was tuned
+ * at: half. A pattern keeps the accent — the colour the author picked, which
+ * is also the headings' — but at full strength it sat too bright behind the
+ * text it decorates. Every kind, full-page and corner alike.
  */
-const PAGE_STRENGTH = 0.5;
+const PATTERN_STRENGTH = 0.5;
 
-/** Every opacity in an SVG layer, and a flat stripe's colour, scaled down. */
-function softened(layer: BgLayer, accent: string): BgLayer {
-  if (layer.image.startsWith("url(")) {
+/** Every opacity in a layer — an SVG's, or a colour's alpha — scaled down. */
+function softened(layer: BgLayer): BgLayer {
+  let image = layer.image;
+  if (image.startsWith("url(")) {
     // The SVG is URI-encoded: `fill-opacity='.24'` reads `fill-opacity%3D'.24'`.
-    const image = layer.image.replace(
+    image = image.replace(
       /(opacity%3D')([\d.]+)(')/g,
-      (_, a: string, v: string, b: string) => `${a}${+(parseFloat(v) * PAGE_STRENGTH).toFixed(3)}${b}`,
+      (_, a: string, v: string, b: string) => `${a}${+(parseFloat(v) * PATTERN_STRENGTH).toFixed(3)}${b}`,
     );
-    return { ...layer, image };
+  } else if (image !== "linear-gradient(#fbf6ec, #fbf6ec)") {
+    // A gradient in the accent: halve each colour's alpha, a bare #rrggbb
+    // counting as fully opaque. Cream paper is a tint, not the accent.
+    image = image.replace(/#([0-9a-f]{6})([0-9a-f]{2})?\b/gi, (_, rgb: string, al?: string) => {
+      const alpha = Math.round((al ? parseInt(al, 16) : 255) * PATTERN_STRENGTH);
+      return `#${rgb}${alpha.toString(16).padStart(2, "0")}`;
+    });
   }
-  const flat = `linear-gradient(${accent}, ${accent})`;
-  if (layer.image === flat && /^#[0-9a-f]{6}$/i.test(accent)) {
-    const alpha = Math.round(PAGE_STRENGTH * 255).toString(16).padStart(2, "0");
-    return { ...layer, image: `linear-gradient(${accent}${alpha}, ${accent}${alpha})` };
-  }
-  return layer;
+  return { ...layer, image };
 }
 
 export function backdropLayers(id: ResumeBackdrop, accent: string): { page: BgLayer[]; corner: BgLayer[] } {
-  return { page: pageLayers(id, accent).map((l) => softened(l, accent)), corner: cornerLayers(id, accent) };
+  return { page: pageLayers(id, accent).map(softened), corner: cornerLayers(id, accent).map(softened) };
 }
 
 /** The paper ground (`paperGround()`) as a bottom layer, so decoration can sit over it. */

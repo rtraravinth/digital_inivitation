@@ -281,9 +281,9 @@ chrome — that inconsistency is what this replaced.
   off the page counts, which is how a list is kept to the resume. Entries
   left in a list nobody placed do not print. The seed keeps its roles on
   the resume that way, with an off-page "Experience" section.
-- **Full-page resume backgrounds are drawn at half strength**
-  (`PAGE_STRENGTH` in `lib/resume-backdrops.ts`): they are in the accent,
-  which is also the headings' colour. Corner graphics keep theirs.
+- **Resume background patterns are drawn at half strength**
+  (`PATTERN_STRENGTH` in `lib/resume-backdrops.ts`), full-page and corner
+  alike: they keep the accent, which is also the headings' colour, at 50%.
 - **One Done per card, at its foot.** An open card's top bar carries only
   its switches and move buttons. The editor's top bar has "Open builder",
   "Preview" and "Publish"; the resume PDF is downloaded from the builder's

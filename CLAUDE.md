@@ -213,6 +213,12 @@ chrome — that inconsistency is what this replaced.
   where an unplaced list shows up again. `LIST_LOOKS` in `types.ts` says
   which looks each list has (the first is its default) and `lookOf()` falls
   back to it; the backend accepts any look so adding one is frontend-only.
+- **The editor's outline is as tall as the window, never taller.** Its list
+  scrolls inside it and "Add section" plus "Add from your resume" are
+  pinned under the list, so they are in view however many sections there
+  are. The page title sits in the document column for the same reason: above
+  both columns it pushed the outline down past a short window. Below `lg`
+  there is no outline, and the same two controls sit under the cards.
 - **There are no built-in cards.** The editor is header, sections, footer.
   The resume's private contact line lives in the header card ("Resume
   contact details"). It is deliberately *not* a component: it never leaves

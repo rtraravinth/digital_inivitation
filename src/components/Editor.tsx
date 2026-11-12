@@ -74,6 +74,9 @@ export function Editor({ id }: { id: string }) {
     if (!open) return;
     const node = document.getElementById(`card-${open}`);
     node?.scrollIntoView({ behavior: reduced ? "auto" : "smooth", block: "start" });
+    // The outline scrolls on its own, so its row for this card may be out of
+    // sight — a section just added is always the last one.
+    document.getElementById(`outline-${open}`)?.scrollIntoView({ block: "nearest" });
     if (justAdded.current === open) {
       justAdded.current = null;
       window.setTimeout(() => document.getElementById(`title-${open}`)?.focus({ preventScroll: true }), 350);
@@ -219,81 +222,134 @@ export function Editor({ id }: { id: string }) {
             )}
           </AnimatePresence>
 
-          {/* ── title ───────────────────────────────────────────── */}
-          <div className="mb-7 flex flex-wrap items-end gap-x-6 gap-y-3">
-            <div className="min-w-0">
-              <motion.h1
-                initial={reduced ? false : { opacity: 0, y: 14, filter: "blur(6px)" }}
-                animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
-                transition={{ duration: 0.6, ease: EASE }}
-                className="m-0 text-[26px] leading-tight tracking-[-0.03em] sm:text-[32px]"
-              >
-                Edit content
-              </motion.h1>
-              <motion.p
-                initial={reduced ? false : { opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ duration: 0.5, delay: 0.15 }}
-                className="m-0 mt-1.5 max-w-[62ch] text-[14px] text-muted"
-              >
-                Everything on your page and your resume, written once. Each card says where it
-                shows — <strong style={{ color: "var(--color-ink)" }}>Page</strong>,{" "}
-                <strong style={{ color: "var(--color-ink)" }}>Resume</strong> or both. The look of each lives in the{" "}
-                <Link href={`/builder/${p.id}`} className="underline underline-offset-2" style={{ color: "var(--color-ink)" }}>
-                  builder
-                </Link>
-                .
-              </motion.p>
-            </div>
-            <span className="ml-auto font-mono text-[12px]" style={{ color: "var(--color-neutral-600)" }}>
-              1 header · {p.sections.length} {p.sections.length === 1 ? "section" : "sections"}
-              {hidden > 0 && ` · ${hidden} off the page`}
-            </span>
-          </div>
-
           <div className="grid grid-cols-1 gap-8 lg:grid-cols-[230px_minmax(0,1fr)]">
             {/* ── outline ─────────────────────────────────────────── */}
-            <nav aria-label="Outline" className="hidden lg:sticky lg:top-20 lg:block lg:self-start">
-              <span className="mb-2 block px-3 text-[12px] font-medium" style={{ color: "var(--color-neutral-600)" }}>
+            {/* As tall as the window and no taller: the list scrolls inside
+                it, and what adds a section stays pinned under the list. It
+                used to be one long column, so on a page with many sections
+                "Add section" sat below the fold until the whole document had
+                been scrolled to its end. */}
+            <nav
+              aria-label="Outline"
+              className="hidden lg:sticky lg:top-20 lg:flex lg:max-h-[calc(100dvh-7.5rem)] lg:flex-col lg:self-start"
+            >
+              <span className="mb-2 block flex-none px-3 text-[12px] font-medium" style={{ color: "var(--color-neutral-600)" }}>
                 Outline
               </span>
-              <ul className="m-0 flex list-none flex-col gap-0.5 p-0">
-                <OutlineItem
-                  on={open === HEADER}
-                  number="—"
-                  title={p.header.name || "Header"}
-                  sub="Header"
-                  onPick={() => setOpen(HEADER)}
-                />
-                {p.sections.map((s, i) => (
+              <div className="-mr-2 min-h-0 flex-1 overflow-y-auto overscroll-contain pr-2">
+                <ul className="m-0 flex list-none flex-col gap-0.5 p-0">
                   <OutlineItem
-                    key={s.id}
-                    on={open === s.id}
-                    number={nn(i)}
-                    title={s.title || "Untitled section"}
-                    sub={lookLabel(!s.hidden, s.onResume, true)}
-                    dim={s.hidden && !s.onResume}
-                    onPick={() => setOpen(s.id)}
+                    id={HEADER}
+                    on={open === HEADER}
+                    number="—"
+                    title={p.header.name || "Header"}
+                    sub="Header"
+                    onPick={() => setOpen(HEADER)}
                   />
-                ))}
-              </ul>
-              <button type="button" className="btn btn-ghost mt-1 w-full justify-start" onClick={add}>
-                <Glyph id="plus" size={14} />
-                Add section
-              </button>
-              <ul className="m-0 mt-1 flex list-none flex-col gap-0.5 p-0 pt-2" style={{ borderTop: "1px solid var(--color-divider)" }}>
-                <OutlineItem
-                  on={open === FOOTER}
-                  number="—"
-                  title={p.footer.headline || "Footer"}
-                  sub="Footer · Page only"
-                  onPick={() => setOpen(FOOTER)}
-                />
-              </ul>
+                  {p.sections.map((s, i) => (
+                    <OutlineItem
+                      key={s.id}
+                      id={s.id}
+                      on={open === s.id}
+                      number={nn(i)}
+                      title={s.title || "Untitled section"}
+                      sub={lookLabel(!s.hidden, s.onResume, true)}
+                      dim={s.hidden && !s.onResume}
+                      onPick={() => setOpen(s.id)}
+                    />
+                  ))}
+                </ul>
+                <ul className="m-0 mt-1 flex list-none flex-col gap-0.5 p-0 pt-2" style={{ borderTop: "1px solid var(--color-divider)" }}>
+                  <OutlineItem
+                    id={FOOTER}
+                    on={open === FOOTER}
+                    number="—"
+                    title={p.footer.headline || "Footer"}
+                    sub="Footer · Page only"
+                    onPick={() => setOpen(FOOTER)}
+                  />
+                </ul>
+              </div>
+
+              <div className="mt-2 flex flex-none flex-col gap-3 pt-3" style={{ borderTop: "1px solid var(--color-divider)" }}>
+                <button type="button" className="btn btn-secondary w-full justify-center" style={{ marginTop: 0 }} onClick={add}>
+                  <Glyph id="plus" size={14} />
+                  Add section
+                </button>
+                {unplaced.length > 0 && (
+                  <div>
+                    <span className="mb-1.5 block px-1 text-[12px] font-medium" style={{ color: "var(--color-neutral-600)" }}>
+                      Add from your resume
+                    </span>
+                    {/* Two across only when there are enough to need it: at
+                        this width a pair clips "Experience". */}
+                    <ul className={`m-0 grid list-none gap-1 p-0 ${unplaced.length > 3 ? "grid-cols-2" : "grid-cols-1"}`}>
+                      {unplaced.map((list) => {
+                        const saved = p.resume[list].length;
+                        return (
+                          <li key={list} className="min-w-0">
+                            <button
+                              type="button"
+                              onClick={() => addList(list)}
+                              title={saved > 0 ? `${listSummary(p.resume, list)} saved, in no section yet` : undefined}
+                              className="flex min-h-[32px] w-full cursor-pointer items-center gap-1.5 rounded-lg px-2 text-left text-[12.5px] transition-colors hover:bg-[var(--color-neutral-100)]"
+                              style={{ boxShadow: "inset 0 0 0 1px var(--color-divider)" }}
+                            >
+                              <span className="flex-none">
+                                <Icon d={COMPONENT_ICON[list]} size={13} />
+                              </span>
+                              <span className="min-w-0 flex-1 truncate">{BLOCK_LABEL[list]}</span>
+                              {saved > 0 && (
+                                <span className="flex-none font-mono text-[11px]" style={{ color: "var(--color-neutral-600)" }}>
+                                  {saved}
+                                </span>
+                              )}
+                            </button>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </div>
+                )}
+              </div>
             </nav>
 
             {/* ── the document ────────────────────────────────────── */}
             <div className="flex min-w-0 flex-col gap-4" style={{ perspective: 1600 }}>
+              {/* The title sits in this column, not above both: the outline
+                  beside it then starts at the top of the window, so its
+                  pinned "Add section" is in view before any scrolling. */}
+              <div className="mb-3 flex flex-wrap items-end gap-x-6 gap-y-3">
+                <div className="min-w-0">
+                  <motion.h1
+                    initial={reduced ? false : { opacity: 0, y: 14, filter: "blur(6px)" }}
+                    animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+                    transition={{ duration: 0.6, ease: EASE }}
+                    className="m-0 text-[26px] leading-tight tracking-[-0.03em] sm:text-[32px]"
+                  >
+                    Edit content
+                  </motion.h1>
+                  <motion.p
+                    initial={reduced ? false : { opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ duration: 0.5, delay: 0.15 }}
+                    className="m-0 mt-1.5 max-w-[62ch] text-[14px] text-muted"
+                  >
+                    Everything on your page and your resume, written once. Each card says where it
+                    shows — <strong style={{ color: "var(--color-ink)" }}>Page</strong>,{" "}
+                    <strong style={{ color: "var(--color-ink)" }}>Resume</strong> or both. The look of each lives in the{" "}
+                    <Link href={`/builder/${p.id}`} className="underline underline-offset-2" style={{ color: "var(--color-ink)" }}>
+                      builder
+                    </Link>
+                    .
+                  </motion.p>
+                </div>
+                <span className="ml-auto font-mono text-[12px]" style={{ color: "var(--color-neutral-600)" }}>
+                  1 header · {p.sections.length} {p.sections.length === 1 ? "section" : "sections"}
+                  {hidden > 0 && ` · ${hidden} off the page`}
+                </span>
+              </div>
+
               <HeaderCard
                 header={p.header}
                 open={open === HEADER}
@@ -378,7 +434,13 @@ export function Editor({ id }: { id: string }) {
                 Add section
               </motion.button>
 
-              {unplaced.length > 0 && <AddLists resume={p.resume} lists={unplaced} onAdd={addList} />}
+              {/* Beside the document on a desk, in the outline; here only
+                  where there is no outline to hold it. */}
+              {unplaced.length > 0 && (
+                <div className="lg:hidden">
+                  <AddLists resume={p.resume} lists={unplaced} onAdd={addList} />
+                </div>
+              )}
 
               <div className="mt-4 flex items-baseline gap-3 px-1">
                 <h2 className="m-0 text-[16px] tracking-[-0.01em]">Footer</h2>
@@ -441,6 +503,7 @@ function lookLabel(page: boolean, resume: boolean, filled: boolean): string {
 /* ── outline ──────────────────────────────────────────────────────────── */
 
 function OutlineItem({
+  id,
   on,
   number,
   title,
@@ -448,6 +511,8 @@ function OutlineItem({
   dim,
   onPick,
 }: {
+  /** The card this row opens; also what the outline scrolls to. */
+  id: string;
   on: boolean;
   number: string;
   title: string;
@@ -458,6 +523,7 @@ function OutlineItem({
   return (
     <li>
       <button
+        id={`outline-${id}`}
         type="button"
         aria-current={on ? "true" : undefined}
         onClick={onPick}

@@ -26,6 +26,7 @@ import {
   headline,
 } from "../shared";
 import { FeatureBand, FooterBody, footerHeadline, footerNote, runsOf } from "../components";
+import { StyledSections } from "../section-styles";
 
 /* ── Journey ──────────────────────────────────────────────────────────────
    A warm page told as a story. The tags ring the portrait in a slow 3D
@@ -102,7 +103,9 @@ export function Journey({ p }: { p: Portfolio }) {
       {runs.map((run) => (
         <section key={run.id} id={run.id} className={`scroll-mt-6 px-5 md:px-10 ${CHAPTER_PAD[p.layout.density]}`}>
           <div className="mx-auto max-w-[1080px]">
-            {run.cards.length > 0 && <Stack p={p} sections={run.cards} />}
+            <StyledSections p={p} sections={run.cards}>
+              {run.cards.length > 0 && <Stack p={p} sections={run.cards} />}
+            </StyledSections>
             {/* Bands sit after the stack: a timeline or a form has no place
                 in a card that pins and shrinks under the next one. */}
             {run.features.map((s, i) => (

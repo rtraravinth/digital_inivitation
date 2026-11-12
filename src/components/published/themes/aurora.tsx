@@ -29,6 +29,7 @@ import {
   headline,
 } from "../shared";
 import { FeatureBand, FooterBody, footerHeadline, footerNote, menuOf, runsOf } from "../components";
+import { StyledSections } from "../section-styles";
 
 /* ── Aurora ───────────────────────────────────────────────────────────────
    A dark page lit from behind. Its one piece of depth is glass: the work
@@ -179,6 +180,7 @@ export function Aurora({ p }: { p: Portfolio }) {
           className={`relative scroll-mt-20 px-5 md:px-10 ${CHAPTER_PAD[p.layout.density]}`}
         >
           <div className="mx-auto flex max-w-[1200px] flex-col gap-5">
+            <StyledSections p={p} sections={run.cards}>
             {run.cards.length > 0 && (
               <div className={`grid gap-4 md:gap-5 ${gridCols(p)}`}>
                 {run.cards.map((s, i, cards) => {
@@ -199,6 +201,7 @@ export function Aurora({ p }: { p: Portfolio }) {
                 })}
               </div>
             )}
+            </StyledSections>
             {run.features.map((s) => (
               <Reveal key={s.id} kind="up">
                 <FeatureBand p={p} section={s} className="fx-glass rounded-[28px] p-6 md:p-12" />

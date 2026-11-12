@@ -5,7 +5,10 @@ import { ColourPicker } from "@/components/builder/ColourPicker";
 import { FontSelect } from "@/components/builder/FontSelect";
 import { ThemeThumb } from "./ThemeThumb";
 import { Segmented } from "@/components/ui";
+import { isFeature } from "@/components/published/components";
+import { StyleIcon, suggestStyle } from "@/components/published/section-styles";
 import { Glyph } from "@/lib/glyphs";
+import { withPlacedLists } from "@/lib/resume";
 import { usePortfolios } from "@/lib/store";
 import {
   BLOCK_TYPES,
@@ -20,6 +23,7 @@ import {
   PHOTO_TREATMENTS,
   PROFESSIONS,
   ROLE_NAVS,
+  SECTION_STYLES,
   THEMES,
   TYPE_SCALES,
   applyProfession,
@@ -32,6 +36,7 @@ import {
   type ListLook,
   type Portfolio,
   type ProfessionId,
+  type SectionStyle,
   type ThemeId,
 } from "@/lib/types";
 
@@ -58,6 +63,85 @@ function Section({
       {note && <p className="m-0 mb-3 text-[12.5px] leading-snug text-muted">{note}</p>}
       {children}
     </section>
+  );
+}
+
+/* ── section style ────────────────────────────────────────────────────── */
+
+const STYLE_NAME = Object.fromEntries(SECTION_STYLES.map((s) => [s.id, s]));
+
+/**
+ * How the page's plain sections are drawn — the ones a theme would make
+ * cards of. "Theme" leaves it to the theme; anything else is the same shape
+ * in every theme, in the theme's own colours and type. One choice for the
+ * page, because a section files under nothing but its own title.
+ *
+ * It reads the content and says which style suits it, and one button applies
+ * that — and each resume list's own suggested look with it. Nothing is ever
+ * applied without that click.
+ */
+export function SectionStyleControl({ p, onChange }: { p: Portfolio; onChange: Recipe }) {
+  const group = useId();
+  const { updateSection } = usePortfolios();
+  const ignored = IGNORED[p.theme]?.styles;
+  const plain = withPlacedLists(p).sections.filter((s) => !s.hidden && !isFeature(s));
+  const current = p.layout.sectionStyle;
+  const suggested = plain.length > 0 ? suggestStyle(plain) : null;
+
+  const set = (style: SectionStyle) => onChange((prev) => ({ ...prev, layout: { ...prev.layout, sectionStyle: style } }));
+  const matchAll = () => {
+    if (suggested) set(suggested);
+    // A list's suggested look is the one its kind reads best in.
+    for (const section of p.sections) {
+      if (!section.blocks.some((b) => isListBlock(b) && lookOf(b) !== LIST_LOOKS[b.type][0])) continue;
+      updateSection(p.id, section.id, (s) => ({
+        ...s,
+        blocks: s.blocks.map((b) => (isListBlock(b) ? { ...b, look: LIST_LOOKS[b.type][0] } : b)),
+      }));
+    }
+  };
+
+  return (
+    <div className="mb-6">
+      <h3 className="m-0 mb-1 text-[14px] tracking-[-0.01em]">Section style</h3>
+      <p className="m-0 mb-3 text-[12.5px] text-muted">
+        How your sections are laid out. The theme keeps its colours and type.
+      </p>
+      {ignored && <IgnoredNote reason={ignored} />}
+      <div className={`flex flex-col gap-3 ${ignored ? "opacity-50" : ""}`}>
+        <div role="radiogroup" aria-label="Section style" className="grid grid-cols-8 gap-1">
+          {SECTION_STYLES.map((st) => (
+            <label key={st.id} title={`${st.name}: ${st.desc}`} className="style-opt" data-suggested={st.id === suggested ? "" : undefined}>
+              <input
+                type="radio"
+                className="sr-only"
+                name={`sstyle-${group}`}
+                checked={current === st.id}
+                onChange={() => set(st.id)}
+                aria-label={st.name}
+              />
+              <StyleIcon id={st.id} />
+            </label>
+          ))}
+        </div>
+        <p className="m-0 text-[12.5px]">
+          <span className="font-semibold">{STYLE_NAME[current]?.name}</span>
+          <span className="text-muted"> — {STYLE_NAME[current]?.desc}</span>
+          {suggested && suggested !== current && (
+            <span className="text-muted"> Suggested for your content: {STYLE_NAME[suggested]?.name}.</span>
+          )}
+        </p>
+        {plain.length === 0 && (
+          <p className="m-0 text-[12.5px] text-muted">
+            This applies to sections without components. Yours all have components, which are laid out under
+            “Components” below.
+          </p>
+        )}
+        <button type="button" className="btn btn-secondary self-start" style={{ marginTop: 0 }} onClick={matchAll}>
+          Match everything to its content
+        </button>
+      </div>
+    </div>
   );
 }
 
@@ -90,6 +174,7 @@ export function ComponentLooksControl({ p }: { p: Portfolio }) {
             section,
             name,
             value: block.layout as string,
+            suggested: "",
             options: GALLERY_LAYOUTS.map((l) => ({ id: l.id as string, label: l.name })),
             onPick: (id: string) => set({ ...block, layout: id as GalleryLayout }),
           },
@@ -102,6 +187,7 @@ export function ComponentLooksControl({ p }: { p: Portfolio }) {
             section,
             name,
             value: lookOf(block) as string,
+            suggested: LOOK_NAME[LIST_LOOKS[block.type][0]].name,
             options: LIST_LOOKS[block.type].map((id) => ({ id: id as string, label: LOOK_NAME[id].name })),
             onPick: (id: string) => set({ ...block, look: id as ListLook }),
           },
@@ -128,7 +214,12 @@ export function ComponentLooksControl({ p }: { p: Portfolio }) {
                 <span className="font-medium">{row.name}</span>
                 <span className="text-muted"> · {row.section.title.trim() || "Untitled section"}</span>
                 {row.section.hidden && <span className="text-muted"> · off the page</span>}
+                {row.suggested && row.options.find((o) => o.id === row.value)?.label !== row.suggested && (
+                  <span className="text-muted"> · suggested {row.suggested}</span>
+                )}
               </span>
+              {/* Seven looks do not fit one row at this width. */}
+              <div className="max-w-full overflow-x-auto [&_button]:flex-none [&_button]:whitespace-nowrap">
               <Segmented
                 label={`${row.name} in ${row.section.title.trim() || "an untitled section"}`}
                 id={`look-${group}-${row.key}`}
@@ -136,6 +227,7 @@ export function ComponentLooksControl({ p }: { p: Portfolio }) {
                 onChange={row.onPick}
                 options={row.options}
               />
+              </div>
             </li>
           ))}
         </ul>
@@ -577,7 +669,7 @@ export function MotionControl({ p, onChange }: { p: Portfolio; onChange: Recipe 
  * that control. The facts are in `src/components/published/themes/` — grep
  * for `useTabFilter`, `gridCols(` and `layout.density` before editing this.
  */
-const IGNORED: Record<ThemeId, { nav?: string; grid?: string; density?: string }> = {
+const IGNORED: Record<ThemeId, { nav?: string; grid?: string; density?: string; styles?: string }> = {
   meridian: {},
   aurora: {
     nav: "Aurora shows every tab as a chapter on one scroll, with a glass nav that jumps between them.",
@@ -599,6 +691,7 @@ const IGNORED: Record<ThemeId, { nav?: string; grid?: string; density?: string }
     nav: "Bio lists every link on one page, grouped by tab.",
     grid: "Bio is a single column of link buttons.",
     density: "Bio keeps its buttons at one comfortable spacing.",
+    styles: "Bio draws every section as link buttons.",
   },
 };
 
@@ -621,6 +714,9 @@ export function LayoutControl({ p, onChange }: { p: Portfolio; onChange: Recipe 
 
   return (
     <>
+      <SectionStyleControl p={p} onChange={onChange} />
+      <ComponentLooksControl p={p} />
+
       <h3 className="m-0 mb-1 text-[14px] tracking-[-0.01em]">Tab navigation</h3>
       <p className="m-0 mb-3 text-[12.5px] text-muted">How visitors move between your sections.</p>
       {ignored.nav && <IgnoredNote reason={ignored.nav} />}

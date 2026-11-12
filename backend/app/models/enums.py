@@ -93,6 +93,14 @@ PhotoTreatment = Literal["colour", "bw"]
 #: A visitor's own reduced-motion preference still wins over "full".
 MotionLevel = Literal["full", "subtle", "off"]
 
+#: How the page's plain sections — the ones a theme would draw as cards — are
+#: laid out. "theme" leaves it to the theme. One choice for the whole page: a
+#: section files under nothing but its own title, so there is no tab to hang
+#: a per-group choice on. Mirrors SECTION_STYLES in src/lib/types.ts.
+SectionStyle = Literal[
+    "theme", "grid", "timeline", "carousel", "tabs", "list", "spotlight", "chips"
+]
+
 PlanId = Literal["free", "pro"]
 PLANS: Final[tuple[str, ...]] = ("free", "pro")
 

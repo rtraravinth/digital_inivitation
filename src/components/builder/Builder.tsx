@@ -7,7 +7,6 @@ import { useState } from "react";
 import { Canvas, DEVICES, type Device } from "./Canvas";
 import {
   ColourControl,
-  ComponentLooksControl,
   LayoutControl,
   MotionControl,
   ProfessionControl,
@@ -123,7 +122,6 @@ export function Builder({ id }: { id: string }) {
       {which === "look" && (
         <>
           <ProfessionControl p={p} onChange={onChange} />
-          <ComponentLooksControl p={p} />
           <ThemeControl p={p} onChange={onChange} />
           <Link href={`/themes/${p.id}`} className="btn btn-secondary btn-block" style={{ justifyContent: "center" }}>
             Open the theme gallery

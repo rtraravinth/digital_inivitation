@@ -29,6 +29,7 @@ import {
   useTabFilter,
 } from "../shared";
 import { FeatureBand, FooterBody, footerHeadline, footerNote, splitFeatures } from "../components";
+import { StyledSections } from "../section-styles";
 
 /* ── Arcade ───────────────────────────────────────────────────────────────
    For players and the people who build games. A synthwave horizon with a
@@ -211,6 +212,7 @@ export function Arcade({ p }: { p: Portfolio }) {
             {/* One column for the run: cards, then bands, never spilling into
                 the level menu's track. */}
             <div className="flex min-w-0 flex-col gap-5">
+            <StyledSections p={p} sections={splitFeatures(shown).cards}>
             {splitFeatures(shown).cards.length > 0 && (
             <div className={`grid gap-5 ${gridCols(p)}`} style={{ perspective: 1600 }}>
               <AnimatePresence mode="popLayout" initial={false}>
@@ -222,6 +224,7 @@ export function Arcade({ p }: { p: Portfolio }) {
               </AnimatePresence>
             </div>
             )}
+            </StyledSections>
             {splitFeatures(shown).features.map((s) => (
               <Reveal key={`${tab}-${s.id}`} kind="up">
                 <div

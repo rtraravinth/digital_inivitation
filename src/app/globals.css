@@ -579,6 +579,46 @@
   .seg-opt + .seg-opt {
     border-left: 1px solid var(--color-divider);
   }
+  /* The builder's section-style picker: one icon tile per style. The
+     suggested style carries a dot so it can be found without reading. */
+  .style-opt {
+    position: relative;
+    display: grid;
+    place-items: center;
+    aspect-ratio: 1;
+    min-height: 32px;
+    border: 1px solid var(--color-divider);
+    border-radius: var(--radius-sm, 6px);
+    color: var(--color-neutral-700);
+    cursor: pointer;
+    transition:
+      background-color 160ms var(--ease-out),
+      color 160ms var(--ease-out),
+      border-color 160ms var(--ease-out);
+  }
+  .style-opt:hover {
+    color: var(--color-ink);
+    background: var(--color-neutral-200);
+  }
+  .style-opt:has(input:checked) {
+    color: var(--color-bg);
+    background: var(--color-ink);
+    border-color: var(--color-ink);
+  }
+  .style-opt:has(input:focus-visible) {
+    outline: 2px solid var(--color-ink);
+    outline-offset: 2px;
+  }
+  .style-opt[data-suggested]::after {
+    content: "";
+    position: absolute;
+    top: 3px;
+    right: 3px;
+    width: 5px;
+    height: 5px;
+    border-radius: 999px;
+    background: currentColor;
+  }
   .seg-opt:has(input:checked) {
     background: var(--color-foil);
     color: var(--color-surface);
@@ -1224,6 +1264,213 @@
   }
   [data-motion="off"] .fc-frame:hover .fc-photo {
     transform: none;
+  }
+
+  /* — section styles (published/section-styles.tsx) —
+     The shape a tab's entries take. Colours and corners are the theme's own
+     --color-* and --fc-* tokens, so nothing here is per theme. */
+  .ss-lift {
+    transition: translate 0.35s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.35s ease;
+  }
+  .ss-lift:hover,
+  .ss-lift:focus-within {
+    translate: 0 -4px;
+    border-color: color-mix(in srgb, var(--color-mark) 55%, var(--fc-line));
+  }
+  .ss-zoom {
+    transition: transform 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  .ss-lift:hover .ss-zoom {
+    transform: scale(1.04);
+  }
+  [data-motion="off"] .ss-lift,
+  [data-motion="off"] .ss-zoom {
+    transition: none;
+    translate: none;
+    transform: none;
+  }
+  .ss-date {
+    color: var(--color-mark);
+  }
+  .ss-sub {
+    color: var(--color-mark);
+  }
+  .ss-placeholder {
+    background:
+      radial-gradient(circle at 20% 15%, color-mix(in srgb, var(--color-accent) 38%, transparent), transparent 60%),
+      radial-gradient(circle at 85% 90%, color-mix(in srgb, var(--color-accent) 22%, transparent), transparent 55%),
+      color-mix(in srgb, var(--color-ink) 4%, var(--color-bg));
+  }
+  .ss-placeholder-mark {
+    font-size: clamp(56px, 7vw, 96px);
+    line-height: 1;
+    color: transparent;
+    -webkit-text-stroke: 1.5px color-mix(in srgb, var(--color-ink) 45%, transparent);
+  }
+  .ss-bullets li {
+    position: relative;
+    padding-left: 1.25em;
+  }
+  .ss-bullets li::before {
+    content: "";
+    position: absolute;
+    left: 0.2em;
+    top: 0.7em;
+    width: 0.4em;
+    height: 0.4em;
+    border-radius: 999px;
+    background: var(--color-mark);
+  }
+  .ss-clamp {
+    display: -webkit-box;
+    -webkit-line-clamp: 4;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  /* Timeline: date gutter, rail, card. On a phone the gutter folds into the
+     card and the rail sits at the left edge. */
+  .ss-tl-item {
+    display: grid;
+    grid-template-columns: 22px minmax(0, 1fr);
+    column-gap: 14px;
+    position: relative;
+    padding-bottom: 20px;
+  }
+  .ss-tl-date {
+    display: none;
+  }
+  .ss-tl-rail {
+    position: relative;
+    grid-column: 1;
+    grid-row: 1;
+  }
+  .ss-tl-content {
+    grid-column: 2;
+    grid-row: 1;
+  }
+  .ss-tl-rail::before {
+    content: "";
+    position: absolute;
+    left: 50%;
+    top: 0;
+    bottom: -20px;
+    width: 1px;
+    translate: -50% 0;
+    background: var(--fc-line);
+  }
+  .ss-tl-item:first-child .ss-tl-rail::before {
+    top: 26px;
+  }
+  .ss-tl-item:last-child .ss-tl-rail::before {
+    bottom: auto;
+    height: 26px;
+  }
+  .ss-tl-item:only-child .ss-tl-rail::before {
+    display: none;
+  }
+  .ss-tl-dot {
+    position: absolute;
+    left: 50%;
+    top: 20px;
+    width: 13px;
+    height: 13px;
+    translate: -50% 0;
+    border-radius: 999px;
+    background: var(--color-bg);
+    border: 2px solid var(--color-mark);
+  }
+  .ss-tl-dot.is-now {
+    background: var(--color-mark);
+    box-shadow: 0 0 0 5px color-mix(in srgb, var(--color-accent) 22%, transparent);
+  }
+  .ss-now {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding: 2px 8px;
+    border-radius: var(--fx-pill, 0px);
+    color: var(--color-accent-ink);
+    background: var(--color-accent);
+  }
+  @media (min-width: 768px) {
+    .ss-tl-item {
+      grid-template-columns: minmax(120px, 180px) 32px minmax(0, 1fr);
+      column-gap: 20px;
+      padding-bottom: 28px;
+    }
+    .ss-tl-date {
+      display: block;
+      grid-column: 1;
+      grid-row: 1;
+      padding-top: 20px;
+      text-align: right;
+      color: var(--color-mark);
+    }
+    .ss-tl-rail {
+      grid-column: 2;
+    }
+    .ss-tl-content {
+      grid-column: 3;
+    }
+    .ss-tl-rail::before {
+      bottom: -28px;
+    }
+    .ss-tl-date-inline {
+      display: none;
+    }
+  }
+
+  /* Carousel: the poster's title sits on a shade over the picture. */
+  .ss-carousel {
+    scroll-padding-inline: 0;
+  }
+  .ss-poster-shade {
+    color: #fff;
+    background: linear-gradient(to top, rgb(0 0 0 / 0.78), rgb(0 0 0 / 0.35) 60%, transparent);
+    padding-top: 48px;
+  }
+
+  /* Side tabs: a ruled list whose open entry carries the mark. */
+  .ss-sidetab {
+    min-height: 44px;
+    padding: 10px 16px;
+    border: 0;
+    background: transparent;
+    color: var(--color-neutral-700);
+    border-bottom: 2px solid var(--fc-line);
+    cursor: pointer;
+    transition: color 0.2s ease, background-color 0.2s ease, border-color 0.2s ease;
+    max-width: 240px;
+  }
+  .ss-sidetab:hover {
+    color: var(--color-ink);
+    background: color-mix(in srgb, var(--color-ink) 4%, transparent);
+  }
+  .ss-sidetab.is-on {
+    color: var(--color-mark);
+    border-color: var(--color-mark);
+    background: color-mix(in srgb, var(--color-accent) 8%, transparent);
+  }
+  @media (min-width: 768px) {
+    .ss-sidetab {
+      max-width: none;
+      border-bottom: 0;
+      border-left: 2px solid var(--fc-line);
+    }
+  }
+
+  /* List: rows ruled with the theme's own line. */
+  .ss-list-row {
+    border-top: 1px solid var(--fc-line);
+  }
+  .ss-list-row:last-child {
+    border-bottom: 1px solid var(--fc-line);
+  }
+
+  .ss-chip {
+    margin: 0;
   }
 
   /* — reveal: one entrance per block, staggered by --fx-delay — */

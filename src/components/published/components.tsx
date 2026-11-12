@@ -5,8 +5,10 @@ import { useId, useRef, useState, type CSSProperties, type KeyboardEvent } from 
 import { LinkIcon, iconFor } from "@/lib/icons";
 import {
   assetSrc,
+  BLOCK_TYPES,
   componentHasContent,
   coverOf,
+  emptySection,
   galleryImages,
   isListBlock,
   lookOf,
@@ -26,6 +28,7 @@ import {
 } from "@/lib/types";
 import { listEntries, type ListEntry } from "@/lib/resume";
 import { CountUp, initials, useMotionLevel } from "./fx";
+import { renderStyle } from "./section-styles";
 import {
   HeaderLinks,
   SectionAside,
@@ -348,7 +351,21 @@ function ResumeListView({ p, section, block }: { p: Portfolio; section: Section;
     </>
   );
 
-  switch (lookOf(block)) {
+  const look = lookOf(block);
+  // The section styles, drawn over this list's entries: each entry stands in
+  // as a section, its organisation and dates on the description's first line,
+  // which is where `entryMeta()` reads them from.
+  if (look === "carousel" || look === "tabs" || look === "spotlight") {
+    const asSections = entries.map((e) => ({
+      ...emptySection(`resume-${block.type}-${e.id}`),
+      title: e.title,
+      description: [[e.sub, e.date].filter(Boolean).join(" · "), ...e.lines.map((l) => `• ${l}`)].filter(Boolean).join("\n"),
+      links: e.url ? [{ id: `${e.id}-link`, label: "Credential", url: e.url }] : [],
+    }));
+    return renderStyle(p, look, asSections, block.title || BLOCK_TYPES.find((t) => t.id === block.type)?.name || "Entries");
+  }
+
+  switch (look) {
     case "timeline":
       return (
         <ol className="fc-timeline m-0 list-none p-0">

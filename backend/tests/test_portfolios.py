@@ -30,6 +30,7 @@ async def test_create_blank_portfolio_starts_with_no_sections(auth_client):
         "tracking": "-0.015em",
         "photo": "colour",
         "motion": "full",
+        "sectionStyle": "theme",
     }
     # Blank is blank: nothing to delete before the first real section.
     assert body["sections"] == []
@@ -546,3 +547,36 @@ async def test_create_accepts_a_card_note(auth_client):
     )
     assert response.status_code == 201
     assert response.json()["summary"] == "For investors, and nobody else."
+
+
+async def test_layout_stores_a_section_style(auth_client, portfolio):
+    response = await auth_client.patch(
+        f"/api/v1/portfolios/{portfolio['id']}",
+        json={"layout": {"sectionStyle": "carousel"}},
+    )
+    assert response.status_code == 200, response.text
+    assert response.json()["layout"]["sectionStyle"] == "carousel"
+
+    again = await auth_client.get(f"/api/v1/portfolios/{portfolio['id']}")
+    assert again.json()["layout"]["sectionStyle"] == "carousel"
+    # The rest of the layout is left as it was.
+    assert again.json()["layout"]["grid"] == 2
+
+
+async def test_layout_rejects_an_unknown_section_style(auth_client, portfolio):
+    response = await auth_client.patch(
+        f"/api/v1/portfolios/{portfolio['id']}",
+        json={"layout": {"sectionStyle": "zigzag"}},
+    )
+    assert response.status_code == 422
+
+
+async def test_a_layout_stored_before_section_styles_reads_as_theme(auth_client, portfolio, db_session):
+    from sqlalchemy import text
+
+    await db_session.execute(
+        text("UPDATE portfolios SET layout = layout - 'sectionStyle' WHERE id = :id"),
+        {"id": portfolio["id"]},
+    )
+    layout = (await auth_client.get(f"/api/v1/portfolios/{portfolio['id']}")).json()["layout"]
+    assert layout["sectionStyle"] == "theme"

@@ -32,6 +32,7 @@ import {
   useTabFilter,
 } from "../shared";
 import { FeatureBand, FooterBody, footerHeadline, footerNote, runsOf, splitFeatures } from "../components";
+import { StyledSections } from "../section-styles";
 
 /* ── Meridian ─────────────────────────────────────────────────────────────
    For the people a visitor has to trust before anything else: a doctor, an
@@ -166,6 +167,7 @@ export function Meridian({ p }: { p: Portfolio }) {
               <div className="flex flex-col gap-20">
                 {runs.map((run) => (
                   <div key={run.id}>
+                    <StyledSections p={p} sections={run.cards}>
                     {run.cards.length > 0 && (
                       <div className={`grid gap-5 ${gridCols(p)}`}>
                         {run.cards.map((s, i) => (
@@ -175,6 +177,7 @@ export function Meridian({ p }: { p: Portfolio }) {
                         ))}
                       </div>
                     )}
+                    </StyledSections>
                     <Bands p={p} sections={run.features} afterCards={run.cards.length > 0} />
                   </div>
                 ))}
@@ -189,6 +192,7 @@ export function Meridian({ p }: { p: Portfolio }) {
                   vertical={nav === "rail"}
                 />
                 <div className="min-w-0">
+                  <StyledSections p={p} sections={splitFeatures(shown).cards}>
                   <div className={`grid gap-5 ${gridCols(p)}`} style={{ perspective: 1400 }}>
                     <AnimatePresence mode="popLayout" initial={false}>
                       {splitFeatures(shown).cards.map((s, i) => (
@@ -198,6 +202,7 @@ export function Meridian({ p }: { p: Portfolio }) {
                       ))}
                     </AnimatePresence>
                   </div>
+                  </StyledSections>
                   <Bands p={p} sections={splitFeatures(shown).features} afterCards={splitFeatures(shown).cards.length > 0} key={tab} />
                 </div>
               </div>

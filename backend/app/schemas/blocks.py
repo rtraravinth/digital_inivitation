@@ -128,7 +128,7 @@ class ResumeListBlock(_Block):
     type: Literal["experience", "education", "skills", "certifications", "languages", "awards"]
     #: How the page draws it. Not every look suits every list; the page
     #: falls back to the list's own default rather than refusing one here.
-    look: Literal["list", "cards", "timeline", "tags"] = "list"
+    look: Literal["list", "cards", "timeline", "tags", "carousel", "tabs", "spotlight"] = "list"
 
 
 class TimelineBlock(_Block):

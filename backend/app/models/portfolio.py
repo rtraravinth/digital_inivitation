@@ -60,6 +60,7 @@ def default_layout() -> dict[str, Any]:
         "tracking": DEFAULT_TRACKING,
         "photo": "colour",
         "motion": "full",
+        "sectionStyle": "theme",
     }
 
 

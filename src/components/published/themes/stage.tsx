@@ -30,6 +30,7 @@ import {
   visibleSections,
 } from "../shared";
 import { FeatureBand, FooterBody, footerHeadline, footerNote, menuOf, runsOf, type Run } from "../components";
+import { StyledSections, pickedStyle } from "../section-styles";
 
 /* ── Stage ────────────────────────────────────────────────────────────────
    For people who perform. The portrait is a billboard that fills the first
@@ -266,6 +267,8 @@ function Rail({ p, run, all }: { p: Portfolio; run: Run; all: Section[] }) {
   const { id, cards, features } = run;
   const trackId = `${id}-track`;
   // Posters for the plain entries; a feature runs as a band under the rail.
+  // A picked section style replaces the poster rail, and its buttons with it.
+  const styled = pickedStyle(p) !== null;
 
   // Steps the rail by most of its own width, inside its own document, and
   // never the page: the rail is the only thing that scrolls sideways.
@@ -284,7 +287,7 @@ function Rail({ p, run, all }: { p: Portfolio; run: Run; all: Section[] }) {
   return (
     <section id={id} className="scroll-mt-16 py-10 md:py-14">
       {/* No heading over the row: every poster carries its own title. */}
-      {cards.length > 1 && (
+      {cards.length > 1 && !styled && (
         <div className="mb-4 hidden justify-end gap-2 px-12 md:flex">
           <button
             type="button"
@@ -306,7 +309,11 @@ function Rail({ p, run, all }: { p: Portfolio; run: Run; all: Section[] }) {
           </button>
         </div>
       )}
-      {cards.length > 0 && (
+      {styled ? (
+        <div className="px-5 md:px-12">
+          <StyledSections p={p} sections={cards} />
+        </div>
+      ) : cards.length > 0 && (
       <div
         id={trackId}
         className="fx-rail flex snap-x snap-mandatory gap-4 overflow-x-auto px-5 pt-2 pb-6 md:gap-6 md:px-12"

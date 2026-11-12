@@ -96,12 +96,17 @@ export const GALLERY_LAYOUTS: Array<{ id: GalleryLayout; name: string; desc: str
 export type GalleryBlock = BlockBase & { type: "gallery"; layout: GalleryLayout; imageIds: string[] };
 
 /** How the page draws one of the resume's lists. */
-export type ListLook = "list" | "cards" | "timeline" | "tags";
+export type ListLook = "list" | "cards" | "timeline" | "tags" | "carousel" | "tabs" | "spotlight";
 export const LOOK_NAME: Record<ListLook, { name: string; desc: string }> = {
   timeline: { name: "Timeline", desc: "Dates down a rail, most recent first." },
   list: { name: "List", desc: "Ruled rows, one entry each." },
   cards: { name: "Cards", desc: "A grid of cards." },
   tags: { name: "Tags", desc: "Short labels in a row." },
+  // The three below are section styles (published/section-styles.tsx) drawn
+  // over a list's entries, so a list and the page's plain sections can match.
+  carousel: { name: "Carousel", desc: "One row of cards that slides sideways." },
+  tabs: { name: "Side tabs", desc: "A list of titles beside the open entry." },
+  spotlight: { name: "Spotlight", desc: "Big rows, one entry each." },
 };
 /**
  * One of the resume's lists, shown in this section. Like a gallery, it
@@ -748,7 +753,38 @@ export type Layout = {
   tracking: string;
   photo: PhotoTreatment;
   motion: MotionLevel;
+  /**
+   * The shape the page's plain sections take — the ones a theme would draw
+   * as cards. "theme" leaves it to the theme. One choice for the whole page:
+   * a section files under nothing but its own title, so there is no tab to
+   * hang a per-group choice on. Mirrors `Layout.section_style` on the API.
+   */
+  sectionStyle: SectionStyle;
 };
+
+/**
+ * How plain sections are drawn, whatever the theme. The theme still supplies
+ * every colour, face and corner; the style decides the shape — a timeline
+ * for a career, a sliding row for projects, chips for skills.
+ */
+export type SectionStyle = "theme" | "grid" | "timeline" | "carousel" | "tabs" | "list" | "spotlight" | "chips";
+
+export const SECTION_STYLES: Array<{ id: SectionStyle; name: string; desc: string }> = [
+  { id: "theme", name: "Theme", desc: "However the theme draws its sections." },
+  { id: "grid", name: "Cards", desc: "A grid of cards with a cover picture." },
+  { id: "timeline", name: "Timeline", desc: "Dated entries down a line." },
+  { id: "carousel", name: "Carousel", desc: "One row of cards that slides sideways." },
+  { id: "tabs", name: "Side tabs", desc: "A list of titles beside the open one." },
+  { id: "list", name: "List", desc: "Compact ruled rows." },
+  { id: "spotlight", name: "Spotlight", desc: "Big alternating rows of picture and text. Suits case studies." },
+  { id: "chips", name: "Chips", desc: "Each section's items as tags. Suits skills and tools." },
+];
+
+const SECTION_STYLE_IDS = new Set<string>(SECTION_STYLES.map((s) => s.id));
+
+export function isSectionStyle(v: unknown): v is SectionStyle {
+  return typeof v === "string" && SECTION_STYLE_IDS.has(v);
+}
 
 export function defaultLayout(): Layout {
   return {
@@ -759,6 +795,7 @@ export function defaultLayout(): Layout {
     tracking: DEFAULT_TRACKING,
     photo: "colour",
     motion: "full",
+    sectionStyle: "theme",
   };
 }
 
@@ -838,6 +875,7 @@ export function normalize(p: Portfolio): Portfolio {
       tracking: layout.tracking ?? DEFAULT_TRACKING,
       photo: layout.photo ?? "colour",
       motion: layout.motion ?? "full",
+      sectionStyle: isSectionStyle(layout.sectionStyle) ? layout.sectionStyle : "theme",
     },
     resume: normalizeResume(p.resume),
     header: {
@@ -1237,12 +1275,12 @@ export const PAGE_BLOCKS: PageBlock[] = ["experience", "education", "skills", "c
 /** The looks each list can take on the page; the first is its default.
  *  A stored look a list does not have falls back to that default. */
 export const LIST_LOOKS: Record<PageBlock, ListLook[]> = {
-  experience: ["timeline", "cards", "list"],
-  education: ["list", "cards", "timeline"],
+  experience: ["timeline", "cards", "list", "carousel", "tabs", "spotlight"],
+  education: ["list", "cards", "timeline", "carousel", "tabs", "spotlight"],
   skills: ["tags", "list"],
-  certifications: ["list", "cards"],
+  certifications: ["list", "cards", "carousel", "tabs", "spotlight"],
   languages: ["tags", "list"],
-  awards: ["list", "cards", "timeline"],
+  awards: ["list", "cards", "timeline", "carousel", "tabs", "spotlight"],
 };
 
 export function isListBlock(b: Block): b is ResumeListBlock {

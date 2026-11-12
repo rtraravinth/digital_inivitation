@@ -29,7 +29,7 @@ because the connection never arrives. Pass flags through when you need them:
 ```
 npm run build
 npm run lint
-cd backend && .venv/bin/python -m pytest    # 340 tests (.venv/Scripts on Windows)
+cd backend && .venv/bin/python -m pytest    # 343 tests (.venv/Scripts on Windows)
 ```
 
 `NEXT_PUBLIC_API_URL` points the frontend at the API; see
@@ -227,9 +227,30 @@ chrome — that inconsistency is what this replaced.
   a new section named after the list with its component inside; it is a
   shortcut, not a different kind of section.
 - **Words in the editor, looks in the builder.** A gallery's layout and a
-  list's look are picked in the builder's Look tab (`ComponentLooksControl`
-  in `builder/controls.tsx`), beside the canvas that shows the change. The
-  editor's component panels have no look controls; do not add one there.
+  list's look are picked in the builder's Motion tab, under Layout
+  (`ComponentLooksControl` in `builder/controls.tsx`), beside the canvas
+  that shows the change. The editor's component panels have no look
+  controls; do not add one there.
+- **One section style for the page.** `p.layout.sectionStyle` (Theme, Cards,
+  Timeline, Carousel, Side tabs, List, Spotlight, Chips) is the shape the
+  page's *plain* sections take — the ones a theme would draw as cards — in
+  every theme, with the theme's own colours and corners. It is in the layout
+  JSON, so no migration; the API validates it as `Layout.section_style`.
+  `StyledSections` in `published/section-styles.tsx` wraps each theme's own
+  card markup and replaces it only when a style is picked; bands (sections
+  with components) follow unchanged, and Bio ignores it. It came from
+  `feature/section_style_changes`, where a style was chosen per tab; there
+  is no tab now, so it is one choice, applied to each run of plain sections.
+  Dates and the organisation are read off a description's first line
+  (`entryMeta`). `SectionStyleControl` shows `suggestStyle()` as a hint and
+  has a "Match everything to its content" button, which also sets each
+  resume list to its kind's default look. Nothing is applied without that
+  click.
+- **A resume list can borrow three of those shapes.** Carousel, Side tabs
+  and Spotlight are looks for Experience, Education, Certifications and
+  Awards. `ResumeListView` hands the entries to `renderStyle()` as stand-in
+  sections (id `resume-…`), and `SectionTitleLink` draws such a title as
+  plain text, because an entry has no page of its own to open.
 - **The editor's outline is as tall as the window, never taller.** Its list
   scrolls inside it and "Add section" plus "Quick add" are
   pinned under the list, so they are in view however many sections there
@@ -692,7 +713,7 @@ claim to be the live page.
 - **Slugs are global.** Two accounts cannot both hold `rohan`, because the
   address is `facet.page/<slug>` with nothing in front of it. The create
   dialog surfaces the 409 as a message.
-- **The frontend has no test runner.** The backend has 340 pytest tests;
+- **The frontend has no test runner.** The backend has 343 pytest tests;
   changes here are checked with `npm run lint`, `npm run build` and by
   actually opening the app.
 

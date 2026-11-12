@@ -1256,6 +1256,9 @@ export function SectionTitleLink({
   className: string;
 }) {
   const pageHref = usePageHref(p);
+  // An entry of a resume list, drawn in a section style: it has no page of
+  // its own to open, so its title is only a title.
+  if (section.id.startsWith("resume-")) return <span className={className.replace(/\bhover:underline\b/, "")}>{section.title}</span>;
   return (
     <Link
       href={`${pageHref}?section=${section.id}`}

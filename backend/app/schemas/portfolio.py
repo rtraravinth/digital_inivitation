@@ -18,6 +18,7 @@ from app.models.enums import (
     PortfolioStatus,
     PhotoTreatment,
     RoleNav,
+    SectionStyle,
     ThemeId,
     TypeScale,
 )
@@ -55,6 +56,9 @@ class Layout(StrictCamelModel):
     tracking: str = Field(default=DEFAULT_TRACKING, max_length=32)
     photo: PhotoTreatment = "colour"
     motion: MotionLevel = "full"
+    #: The shape the page's plain sections take, whatever the theme. A row
+    #: stored before this existed has no key and reads as "theme".
+    section_style: SectionStyle = "theme"
 
 
 class Footer(StrictCamelModel):

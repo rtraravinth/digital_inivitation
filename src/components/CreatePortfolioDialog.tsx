@@ -72,7 +72,7 @@ export function CreatePortfolioDialog({
     {
       id: "blank",
       title: "Blank",
-      desc: "A header and one empty section.",
+      desc: "A header and nothing else. Add sections as you go.",
       icon: <Glyph id="plus" size={16} />,
     },
     {

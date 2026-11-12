@@ -7,7 +7,7 @@ import pytest
 from app.models.enums import FONTS, THEMES
 
 
-async def test_create_blank_portfolio_starts_with_one_empty_section(auth_client):
+async def test_create_blank_portfolio_starts_with_no_sections(auth_client):
     response = await auth_client.post(
         "/api/v1/portfolios",
         json={"name": "Rohan Mehta", "slug": "rohan", "startFrom": {"kind": "blank"}},
@@ -31,9 +31,9 @@ async def test_create_blank_portfolio_starts_with_one_empty_section(auth_client)
         "photo": "colour",
         "motion": "full",
     }
-    assert len(body["sections"]) == 1
-    assert body["sections"][0]["title"] == ""
-    assert body["meta"] == "1 section · just now"
+    # Blank is blank: nothing to delete before the first real section.
+    assert body["sections"] == []
+    assert body["meta"] == "0 sections · just now"
 
 
 async def test_create_founder_portfolio_seeds_three_titled_sections(auth_client):
@@ -136,7 +136,7 @@ async def test_list_only_returns_my_portfolios(auth_client, other_auth_client):
 
     rows = (await auth_client.get("/api/v1/portfolios")).json()
     assert [row["name"] for row in rows] == ["Mine"]
-    assert rows[0]["sectionCount"] == 1
+    assert rows[0]["sectionCount"] == 0
 
 
 async def test_reading_another_users_portfolio_is_404_not_403(auth_client, other_auth_client):

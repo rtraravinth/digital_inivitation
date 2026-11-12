@@ -189,7 +189,9 @@ async def test_touching_a_section_of_another_users_portfolio_is_404(
             json={"name": "T", "slug": "theirs-sec", "startFrom": {"kind": "blank"}},
         )
     ).json()
-    section_id = theirs["sections"][0]["id"]
+    section_id = (
+        await other_auth_client.post(f"/api/v1/portfolios/{theirs['id']}/sections", json={})
+    ).json()["id"]
 
     response = await auth_client.patch(
         f"/api/v1/portfolios/{theirs['id']}/sections/{section_id}", json={"title": "hijack"}
@@ -208,7 +210,9 @@ async def test_a_section_id_from_another_portfolio_is_404(auth_client, portfolio
             json={"name": "Other", "slug": "other-sec", "startFrom": {"kind": "blank"}},
         )
     ).json()
-    foreign_section = other["sections"][0]["id"]
+    foreign_section = (
+        await auth_client.post(f"/api/v1/portfolios/{other['id']}/sections", json={})
+    ).json()["id"]
 
     response = await auth_client.patch(
         f"/api/v1/portfolios/{portfolio['id']}/sections/{foreign_section}",

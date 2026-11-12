@@ -83,13 +83,19 @@ async def other_auth_client(app) -> AsyncIterator[AsyncClient]:
 
 @pytest.fixture
 async def portfolio(auth_client: AsyncClient) -> dict:
-    """A blank portfolio, as the create dialog's first option makes it."""
+    """A portfolio with one empty section: a blank one, plus its first."""
     response = await auth_client.post(
         "/api/v1/portfolios",
         json={"name": "Rohan Mehta", "slug": "rohan", "startFrom": {"kind": "blank"}},
     )
     assert response.status_code == 201, response.text
-    return response.json()
+    created = response.json()
+
+    # A blank portfolio has no sections. Most tests are about one, so this
+    # fixture adds it, the way its owner would as their first step.
+    added = await auth_client.post(f"/api/v1/portfolios/{created['id']}/sections", json={})
+    assert added.status_code == 201, added.text
+    return (await auth_client.get(f"/api/v1/portfolios/{created['id']}")).json()
 
 
 @pytest.fixture

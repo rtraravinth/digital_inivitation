@@ -364,8 +364,8 @@ export function Editor({ id }: { id: string }) {
                 >
                   <p className="m-0 text-[15px] font-medium">No sections yet</p>
                   <p className="m-0 mt-1 text-[13.5px] text-muted">
-                    A section is one thing you do or did — a job, a project, a cause. Each one
-                    files under a tab on your page.
+                    A section is one thing you do or did — a job, a project, a cause. Add one below,
+                    or start from a resume list with Quick add.
                   </p>
                 </div>
               )}

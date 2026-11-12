@@ -290,7 +290,9 @@ class PortfolioService:
                 for index, section in enumerate(source.sections)
             ]
 
-        return [Section(position=0, tab=DEFAULT_TAB, links=[])]
+        # Blank is blank: a header and no sections. It used to start with one
+        # empty section, which was a thing to delete before anything else.
+        return []
 
     async def update(self, portfolio: Portfolio, patch: PortfolioPatch) -> Portfolio:
         changes = patch.model_dump(exclude_unset=True, exclude_none=True)

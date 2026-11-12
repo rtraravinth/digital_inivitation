@@ -127,6 +127,34 @@ export function Meridian({ p }: { p: Portfolio }) {
             </section>
           )}
 
+          {/* The header's timeline sits with the header — its numbers, then its
+              dates — before the sections, not after them: both are about the
+              person, and were typed in the header's card. */}
+          {dates.length > 0 && (
+            <section className="px-5 pt-14 md:px-10 md:pt-20">
+              <div className="mx-auto max-w-[1160px]">
+                <ChapterHead index={-1} title="Timeline" />
+                <ol className="m-0 grid grid-cols-1 list-none gap-0 p-0 md:grid-cols-2 md:gap-x-16">
+                  {dates.map((d, i) => (
+                    <Reveal
+                      as="li"
+                      key={d.id}
+                      kind="up"
+                      delay={(i % 6) * 60}
+                      className="grid grid-cols-[88px_minmax(0,1fr)] gap-4 py-5"
+                      style={{ borderTop: "1px solid var(--color-divider)" }}
+                    >
+                      <span className="font-heading figure text-[20px]" style={{ color: "var(--color-mark)" }}>
+                        {d.year}
+                      </span>
+                      <span className="text-[16px] leading-[1.55]">{d.text}</span>
+                    </Reveal>
+                  ))}
+                </ol>
+              </div>
+            </section>
+          )}
+
           {/* The page's side margin is the hero's, so the work lines up under
               it; density only sets the vertical rhythm. `pad().page` carries
               its own horizontal padding and would indent this past the hero. */}
@@ -176,30 +204,6 @@ export function Meridian({ p }: { p: Portfolio }) {
             )}
           </section>
 
-          {dates.length > 0 && (
-            <section className="px-5 pb-20 md:px-10 md:pb-28">
-              <div className="mx-auto max-w-[1160px]">
-                <ChapterHead index={-1} title="Timeline" />
-                <ol className="m-0 grid grid-cols-1 list-none gap-0 p-0 md:grid-cols-2 md:gap-x-16">
-                  {dates.map((d, i) => (
-                    <Reveal
-                      as="li"
-                      key={d.id}
-                      kind="up"
-                      delay={(i % 6) * 60}
-                      className="grid grid-cols-[88px_minmax(0,1fr)] gap-4 py-5"
-                      style={{ borderTop: "1px solid var(--color-divider)" }}
-                    >
-                      <span className="font-heading figure text-[20px]" style={{ color: "var(--color-mark)" }}>
-                        {d.year}
-                      </span>
-                      <span className="text-[16px] leading-[1.55]">{d.text}</span>
-                    </Reveal>
-                  ))}
-                </ol>
-              </div>
-            </section>
-          )}
         </>
       )}
 

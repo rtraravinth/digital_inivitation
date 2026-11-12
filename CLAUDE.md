@@ -152,6 +152,13 @@ redeploys). `scripts/start.sh` migrates, optionally creates a demo account
 - `src/app/globals.css` — the Modernist design system: tokens in `@theme`,
   component classes in `@layer components`.
 
+**The header's numbers and timeline are drawn with the header, before the
+sections.** Both are typed in the header's card, so in every theme the order
+is hero, numbers, timeline, then the sections. The timeline used to come
+after the last section, where it read as a section of its own nobody had
+added. Its block carries top padding only; the sections' own padding is what
+separates them from it.
+
 **The live canvas is an iframe, and it has to be.** A theme's `md:` and `lg:`
 utilities are media queries, and a media query answers about the *window* — so
 a 390px box inside a 1440px window still got the desktop layout, crammed and

@@ -115,10 +115,9 @@ export function Stage({ p }: { p: Portfolio }) {
         </section>
       )}
 
-      {runs.map((run) => (
-        <Rail key={run.id} p={p} run={run} all={all} />
-      ))}
-
+      {/* The header's timeline sits with the header — its numbers, then its
+          dates — before the sections, not after them: both are about the
+          person, and were typed in the header's card. */}
       {dates.length > 0 && (
         <section className="px-5 py-16 md:px-12 md:py-24">
           <h2 className="mb-10" style={{ ...headline("clamp(32px, 4.6vw, 60px)"), lineHeight: 1 }}>
@@ -146,6 +145,10 @@ export function Stage({ p }: { p: Portfolio }) {
           </ol>
         </section>
       )}
+
+      {runs.map((run) => (
+        <Rail key={run.id} p={p} run={run} all={all} />
+      ))}
 
       <footer id={contactId} className="scroll-mt-16 px-5 pt-20 pb-12 md:px-12 md:pt-28">
         <Reveal kind="up">

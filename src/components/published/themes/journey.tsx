@@ -94,6 +94,11 @@ export function Journey({ p }: { p: Portfolio }) {
         </section>
       )}
 
+      {/* The header's timeline sits with the header — its numbers, then its
+          dates — before the sections, not after them: both are about the
+          person, and were typed in the header's card. */}
+      {dates.length > 0 && <Milestones p={p} />}
+
       {runs.map((run) => (
         <section key={run.id} id={run.id} className={`scroll-mt-6 px-5 md:px-10 ${CHAPTER_PAD[p.layout.density]}`}>
           <div className="mx-auto max-w-[1080px]">
@@ -116,8 +121,6 @@ export function Journey({ p }: { p: Portfolio }) {
           </div>
         </section>
       ))}
-
-      {dates.length > 0 && <Milestones p={p} />}
 
       <footer id={contactId} className="scroll-mt-6 px-5 pt-10 pb-12 md:px-10">
         <Reveal
@@ -369,7 +372,9 @@ function StackCard({
 function Milestones({ p }: { p: Portfolio }) {
   const dates = allDates(p);
   return (
-    <section className="px-5 pb-20 md:px-10">
+    // Under the header's numbers now, with the sections' own padding below
+    // it: room above, none of its own beneath.
+    <section className="px-5 pt-16 md:px-10 md:pt-24">
       <div className="mx-auto max-w-[1080px]">
         <h2 className="mb-12 text-center" style={{ ...headline("clamp(32px, 4.6vw, 56px)"), lineHeight: 1 }}>
           Milestones

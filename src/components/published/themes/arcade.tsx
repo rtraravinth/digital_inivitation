@@ -128,6 +128,44 @@ export function Arcade({ p }: { p: Portfolio }) {
         </section>
       )}
 
+      {/* The header's timeline sits with the header — its numbers, then its
+          dates — before the sections, not after them: both are about the
+          person, and were typed in the header's card. */}
+      {dates.length > 0 && (
+        <section className="relative z-10 px-5 py-14 md:px-10 md:py-20">
+          <div className="mx-auto max-w-[1200px]">
+            <h2 className="font-heading mb-8 text-[13px] tracking-[0.24em] uppercase" style={{ color: "var(--color-mark)" }}>
+              Achievements
+            </h2>
+            <ol className="m-0 grid grid-cols-1 list-none gap-3 p-0 md:grid-cols-2">
+              {dates.map((d, i) => (
+                <Reveal
+                  as="li"
+                  key={d.id}
+                  kind="left"
+                  delay={(i % 6) * 60}
+                  className="arcade-cut flex items-center gap-4 p-4"
+                  style={{ background: "color-mix(in srgb, var(--color-ink) 5%, var(--color-bg))" }}
+                >
+                  <span
+                    aria-hidden
+                    className="h-4 w-4 flex-none rotate-45"
+                    style={{
+                      background: "var(--color-accent)",
+                      boxShadow: "0 0 14px var(--color-accent)",
+                    }}
+                  />
+                  <span className="font-heading figure flex-none text-[18px]" style={{ color: "var(--color-mark)" }}>
+                    {d.year}
+                  </span>
+                  <span className="text-[15px] leading-[1.5]">{d.text}</span>
+                </Reveal>
+              ))}
+            </ol>
+          </div>
+        </section>
+      )}
+
       {levels.length > 0 && (
         <section id={levelsId} className="relative z-10 scroll-mt-20 px-5 py-14 md:px-10 md:py-20">
           <div className="mx-auto grid grid-cols-1 max-w-[1200px] gap-8 md:grid-cols-[260px_minmax(0,1fr)] md:gap-10">
@@ -200,41 +238,6 @@ export function Arcade({ p }: { p: Portfolio }) {
               </Reveal>
             ))}
             </div>
-          </div>
-        </section>
-      )}
-
-      {dates.length > 0 && (
-        <section className="relative z-10 px-5 py-14 md:px-10 md:py-20">
-          <div className="mx-auto max-w-[1200px]">
-            <h2 className="font-heading mb-8 text-[13px] tracking-[0.24em] uppercase" style={{ color: "var(--color-mark)" }}>
-              Achievements
-            </h2>
-            <ol className="m-0 grid grid-cols-1 list-none gap-3 p-0 md:grid-cols-2">
-              {dates.map((d, i) => (
-                <Reveal
-                  as="li"
-                  key={d.id}
-                  kind="left"
-                  delay={(i % 6) * 60}
-                  className="arcade-cut flex items-center gap-4 p-4"
-                  style={{ background: "color-mix(in srgb, var(--color-ink) 5%, var(--color-bg))" }}
-                >
-                  <span
-                    aria-hidden
-                    className="h-4 w-4 flex-none rotate-45"
-                    style={{
-                      background: "var(--color-accent)",
-                      boxShadow: "0 0 14px var(--color-accent)",
-                    }}
-                  />
-                  <span className="font-heading figure flex-none text-[18px]" style={{ color: "var(--color-mark)" }}>
-                    {d.year}
-                  </span>
-                  <span className="text-[15px] leading-[1.5]">{d.text}</span>
-                </Reveal>
-              ))}
-            </ol>
           </div>
         </section>
       )}

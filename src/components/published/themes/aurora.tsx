@@ -167,6 +167,11 @@ export function Aurora({ p }: { p: Portfolio }) {
         </section>
       )}
 
+      {/* The header's timeline sits with the header — its numbers, then its
+          dates — before the sections, not after them: both are about the
+          person, and were typed in the header's card. */}
+      {dates.length > 0 && <Timeline p={p} />}
+
       {runs.map((run) => (
         <section
           key={run.id}
@@ -202,8 +207,6 @@ export function Aurora({ p }: { p: Portfolio }) {
           </div>
         </section>
       ))}
-
-      {dates.length > 0 && <Timeline p={p} />}
 
       <footer id={contactId} className="relative scroll-mt-20 px-5 pt-16 pb-12 md:px-10 md:pt-24">
         <Reveal

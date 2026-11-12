@@ -807,8 +807,10 @@ function ago(iso: string, now: number): string {
   return n(Math.floor(days / 365), "year");
 }
 
+// The colour is a class, not an inline style: an inline `color` outranks
+// every class, `hover:` included, so the label stayed ink on the ink pill.
 const DOCK_ITEM =
-  "flex h-8 cursor-pointer items-center gap-1.5 rounded-full px-3 text-[12.5px] font-medium no-underline transition-colors hover:bg-[var(--color-ink)] hover:text-[var(--color-bg)]";
+  "flex h-8 cursor-pointer items-center gap-1.5 rounded-full px-3 text-[12.5px] font-medium no-underline transition-colors text-[var(--color-ink)] hover:bg-[var(--color-ink)] hover:text-[var(--color-bg)] focus-visible:bg-[var(--color-ink)] focus-visible:text-[var(--color-bg)]";
 
 function DockLink({ href, icon, label, external }: { href: string; icon: React.ReactNode; label: string; external?: boolean }) {
   const content = (
@@ -818,11 +820,11 @@ function DockLink({ href, icon, label, external }: { href: string; icon: React.R
     </>
   );
   return external ? (
-    <a href={href} target="_blank" rel="noopener noreferrer" className={DOCK_ITEM} style={{ color: "var(--color-ink)" }}>
+    <a href={href} target="_blank" rel="noopener noreferrer" className={DOCK_ITEM}>
       {content}
     </a>
   ) : (
-    <Link href={href} className={DOCK_ITEM} style={{ color: "var(--color-ink)" }}>
+    <Link href={href} className={DOCK_ITEM}>
       {content}
     </Link>
   );
@@ -830,7 +832,7 @@ function DockLink({ href, icon, label, external }: { href: string; icon: React.R
 
 function DockButton({ onClick, icon, label }: { onClick: () => void; icon: React.ReactNode; label: string }) {
   return (
-    <button type="button" onClick={onClick} className={DOCK_ITEM} style={{ color: "var(--color-ink)" }}>
+    <button type="button" onClick={onClick} className={DOCK_ITEM}>
       <Icon d={icon} size={13} />
       {label}
     </button>

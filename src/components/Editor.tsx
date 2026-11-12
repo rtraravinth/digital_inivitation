@@ -13,7 +13,6 @@ import { COMPONENT_ICON, ComponentChip, ComponentPanel, ComponentPicker, CoverFi
 import { ICON, Icon, IconButton, LookToggles, StatusPill } from "./ui";
 import { Glyph } from "@/lib/glyphs";
 import { LinkIcon, iconFor } from "@/lib/icons";
-import { resumePrintPath } from "@/lib/resume";
 import { usePortfolios } from "@/lib/store";
 import {
   BLOCK_TYPES,
@@ -157,18 +156,8 @@ export function Editor({ id }: { id: string }) {
           </span>
           <span className="ml-auto flex flex-none items-center gap-2">
             <Link href={`/builder/${p.id}`} className="btn btn-secondary hidden md:inline-flex" style={{ marginTop: 0, minHeight: 34 }}>
-              Builder
+              Open builder
             </Link>
-            <a
-              href={resumePrintPath(p.id)}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="btn btn-secondary hidden sm:inline-flex"
-              style={{ marginTop: 0, minHeight: 34 }}
-            >
-              <Icon d={<path d="M12 4v11m0 0-4-4m4 4 4-4M5 20h14" />} size={14} />
-              Resume PDF
-            </a>
             <a
               href={previewPath(p.id)}
               target="_blank"
@@ -227,16 +216,22 @@ export function Editor({ id }: { id: string }) {
               <span className="mb-2 block flex-none px-3 text-[12px] font-medium" style={{ color: "var(--color-neutral-600)" }}>
                 Outline
               </span>
+              {/* Header, the sections, "Add section", footer: the order of
+                  the page, with the button where a new section lands. Only
+                  the sections scroll, so the button and the footer stay in
+                  view under them however many there are. */}
+              <ul className="m-0 flex flex-none list-none flex-col gap-0.5 p-0">
+                <OutlineItem
+                  id={HEADER}
+                  on={open === HEADER}
+                  number="—"
+                  title={p.header.name || "Header"}
+                  sub="Header"
+                  onPick={() => setOpen(HEADER)}
+                />
+              </ul>
               <div className="-mr-2 min-h-0 flex-1 overflow-y-auto overscroll-contain pr-2">
                 <ul className="m-0 flex list-none flex-col gap-0.5 p-0">
-                  <OutlineItem
-                    id={HEADER}
-                    on={open === HEADER}
-                    number="—"
-                    title={p.header.name || "Header"}
-                    sub="Header"
-                    onPick={() => setOpen(HEADER)}
-                  />
                   {p.sections.map((s, i) => (
                     <OutlineItem
                       key={s.id}
@@ -250,7 +245,14 @@ export function Editor({ id }: { id: string }) {
                     />
                   ))}
                 </ul>
-                <ul className="m-0 mt-1 flex list-none flex-col gap-0.5 p-0 pt-2" style={{ borderTop: "1px solid var(--color-divider)" }}>
+              </div>
+
+              <div className="flex flex-none flex-col gap-1 pt-1">
+                <button type="button" className="btn btn-secondary w-full justify-center" style={{ marginTop: 0 }} onClick={add}>
+                  <Glyph id="plus" size={14} />
+                  Add section
+                </button>
+                <ul className="m-0 flex list-none flex-col gap-0.5 p-0">
                   <OutlineItem
                     id={FOOTER}
                     on={open === FOOTER}
@@ -263,10 +265,6 @@ export function Editor({ id }: { id: string }) {
               </div>
 
               <div className="mt-2 flex flex-none flex-col gap-3 pt-3" style={{ borderTop: "1px solid var(--color-divider)" }}>
-                <button type="button" className="btn btn-secondary w-full justify-center" style={{ marginTop: 0 }} onClick={add}>
-                  <Glyph id="plus" size={14} />
-                  Add section
-                </button>
                 <QuickAdd onAdd={quickAdd} compact />
               </div>
             </nav>
@@ -578,11 +576,6 @@ function HeaderCard({
       tools={
         <span className="flex items-center gap-1">
           <LookToggles name="the header" page resume />
-          {open && (
-            <button type="button" className="btn btn-primary ml-1" style={{ marginTop: 0, minHeight: 32, fontSize: 13 }} onClick={onClose}>
-              Done
-            </button>
-          )}
         </span>
       }
       preview={
@@ -747,11 +740,6 @@ function SectionCard({
               <Glyph id="down" size={15} />
             </span>
           </IconButton>
-          {open && (
-            <button type="button" className="btn btn-primary ml-1" style={{ marginTop: 0, minHeight: 32, fontSize: 13 }} onClick={onClose}>
-              Done
-            </button>
-          )}
         </span>
       }
       preview={
@@ -924,11 +912,6 @@ function FooterCard({
       tools={
         <span className="flex items-center gap-1">
           <LookToggles name="the footer" page resume={null} />
-          {open && (
-            <button type="button" className="btn btn-primary ml-1" style={{ marginTop: 0, minHeight: 32, fontSize: 13 }} onClick={onClose}>
-              Done
-            </button>
-          )}
         </span>
       }
       preview={

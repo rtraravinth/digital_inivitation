@@ -258,16 +258,20 @@ chrome — that inconsistency is what this replaced.
   without a click. An earlier version styled only the plain sections, so a
   style picked for the page did nothing to an Experience section — which is
   what "the style is not applied" meant.
-- **The editor's outline is as tall as the window, never taller.** Its list
-  scrolls inside it and "Add section" plus "Quick add" are
-  pinned under the list, so they are in view however many sections there
-  are. The page title sits in the document column for the same reason: above
+- **The editor's outline is as tall as the window, never taller.** It reads
+  in the page's order — header, sections, "Add section", footer — and only
+  the sections scroll, so "Add section", the footer and "Quick add" below
+  them stay in view however many sections there are. The page title sits in the document column for the same reason: above
   both columns it pushed the outline down past a short window. Below `lg`
   there is no outline, and the same two controls sit under the cards.
 - **A blank portfolio starts with no sections.** The create dialog's
   "Blank" used to add one empty section, which was a thing to delete first.
   Only "Copy a page" and "Founder" start with sections, because picking
   either asks for them. The test fixture `portfolio` adds one itself.
+- **One Done per card, at its foot.** An open card's top bar carries only
+  its switches and move buttons. The editor's top bar has "Open builder",
+  "Preview" and "Publish"; the resume PDF is downloaded from the builder's
+  Resume side, not here.
 - **There are no built-in cards.** The editor is header, sections, footer.
   The resume's private contact line lives in the header card ("Resume
   contact details"). It is deliberately *not* a component: it never leaves

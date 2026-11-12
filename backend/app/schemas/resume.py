@@ -130,6 +130,9 @@ class ResumeStyle(StrictCamelModel):
     photo: bool = False
     columns: ResumeColumns = "auto"
     backdrop: ResumeBackdrop = "none"
+    #: The background pattern's own colour. Empty means "the accent", which
+    #: is what every resume stored before this existed gets.
+    backdrop_color: str = Field(default="", pattern=r"^(#[0-9a-fA-F]{6})?$")
 
 
 class ExperienceItem(StrictCamelModel):

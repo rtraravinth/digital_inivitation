@@ -298,7 +298,13 @@ async def test_columns_and_background_save_and_unknown_ones_are_refused(auth_cli
     assert res.json()["resume"]["style"]["columns"] == "half"
     assert res.json()["resume"]["style"]["backdrop"] == "hexagons"
 
-    for bad in ({"columns": "three"}, {"backdrop": "glitter"}):
+    # The pattern's own colour, and back to following the accent.
+    for colour in ("#94a3b8", ""):
+        res = await auth_client.put(url, json={**body, "style": {**body["style"], "backdropColor": colour}})
+        assert res.status_code == 200
+        assert res.json()["resume"]["style"]["backdropColor"] == colour
+
+    for bad in ({"columns": "three"}, {"backdrop": "glitter"}, {"backdropColor": "grey"}, {"backdropColor": "#abc"}):
         res = await auth_client.put(url, json={**FULL_RESUME, "style": {**FULL_RESUME["style"], **bad}})
         assert res.status_code == 422
 

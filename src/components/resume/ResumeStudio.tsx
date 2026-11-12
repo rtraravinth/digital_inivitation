@@ -26,7 +26,7 @@ import {
   templateOf,
   type TemplateCategory,
 } from "@/lib/resume";
-import { RESUME_BACKDROPS, backdropLayers, layerStyle } from "@/lib/resume-backdrops";
+import { RESUME_BACKDROPS, backdropLayers, layerStyle, patternColour } from "@/lib/resume-backdrops";
 import { usePortfolios } from "@/lib/store";
 import type { Paper, Portfolio, Resume, ResumeBlock, ResumeColumns, ResumeStyle, ResumeTemplateId } from "@/lib/types";
 
@@ -584,11 +584,11 @@ function StylePanel({ p, onStyle }: { p: Portfolio; onStyle: (patch: Partial<Res
         </div>
       </Group>
 
-      <Group title="Background" note="Decoration behind the text, in your accent. It is never part of the text, so an ATS reads the page the same.">
+      <Group title="Background" note="Decoration behind the text, drawn at half strength. It is never part of the text, so an ATS reads the page the same.">
         <div role="group" aria-label="Background" className="grid grid-cols-4 gap-2">
           {RESUME_BACKDROPS.map((b) => {
             const on = (s.backdrop ?? "none") === b.id;
-            const { page, corner } = backdropLayers(b.id, s.accent);
+            const { page, corner } = backdropLayers(b.id, patternColour(s));
             return (
               <button
                 key={b.id}
@@ -613,6 +613,9 @@ function StylePanel({ p, onStyle }: { p: Portfolio; onStyle: (patch: Partial<Res
         <p className="m-0 mt-2 text-[12px] text-muted">
           {RESUME_BACKDROPS.find((b) => b.id === (s.backdrop ?? "none"))?.name}
         </p>
+        {s.backdrop !== "none" && s.backdrop !== "cream" && (
+          <PatternColour s={s} group={group} onStyle={onStyle} />
+        )}
       </Group>
 
       <Group title="Photo" note={hasPortrait ? "Many employers prefer resumes without one — off by default." : "Add a portrait to your page header to use one here."}>
@@ -670,5 +673,73 @@ function Group({ title, note, children }: { title: string; note?: string; childr
       {note && <p className="m-0 mb-3 text-[12.5px] leading-snug text-muted">{note}</p>}
       {children}
     </section>
+  );
+}
+
+/** Soft tints that sit behind any accent: what "Custom" offers first. */
+const PATTERN_TINTS = ["#94a3b8", "#a8a29e", "#c4b5a0", "#9fb4a5", "#a3b1c6", "#c9a9a6"];
+
+/**
+ * The pattern's colour: the accent (the default, and what every resume had
+ * before this), or one of its own. Whichever it is, the pattern is drawn at
+ * half strength, so a strong colour still stays a background.
+ */
+function PatternColour({
+  s,
+  group,
+  onStyle,
+}: {
+  s: ResumeStyle;
+  group: string;
+  onStyle: (patch: Partial<ResumeStyle>) => void;
+}) {
+  const custom = !!s.backdropColor;
+  return (
+    <div className="mt-4 flex flex-col gap-3">
+      <div className="flex items-baseline justify-between gap-2">
+        <span className="text-[13px] font-semibold">Pattern colour</span>
+        <Segmented
+          label="Pattern colour"
+          id={`pattern-colour-${group}`}
+          value={custom ? "custom" : "accent"}
+          onChange={(v) => onStyle({ backdropColor: v === "custom" ? s.backdropColor || PATTERN_TINTS[0] : "" })}
+          options={[
+            { id: "accent", label: "Same as text" },
+            { id: "custom", label: "Custom" },
+          ]}
+        />
+      </div>
+      {custom && (
+        <>
+          <div className="flex flex-wrap gap-2">
+            {PATTERN_TINTS.map((hex) => {
+              const on = s.backdropColor.toLowerCase() === hex;
+              return (
+                <button
+                  key={hex}
+                  type="button"
+                  aria-label={`Pattern colour ${hex}`}
+                  aria-pressed={on}
+                  onClick={() => onStyle({ backdropColor: hex })}
+                  className="h-7 w-7 cursor-pointer rounded-full transition-transform hover:scale-110"
+                  style={{
+                    background: hex,
+                    boxShadow: on
+                      ? "0 0 0 2px var(--color-bg), 0 0 0 4px var(--color-ink)"
+                      : "inset 0 0 0 1px color-mix(in srgb, var(--color-ink) 28%, transparent)",
+                  }}
+                />
+              );
+            })}
+          </div>
+          <ColourPicker
+            id={`resume-pattern-${group}`}
+            name="Pattern colour"
+            value={s.backdropColor}
+            onPick={(backdropColor) => onStyle({ backdropColor })}
+          />
+        </>
+      )}
+    </div>
   );
 }

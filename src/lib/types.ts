@@ -1337,6 +1337,8 @@ export type ResumeStyle = {
   photo: boolean;
   columns: ResumeColumns;
   backdrop: ResumeBackdrop;
+  /** The background pattern's colour, `#rrggbb`. Empty: the accent. */
+  backdropColor: string;
 };
 
 export type Resume = {
@@ -1370,6 +1372,7 @@ export function defaultResumeStyle(): ResumeStyle {
     photo: false,
     columns: "auto",
     backdrop: "none",
+    backdropColor: "",
   };
 }
 
@@ -1432,5 +1435,6 @@ function normalizeResumeStyle(style: ResumeStyle): ResumeStyle {
     template: known(RESUME_TEMPLATE_IDS, style.template, "classic"),
     columns: known(RESUME_COLUMNS, style.columns, "auto"),
     backdrop: known(RESUME_BACKDROP_IDS, style.backdrop, "none"),
+    backdropColor: /^#[0-9a-f]{6}$/i.test(style.backdropColor ?? "") ? style.backdropColor : "",
   };
 }

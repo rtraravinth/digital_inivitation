@@ -272,8 +272,14 @@ export function layerCss(layers: BgLayer[], color = "#fff"): string {
   ].join(" ");
 }
 
+/** The colour a resume's background pattern is drawn in: its own, if one
+ *  was picked, or the accent. */
+export function patternColour(style: Resume["style"]): string {
+  return style.backdropColor || style.accent;
+}
+
 /** Every layer behind a resume, top first, ending with its paper ground. */
 export function sheetLayers(resume: Resume): BgLayer[] {
-  const { page, corner } = backdropLayers(resume.style.backdrop, resume.style.accent);
+  const { page, corner } = backdropLayers(resume.style.backdrop, patternColour(resume.style));
   return [...corner, ...page, ...groundLayer(paperGround(resume))];
 }

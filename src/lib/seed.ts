@@ -314,6 +314,18 @@ const RAW: SeedPortfolio[] = [
           { id: "s8b4", type: "languages", title: "Languages", look: "chips" },
         ],
       },
+      // The roles are on the resume only: the page tells the businesses as
+      // sections already. A section off the page is how a list is kept to
+      // the resume — the resume prints what a section places.
+      {
+        id: "s9",
+        title: "Experience",
+        description: "",
+        links: [],
+        hidden: true,
+        onResume: false,
+        blocks: [{ id: "s9b1", type: "experience", title: "", look: "theme" }],
+      },
       {
         id: "s7",
         title: "Work with me",

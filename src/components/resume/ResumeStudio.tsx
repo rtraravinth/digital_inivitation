@@ -21,6 +21,7 @@ import {
   TEMPLATE_CATEGORIES,
   TEMPLATE_DEFAULTS,
   blockHasContent,
+  blockInUse,
   resumePrintPath,
   templateOf,
   type TemplateCategory,
@@ -108,7 +109,7 @@ export function ResumeStudio({
           <span className="hidden xl:inline-flex">
             <StatusPill live={p.status === "live"} />
           </span>
-          {modeSwitch}
+          <span className="lg:hidden">{modeSwitch}</span>
           <span className="ml-auto flex flex-none items-center gap-2">
             <Link href={`/editor/${p.id}`} className="btn btn-secondary hidden md:inline-flex" style={{ marginTop: 0, minHeight: 34 }}>
               Edit resume
@@ -144,6 +145,7 @@ export function ResumeStudio({
             className="min-h-0 overflow-y-auto rounded-2xl"
             style={{ background: "var(--color-bg)", border: "1px solid var(--color-divider)" }}
           >
+            <div className="px-3 pt-3 [&>span>div]:w-full [&>span>div>button]:flex-1 [&>span>div>button]:justify-center">{modeSwitch}</div>
             <BlockRail p={p} onChange={change} />
           </motion.aside>
 
@@ -288,16 +290,22 @@ function BlockRail({ p, onChange }: { p: Portfolio; onChange: (recipe: (r: Resum
   // a live page freezes it; what prints stays a resume-only choice.
   const live = p.status === "live";
 
+  // Swaps with its neighbour in the list shown, so a block that is not in
+  // use — and not shown — never makes a click look like it did nothing.
   const move = (block: ResumeBlock, delta: -1 | 1) =>
     onChange((prev) => {
+      const shown = prev.order.filter((b) => blockInUse(p, b));
+      const other = shown[shown.indexOf(block) + delta];
+      if (!other) return prev;
       const order = [...prev.order];
-      const from = order.indexOf(block);
-      const to = from + delta;
-      if (from < 0 || to < 0 || to >= order.length) return prev;
-      order.splice(from, 1);
-      order.splice(to, 0, block);
+      const a = order.indexOf(block);
+      const b = order.indexOf(other);
+      [order[a], order[b]] = [order[b], order[a]];
       return { ...prev, order };
     });
+  // Only what this portfolio has: its summary and sections once written, and
+  // a resume list once a component places it — not every block there could be.
+  const inUse = r.order.filter((b) => blockInUse(p, b));
   const toggle = (block: ResumeBlock) =>
     onChange((prev) => ({
       ...prev,
@@ -313,8 +321,14 @@ function BlockRail({ p, onChange }: { p: Portfolio; onChange: (recipe: (r: Resum
         </span>
       </div>
 
+      {inUse.length === 0 && (
+        <p className="m-0 px-4 pb-3 text-[12.5px] leading-snug text-muted">
+          Nothing to arrange yet. Write an About in your header, add a section, or add Experience, Skills and the rest
+          from Edit content.
+        </p>
+      )}
       <ul className="m-0 flex list-none flex-col gap-0.5 p-0 px-2">
-        {r.order.map((b, i) => {
+        {inUse.map((b, i) => {
           const off = r.hidden.includes(b);
           const empty = !blockHasContent(p, b);
           return (
@@ -342,7 +356,7 @@ function BlockRail({ p, onChange }: { p: Portfolio; onChange: (recipe: (r: Resum
                   </span>
                 </IconButton>
                 <IconButton label={live ? "Unpublish to reorder" : `Move ${BLOCK_LABEL[b]} down`} onClick={() => !live && move(b, 1)}>
-                  <span style={{ opacity: live || i === r.order.length - 1 ? 0.3 : 1 }}>
+                  <span style={{ opacity: live || i === inUse.length - 1 ? 0.3 : 1 }}>
                     <Glyph id="down" size={14} />
                   </span>
                 </IconButton>
@@ -365,7 +379,7 @@ function BlockRail({ p, onChange }: { p: Portfolio; onChange: (recipe: (r: Resum
         </Link>
       </div>
       <p className="m-0 mx-3 mb-4 rounded-xl p-3 text-[12px] leading-snug text-muted" style={{ background: "var(--color-surface)" }}>
-        {live && "The page is live, so the order is fixed until you unpublish. "}“Your sections” are the page’s sections switched on for the resume, each under its section title. In two-column templates, Skills, Certifications, Languages and Awards sit in the narrow column.
+        {live && "The page is live, so the order is fixed until you unpublish. "}Only what you have added is listed. “Your sections” are the page’s sections switched on for the resume; a list such as Experience prints once a section holds it. In two-column templates, Skills, Certifications, Languages and Awards sit in the narrow column.
       </p>
     </div>
   );

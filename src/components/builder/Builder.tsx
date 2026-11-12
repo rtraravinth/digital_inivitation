@@ -172,10 +172,11 @@ export function Builder({ id }: { id: string }) {
           <span className="hidden xl:inline-flex">
             <StatusPill live={false} />
           </span>
-          {modeSwitch}
+          {/* On a desk the switch heads the section rail; here it has no rail. */}
+          <span className="lg:hidden">{modeSwitch}</span>
           <span className="ml-auto flex flex-none items-center gap-2">
             <Link href={`/editor/${p.id}`} className="btn btn-secondary hidden md:inline-flex" style={{ marginTop: 0, minHeight: 34 }}>
-              Edit text
+              Edit content
             </Link>
             <a
               href={previewPath(p.id)}
@@ -230,6 +231,9 @@ export function Builder({ id }: { id: string }) {
             className="min-h-0 overflow-y-auto rounded-2xl"
             style={{ background: "var(--color-bg)", border: "1px solid var(--color-divider)" }}
           >
+            {/* Page or resume first: it decides what everything else on the
+                screen is about. */}
+            <div className="px-3 pt-3 [&>span>div]:w-full [&>span>div>button]:flex-1 [&>span>div>button]:justify-center">{modeSwitch}</div>
             <SectionRail p={p} />
           </motion.aside>
 
@@ -429,7 +433,7 @@ function SectionRail({ p }: { p: Portfolio }) {
           Add section
         </button>
         <Link href={`/editor/${p.id}`} className="btn btn-ghost btn-block" style={{ justifyContent: "center", marginTop: 0 }}>
-          Edit the words
+          Edit page content
           <Glyph id="arrow" size={14} />
         </Link>
       </div>

@@ -683,10 +683,10 @@ export type GridCols = 1 | 2 | 3;
 export type Density = "airy" | "standard" | "dense";
 
 export const ROLE_NAVS: Array<{ id: RoleNav; name: string }> = [
-  { id: "tabs", name: "Tabs across the page" },
-  { id: "rail", name: "Numbered side rail" },
-  { id: "scroll", name: "One scroll, tabs as chapters" },
-  { id: "lens", name: "Visitor picks a lens first" },
+  { id: "tabs", name: "A row of section names" },
+  { id: "rail", name: "A numbered side rail" },
+  { id: "scroll", name: "Every section on one scroll" },
+  { id: "lens", name: "The visitor picks a section first" },
 ];
 
 export const DENSITIES: Array<{ id: Density; name: string }> = [

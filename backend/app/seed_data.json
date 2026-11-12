@@ -550,6 +550,26 @@
         "onResume": false
       },
       {
+        "id": "s9",
+        "title": "Experience",
+        "description": "",
+        "tab": "Experience",
+        "links": [],
+        "images": [],
+        "file": null,
+        "quote": null,
+        "blocks": [
+          {
+            "id": "s9b1",
+            "type": "experience",
+            "title": "",
+            "look": "theme"
+          }
+        ],
+        "hidden": true,
+        "onResume": false
+      },
+      {
         "id": "s7",
         "title": "Work with me",
         "description": "Advisory enquiries, speaking at your company or a conversation about the businesses. I read everything and answer within two working days.",

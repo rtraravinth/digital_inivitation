@@ -686,28 +686,40 @@ export function MotionControl({ p, onChange }: { p: Portfolio; onChange: Recipe 
 const IGNORED: Record<ThemeId, { nav?: string; grid?: string; density?: string; styles?: string }> = {
   meridian: {},
   aurora: {
-    nav: "Aurora shows every tab as a chapter on one scroll, with a glass nav that jumps between them.",
+    nav: "Aurora shows every section on one scroll, with a glass bar that jumps between them.",
   },
   stage: {
-    nav: "Stage gives every tab its own showreel rail, one under another.",
-    grid: "Stage's rails are a single row of posters that scrolls sideways.",
-    density: "Stage sets its own rhythm around the billboard and the rails.",
+    nav: "Stage shows every section on one scroll, with a bar that jumps between them.",
+    grid: "Stage lays its cards in a row of posters that scrolls sideways.",
+    density: "Stage sets its own rhythm around the billboard and the rows.",
   },
   arcade: {
     nav: "Arcade's sections are its level-select menu.",
     density: "Arcade sets its own spacing around the horizon.",
   },
   journey: {
-    nav: "Journey tells every tab as a chapter on one scroll.",
-    grid: "Journey's entries are one column of cards that stack as you read.",
+    nav: "Journey shows every section on one scroll.",
+    grid: "Journey's cards are one column that stacks as you read.",
   },
   bio: {
-    nav: "Bio lists every link on one page, grouped by tab.",
+    nav: "Bio lists every link on one page.",
     grid: "Bio is a single column of link buttons.",
     density: "Bio keeps its buttons at one comfortable spacing.",
     styles: "Bio draws every section as link buttons.",
   },
 };
+
+/** A layout control the current theme does not read, as one quiet line. */
+function Unused({ title, reason }: { title: string; reason: string }) {
+  return (
+    <p className="m-0 mb-5 text-[12px] leading-snug" style={{ color: "var(--color-neutral-700)" }} role="note">
+      <span className="font-semibold" style={{ color: "var(--color-ink)" }}>
+        {title}
+      </span>{" "}
+      — not used by this theme. {reason}
+    </p>
+  );
+}
 
 function IgnoredNote({ reason }: { reason: string }) {
   return (
@@ -725,67 +737,84 @@ export function LayoutControl({ p, onChange }: { p: Portfolio; onChange: Recipe 
   // only checked member. The state was right; only the dot was missing.
   const group = useId();
   const ignored = IGNORED[p.theme] ?? {};
+  // The Cards style lays its cards with the same column count in any theme.
+  const cardsStyled =
+    p.layout.sectionStyle === "grid" || p.sections.some((s) => s.blocks.some((b) => isListBlock(b) && lookOf(b) === "grid"));
 
   return (
     <>
       <SectionStyleControl p={p} onChange={onChange} />
 
-      <h3 className="m-0 mb-1 text-[14px] tracking-[-0.01em]">Tab navigation</h3>
-      <p className="m-0 mb-3 text-[12.5px] text-muted">How visitors move between your sections.</p>
-      {ignored.nav && <IgnoredNote reason={ignored.nav} />}
-      <div className={`mb-5 flex flex-col gap-2.5 ${ignored.nav ? "opacity-50" : ""}`}>
-        {ROLE_NAVS.map((n) => (
-          <label key={n.id} className="radio">
-            <input
-              type="radio"
-              name={`rolenav-${group}`}
-              checked={p.layout.roleNav === n.id}
-              onChange={() =>
-                onChange((prev) => ({ ...prev, layout: { ...prev.layout, roleNav: n.id } }))
-              }
-            />
-            <span className="dot" />
-            {n.name}
-          </label>
-        ))}
-      </div>
+      {/* A control the theme does not read is one line saying so, not a set
+          of options that would do nothing: Navigation is Meridian's alone,
+          and Columns only matters where cards are laid in a grid — the
+          theme's own, or the Cards style wherever it is picked. */}
+      {ignored.nav ? (
+        <Unused title="Navigation" reason={ignored.nav} />
+      ) : (
+        <>
+          <h3 className="m-0 mb-1 text-[14px] tracking-[-0.01em]">Navigation</h3>
+          <p className="m-0 mb-3 text-[12.5px] text-muted">How visitors move between your sections.</p>
+          <div className="mb-5 flex flex-col gap-2.5">
+            {ROLE_NAVS.map((n) => (
+              <label key={n.id} className="radio">
+                <input
+                  type="radio"
+                  name={`rolenav-${group}`}
+                  checked={p.layout.roleNav === n.id}
+                  onChange={() => onChange((prev) => ({ ...prev, layout: { ...prev.layout, roleNav: n.id } }))}
+                />
+                <span className="dot" />
+                {n.name}
+              </label>
+            ))}
+          </div>
+        </>
+      )}
 
-      <h3 className={`m-0 text-[14px] tracking-[-0.01em] ${ignored.grid ? "mb-1.5" : "mb-3"}`}>Content grid</h3>
-      {ignored.grid && <IgnoredNote reason={ignored.grid} />}
-      <div className={`seg mb-5 ${ignored.grid ? "opacity-50" : ""}`}>
-        {([1, 2, 3] as GridCols[]).map((n) => (
-          <label key={n} className="seg-opt">
-            <input
-              type="radio"
-              name={`gridcols-${group}`}
-              checked={p.layout.grid === n}
-              onChange={() =>
-                onChange((prev) => ({ ...prev, layout: { ...prev.layout, grid: n } }))
-              }
-            />
-            {n} col
-          </label>
-        ))}
-      </div>
+      {ignored.grid && !cardsStyled ? (
+        <Unused title="Columns" reason={`${ignored.grid} Picking the Cards style above brings this back.`} />
+      ) : (
+        <>
+          <h3 className="m-0 mb-1 text-[14px] tracking-[-0.01em]">Columns</h3>
+          <p className="m-0 mb-3 text-[12.5px] text-muted">How many cards sit side by side on a wide screen.</p>
+          <div className="seg mb-5">
+            {([1, 2, 3] as GridCols[]).map((n) => (
+              <label key={n} className="seg-opt">
+                <input
+                  type="radio"
+                  name={`gridcols-${group}`}
+                  checked={p.layout.grid === n}
+                  onChange={() => onChange((prev) => ({ ...prev, layout: { ...prev.layout, grid: n } }))}
+                />
+                {n} col
+              </label>
+            ))}
+          </div>
+        </>
+      )}
 
-      <h3 className={`m-0 text-[14px] tracking-[-0.01em] ${ignored.density ? "mb-1.5" : "mb-3"}`}>Density</h3>
-      {ignored.density && <IgnoredNote reason={ignored.density} />}
-      <div className={`flex flex-col gap-2.5 ${ignored.density ? "opacity-50" : ""}`}>
-        {DENSITIES.map((d) => (
-          <label key={d.id} className="radio">
-            <input
-              type="radio"
-              name={`density-${group}`}
-              checked={p.layout.density === d.id}
-              onChange={() =>
-                onChange((prev) => ({ ...prev, layout: { ...prev.layout, density: d.id } }))
-              }
-            />
-            <span className="dot" />
-            {d.name}
-          </label>
-        ))}
-      </div>
+      {ignored.density ? (
+        <Unused title="Density" reason={ignored.density} />
+      ) : (
+        <>
+          <h3 className="m-0 mb-3 text-[14px] tracking-[-0.01em]">Density</h3>
+          <div className="flex flex-col gap-2.5">
+            {DENSITIES.map((d) => (
+              <label key={d.id} className="radio">
+                <input
+                  type="radio"
+                  name={`density-${group}`}
+                  checked={p.layout.density === d.id}
+                  onChange={() => onChange((prev) => ({ ...prev, layout: { ...prev.layout, density: d.id } }))}
+                />
+                <span className="dot" />
+                {d.name}
+              </label>
+            ))}
+          </div>
+        </>
+      )}
     </>
   );
 }

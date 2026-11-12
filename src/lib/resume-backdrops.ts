@@ -207,8 +207,35 @@ function cornerLayers(id: ResumeBackdrop, c: string): BgLayer[] {
   }
 }
 
+/**
+ * How strongly a full-page background is drawn, against what each pattern
+ * was tuned at. They are drawn in the accent, which is also the colour of
+ * the resume's headings, so at full strength a pattern behind every line
+ * competed with the text it sits under. Corner graphics sit apart from the
+ * text and keep their own strength.
+ */
+const PAGE_STRENGTH = 0.5;
+
+/** Every opacity in an SVG layer, and a flat stripe's colour, scaled down. */
+function softened(layer: BgLayer, accent: string): BgLayer {
+  if (layer.image.startsWith("url(")) {
+    // The SVG is URI-encoded: `fill-opacity='.24'` reads `fill-opacity%3D'.24'`.
+    const image = layer.image.replace(
+      /(opacity%3D')([\d.]+)(')/g,
+      (_, a: string, v: string, b: string) => `${a}${+(parseFloat(v) * PAGE_STRENGTH).toFixed(3)}${b}`,
+    );
+    return { ...layer, image };
+  }
+  const flat = `linear-gradient(${accent}, ${accent})`;
+  if (layer.image === flat && /^#[0-9a-f]{6}$/i.test(accent)) {
+    const alpha = Math.round(PAGE_STRENGTH * 255).toString(16).padStart(2, "0");
+    return { ...layer, image: `linear-gradient(${accent}${alpha}, ${accent}${alpha})` };
+  }
+  return layer;
+}
+
 export function backdropLayers(id: ResumeBackdrop, accent: string): { page: BgLayer[]; corner: BgLayer[] } {
-  return { page: pageLayers(id, accent), corner: cornerLayers(id, accent) };
+  return { page: pageLayers(id, accent).map((l) => softened(l, accent)), corner: cornerLayers(id, accent) };
 }
 
 /** The paper ground (`paperGround()`) as a bottom layer, so decoration can sit over it. */

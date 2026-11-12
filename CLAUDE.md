@@ -268,6 +268,22 @@ chrome — that inconsistency is what this replaced.
   "Blank" used to add one empty section, which was a thing to delete first.
   Only "Copy a page" and "Founder" start with sections, because picking
   either asks for them. The test fixture `portfolio` adds one itself.
+- **The builder: Page / Resume heads the left rail on a desk** (in the top
+  bar only below `lg`, where there is no rail). Its top bar links to the
+  editor as "Edit content". Layout controls a theme does not read —
+  Navigation (Meridian's alone), Columns, Density — collapse to one line
+  naming why (`Unused` in `builder/controls.tsx`); Columns comes back
+  wherever the Cards style is picked, because that style lays its cards
+  with the same count in any theme.
+- **The resume prints, and its Blocks rail lists, only what is in use**
+  (`blockInUse()` in `lib/resume.ts`): the summary and the sections once
+  written, and a list once a component places it in a section — a section
+  off the page counts, which is how a list is kept to the resume. Entries
+  left in a list nobody placed do not print. The seed keeps its roles on
+  the resume that way, with an off-page "Experience" section.
+- **Full-page resume backgrounds are drawn at half strength**
+  (`PAGE_STRENGTH` in `lib/resume-backdrops.ts`): they are in the accent,
+  which is also the headings' colour. Corner graphics keep theirs.
 - **One Done per card, at its foot.** An open card's top bar carries only
   its switches and move buttons. The editor's top bar has "Open builder",
   "Preview" and "Publish"; the resume PDF is downloaded from the builder's

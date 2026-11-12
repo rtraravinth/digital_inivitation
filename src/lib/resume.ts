@@ -704,9 +704,21 @@ export function blockHasContent(p: Portfolio, block: ResumeBlock): boolean {
   }
 }
 
+/**
+ * Whether the portfolio uses a block at all: the summary and the sections
+ * once there is something to print, and a resume list once a component
+ * places it in a section — a section that is off the page counts, which is
+ * how a list is kept to the resume. A list nobody has added is not part of
+ * this portfolio, whatever entries an earlier build left in it.
+ */
+export function blockInUse(p: Portfolio, block: ResumeBlock): boolean {
+  if (block === "summary" || block === "projects") return blockHasContent(p, block);
+  return p.sections.some((s) => s.blocks.some((b) => b.type === block));
+}
+
 /** The blocks this sheet prints, in order. */
 export function visibleBlocks(p: Portfolio): ResumeBlock[] {
-  return p.resume.order.filter((b) => !p.resume.hidden.includes(b) && blockHasContent(p, b));
+  return p.resume.order.filter((b) => !p.resume.hidden.includes(b) && blockInUse(p, b) && blockHasContent(p, b));
 }
 
 /* ── the resume's lists on the page ─────────────────────────────────────

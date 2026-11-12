@@ -214,10 +214,11 @@ chrome — that inconsistency is what this replaced.
   `lookOf()` falls back to it; the backend accepts any look so adding one is
   frontend-only.
 - **One list of components, and no "resume" group in it.** `BLOCK_TYPES` is
-  the order both "Add a component" and the editor's "Quick add" offer, the
-  six resume lists mixed in with the rest. Quick add makes a new section
-  named after the component with it inside; it is a shortcut, not a
-  different kind of section.
+  the order "Add a component" offers, the six resume lists mixed in with
+  the rest. The editor's "Quick add" is those six lists only (`QUICK_ADD` in
+  `Editor.tsx`) — by request; do not widen it to every component. It makes
+  a new section named after the list with its component inside; it is a
+  shortcut, not a different kind of section.
 - **Words in the editor, looks in the builder.** A gallery's layout and a
   list's look are picked in the builder's Look tab (`ComponentLooksControl`
   in `builder/controls.tsx`), beside the canvas that shows the change. The

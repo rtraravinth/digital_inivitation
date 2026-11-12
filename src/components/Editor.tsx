@@ -213,7 +213,7 @@ export function Editor({ id }: { id: string }) {
             )}
           </AnimatePresence>
 
-          <div className="grid grid-cols-1 gap-8 lg:grid-cols-[230px_minmax(0,1fr)]">
+          <div className="grid grid-cols-1 gap-8 lg:grid-cols-[250px_minmax(0,1fr)]">
             {/* ── outline ─────────────────────────────────────────── */}
             {/* As tall as the window and no taller: the list scrolls inside
                 it, and what adds a section stays pinned under the list. It
@@ -415,29 +415,33 @@ export function Editor({ id }: { id: string }) {
   );
 }
 
+/** What quick add offers, in this order: the resume's six lists. */
+const QUICK_ADD: BlockType[] = ["experience", "education", "skills", "certifications", "awards", "languages"];
+
 /**
- * Every component as a one-click start: a new section named after it, with
- * it already inside. A shortcut and nothing more — the same components are
- * under "Add a component" in any section, as often as their author likes.
- * `compact` is the outline's copy: two across, scrolling inside its own box
- * so the list of sections above it keeps its room.
+ * The resume's lists as a one-click start: a new section named after the
+ * list, with its component already inside. These six and no others — they
+ * are what most pages begin with, and a short row stays readable in the
+ * outline. Everything else, and these too, is under "Add a component" in
+ * any section, as often as its author likes. `compact` is the outline's
+ * copy.
  */
 function QuickAdd({ onAdd, compact }: { onAdd: (type: BlockType) => void; compact?: boolean }) {
   const chips = (
     <ul className={`m-0 grid list-none gap-1 p-0 ${compact ? "grid-cols-2" : "grid-cols-2 sm:grid-cols-3"}`}>
-      {BLOCK_TYPES.map((t) => (
+      {QUICK_ADD.map((id) => BLOCK_TYPES.find((t) => t.id === id)!).map((t) => (
         <li key={t.id} className="min-w-0">
           <button
             type="button"
             onClick={() => onAdd(t.id)}
             title={t.desc}
-            className="flex min-h-[32px] w-full cursor-pointer items-center gap-1.5 rounded-lg px-2 text-left text-[12.5px] transition-colors hover:bg-[var(--color-neutral-100)]"
+            className="flex min-h-[32px] w-full cursor-pointer items-center gap-1.5 rounded-lg px-2 text-left text-[12px] transition-colors hover:bg-[var(--color-neutral-100)]"
             style={{ boxShadow: "inset 0 0 0 1px var(--color-divider)" }}
           >
             <span className="flex-none">
               <Icon d={COMPONENT_ICON[t.id]} size={13} />
             </span>
-            <span className="min-w-0 flex-1 truncate">{t.name}</span>
+            <span className="quick-add-name min-w-0 flex-1 truncate">{t.name}</span>
           </button>
         </li>
       ))}
@@ -445,11 +449,11 @@ function QuickAdd({ onAdd, compact }: { onAdd: (type: BlockType) => void; compac
   );
   if (compact) {
     return (
-      <div className="flex min-h-0 flex-col">
-        <span className="mb-1.5 block flex-none px-1 text-[12px] font-medium" style={{ color: "var(--color-neutral-600)" }}>
+      <div>
+        <span className="mb-1.5 block px-1 text-[12px] font-medium" style={{ color: "var(--color-neutral-600)" }}>
           Quick add
         </span>
-        <div className="-mr-2 max-h-[30dvh] overflow-y-auto overscroll-contain pr-2 pb-px">{chips}</div>
+        {chips}
       </div>
     );
   }

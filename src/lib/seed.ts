@@ -309,9 +309,9 @@ const RAW: SeedPortfolio[] = [
         onResume: false,
         blocks: [
           { id: "s8b1", type: "education", title: "Education", look: "list" },
-          { id: "s8b2", type: "skills", title: "Skills", look: "tags" },
+          { id: "s8b2", type: "skills", title: "Skills", look: "chips" },
           { id: "s8b3", type: "certifications", title: "Certifications", look: "list" },
-          { id: "s8b4", type: "languages", title: "Languages", look: "tags" },
+          { id: "s8b4", type: "languages", title: "Languages", look: "chips" },
         ],
       },
       {

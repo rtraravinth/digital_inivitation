@@ -782,6 +782,43 @@ export function listEntries(resume: Resume, list: PageBlock): ListEntry[] {
 }
 
 /**
+ * A list's entries as stand-in sections, which is what the section styles
+ * draw. The organisation and the dates go on the description's first line
+ * and the points under it as bullets — the layout `entryMeta()` in
+ * published/section-styles.tsx reads a date and a subtitle back out of.
+ * Their ids start `resume-`, which is how a title knows it has no page of
+ * its own to link to.
+ *
+ * Skills are one stand-in per group, its items as a separated line, and the
+ * languages are one stand-in holding all of them: both read as chips.
+ */
+export function listSections(resume: Resume, list: PageBlock): Section[] {
+  const entries = listEntries(resume, list);
+  const stand = (id: string, title: string, description: string, url = ""): Section => ({
+    id: `resume-${list}-${id}`,
+    title,
+    description,
+    tab: BLOCK_LABEL[list],
+    links: url ? [{ id: `resume-${list}-${id}-link`, label: "Credential", url }] : [],
+    images: [],
+    file: null,
+    quote: null,
+    blocks: [],
+    hidden: false,
+    onResume: false,
+  });
+  if (list === "skills") return entries.map((e) => stand(e.id, e.title, e.tags.join(" · ")));
+  if (list === "languages") {
+    // One line, not one per language: a first line on its own is read as a
+    // subtitle, and the first language would be set apart from the rest.
+    return entries.length > 0 ? [stand("all", "", entries.map((e) => (e.sub ? `${e.title} — ${e.sub}` : e.title)).join(" · "))] : [];
+  }
+  return entries.map((e) =>
+    stand(e.id, e.title, [line(e.sub, e.date), ...e.lines.map((l) => (e.lines.length > 1 ? `• ${l}` : l))].filter(Boolean).join("\n"), e.url),
+  );
+}
+
+/**
  * The portfolio as the page draws it: a list component whose list has
  * nothing to show is left out, so a section is a band only when it has
  * something for one. Applied where the page is rendered — never in the

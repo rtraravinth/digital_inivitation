@@ -8,7 +8,6 @@ import {
   BLOCK_TYPES,
   componentHasContent,
   coverOf,
-  emptySection,
   galleryImages,
   isListBlock,
   lookOf,
@@ -26,7 +25,7 @@ import {
   type TestimonialsBlock,
   type TimelineBlock,
 } from "@/lib/types";
-import { listEntries, type ListEntry } from "@/lib/resume";
+import { listSections } from "@/lib/resume";
 import { CountUp, initials, useMotionLevel } from "./fx";
 import { renderStyle } from "./section-styles";
 import {
@@ -254,7 +253,7 @@ export function ComponentView({ p, section, block }: { p: Portfolio; section: Se
 }
 
 function renderBlock(p: Portfolio, section: Section, b: Block) {
-  if (isListBlock(b)) return <ResumeListView p={p} section={section} block={b} />;
+  if (isListBlock(b)) return <ResumeListView p={p} block={b} />;
   switch (b.type) {
     case "gallery":
       return <GalleryView section={section} block={b} />;
@@ -308,162 +307,15 @@ function TimelineView({ block }: { block: TimelineBlock }) {
 /**
  * Experience, education, skills and the rest, placed in a section. The
  * entries come from the resume — the component holds none — and are drawn
- * in the look its author picked: a timeline, ruled rows, cards or tags.
- * One renderer for all six, because `listEntries()` hands every list over
- * in the same shape.
+ * by the section styles (section-styles.tsx): the same seven shapes the
+ * page's plain sections take, so a role in a timeline and a project in a
+ * timeline are one design. Which shape is the component's own choice, or the
+ * one that suits its kind until one is made.
  */
-function ResumeListView({ p, section, block }: { p: Portfolio; section: Section; block: ResumeListBlock }) {
-  const entries = listEntries(p.resume, block.type);
-  const record = useRecordClick();
-  const handle = usePublishedHandle();
-  if (entries.length === 0) return null;
-
-  const title = (e: ListEntry, className: string) =>
-    e.url ? (
-      <a
-        href={href(e.url)}
-        target="_blank"
-        rel="noopener noreferrer"
-        className={`fc-title-link ${className}`}
-        onClick={() => record(handle, p.slug, section.id)}
-      >
-        {e.title}
-      </a>
-    ) : (
-      <span className={className}>{e.title}</span>
-    );
-  const detail = (e: ListEntry) => (
-    <>
-      {e.lines.length === 1 && <p className="text-muted m-0 mt-2 max-w-[60ch] text-[15.5px] leading-[1.65]">{e.lines[0]}</p>}
-      {e.lines.length > 1 && (
-        <ul className="text-muted m-0 mt-2.5 flex max-w-[62ch] list-none flex-col gap-1.5 p-0 text-[15.5px] leading-[1.6]">
-          {e.lines.map((l, i) => (
-            <li key={i} className="grid grid-cols-[0.9rem_minmax(0,1fr)]">
-              <span aria-hidden style={{ color: "var(--color-mark)" }}>
-                ·
-              </span>
-              {l}
-            </li>
-          ))}
-        </ul>
-      )}
-      {e.tags.length > 0 && <Tags tags={e.tags} />}
-    </>
-  );
-
-  const look = lookOf(block);
-  // The section styles, drawn over this list's entries: each entry stands in
-  // as a section, its organisation and dates on the description's first line,
-  // which is where `entryMeta()` reads them from.
-  if (look === "carousel" || look === "tabs" || look === "spotlight") {
-    const asSections = entries.map((e) => ({
-      ...emptySection(`resume-${block.type}-${e.id}`),
-      title: e.title,
-      description: [[e.sub, e.date].filter(Boolean).join(" · "), ...e.lines.map((l) => `• ${l}`)].filter(Boolean).join("\n"),
-      links: e.url ? [{ id: `${e.id}-link`, label: "Credential", url: e.url }] : [],
-    }));
-    return renderStyle(p, look, asSections, block.title || BLOCK_TYPES.find((t) => t.id === block.type)?.name || "Entries");
-  }
-
-  switch (look) {
-    case "timeline":
-      return (
-        <ol className="fc-timeline m-0 list-none p-0">
-          {entries.map((e) => (
-            <li
-              key={e.id}
-              className="fc-timeline-item grid grid-cols-[1.25rem_minmax(0,1fr)] gap-x-4 md:grid-cols-[11rem_1.25rem_minmax(0,1fr)] md:gap-x-6"
-            >
-              <span className="font-heading figure hidden pt-0.5 text-right text-[16px] md:block" style={{ color: "var(--color-mark)" }}>
-                {e.date}
-              </span>
-              <span aria-hidden className="fc-timeline-dot" />
-              <div className="min-w-0 pb-9">
-                {e.date && (
-                  <span className="font-heading figure mb-1 block text-[15px] md:hidden" style={{ color: "var(--color-mark)" }}>
-                    {e.date}
-                  </span>
-                )}
-                <p className="m-0 text-[17.5px] leading-snug font-semibold">{title(e, "")}</p>
-                {e.sub && <p className="m-0 mt-0.5 text-[15px]">{e.sub}</p>}
-                {detail(e)}
-              </div>
-            </li>
-          ))}
-        </ol>
-      );
-
-    case "cards":
-      return (
-        <ul className={`m-0 grid list-none grid-cols-1 gap-4 p-0 ${entries.length === 1 ? "" : "md:grid-cols-2"}`}>
-          {entries.map((e) => (
-            <li key={e.id} className="fc-card flex min-w-0 flex-col p-6 md:p-7">
-              {e.date && (
-                <span className="font-heading figure mb-2 text-[14px]" style={{ color: "var(--color-mark)" }}>
-                  {e.date}
-                </span>
-              )}
-              {e.title && title(e, "font-heading text-[21px] leading-snug")}
-              {e.sub && <span className="mt-1 text-[15px]">{e.sub}</span>}
-              {detail(e)}
-            </li>
-          ))}
-        </ul>
-      );
-
-    case "tags": {
-      // Languages are each their own entry; as tags they read as one row.
-      const groups = entries.some((e) => e.tags.length > 0)
-        ? entries.map((e) => ({ id: e.id, name: e.title, tags: e.tags }))
-        : [{ id: block.id, name: "", tags: entries.map((e) => (e.sub ? `${e.title} — ${e.sub}` : e.title)) }];
-      return (
-        <div className="flex flex-col gap-6">
-          {groups.map((g) => (
-            <div key={g.id} className="grid grid-cols-1 gap-x-8 gap-y-2 md:grid-cols-[11rem_minmax(0,1fr)] md:items-baseline">
-              {g.name ? <span className="font-heading text-[18px] leading-snug">{g.name}</span> : <span aria-hidden className="hidden md:block" />}
-              <Tags tags={g.tags} flush />
-            </div>
-          ))}
-        </div>
-      );
-    }
-
-    case "list":
-      return (
-        <ul className="m-0 list-none p-0" style={{ borderTop: "1px solid var(--color-divider)" }}>
-          {entries.map((e) => (
-            <li
-              key={e.id}
-              className="fc-row grid grid-cols-1 gap-x-10 gap-y-1 py-5 md:grid-cols-[minmax(0,1fr)_minmax(7rem,auto)] md:items-baseline"
-              style={{ borderBottom: "1px solid var(--color-divider)" }}
-            >
-              <div className="min-w-0">
-                {e.title && title(e, "font-heading text-[20px] leading-snug")}
-                {e.sub && <span className="text-muted mt-0.5 block text-[15px]">{e.sub}</span>}
-                {e.tags.length > 0 ? <p className="text-muted m-0 mt-1 max-w-[70ch] text-[15.5px] leading-[1.65]">{e.tags.join(" · ")}</p> : detail(e)}
-              </div>
-              {e.date && (
-                <span className="text-[15px] font-semibold whitespace-nowrap tabular-nums md:text-right" style={{ color: "var(--color-mark)" }}>
-                  {e.date}
-                </span>
-              )}
-            </li>
-          ))}
-        </ul>
-      );
-  }
-}
-
-function Tags({ tags, flush }: { tags: string[]; flush?: boolean }) {
-  return (
-    <ul className={`m-0 flex list-none flex-wrap gap-2 p-0 ${flush ? "" : "mt-3"}`}>
-      {tags.map((t) => (
-        <li key={t} className="fc-chip">
-          {t}
-        </li>
-      ))}
-    </ul>
-  );
+function ResumeListView({ p, block }: { p: Portfolio; block: ResumeListBlock }) {
+  const sections = listSections(p.resume, block.type);
+  if (sections.length === 0) return null;
+  return renderStyle(p, lookOf(block), sections, block.title || BLOCK_TYPES.find((t) => t.id === block.type)?.name || "Entries");
 }
 
 function TestimonialsView({ block }: { block: TestimonialsBlock }) {

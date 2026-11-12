@@ -126,9 +126,15 @@ class ResumeListBlock(_Block):
     """
 
     type: Literal["experience", "education", "skills", "certifications", "languages", "awards"]
-    #: How the page draws it. Not every look suits every list; the page
-    #: falls back to the list's own default rather than refusing one here.
-    look: Literal["list", "cards", "timeline", "tags", "carousel", "tabs", "spotlight"] = "list"
+    #: How the page draws it: one of the section styles, the same shapes the
+    #: page's plain sections take. "theme" leaves it to the one that suits
+    #: this kind of list. "cards" and "tags" are what "grid" and "chips" were
+    #: called before lists were drawn by the section styles; they are still
+    #: accepted so a stored component keeps validating.
+    look: Literal[
+        "theme", "grid", "timeline", "carousel", "tabs", "list", "spotlight", "chips",
+        "cards", "tags",
+    ] = "theme"
 
 
 class TimelineBlock(_Block):

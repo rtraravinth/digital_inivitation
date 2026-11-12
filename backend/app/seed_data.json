@@ -531,7 +531,7 @@
             "id": "s8b2",
             "type": "skills",
             "title": "Skills",
-            "look": "tags"
+            "look": "chips"
           },
           {
             "id": "s8b3",
@@ -543,7 +543,7 @@
             "id": "s8b4",
             "type": "languages",
             "title": "Languages",
-            "look": "tags"
+            "look": "chips"
           }
         ],
         "hidden": false,
@@ -604,7 +604,8 @@
       "scale": "default",
       "tracking": "-0.015em",
       "photo": "colour",
-      "motion": "full"
+      "motion": "full",
+      "sectionStyle": "theme"
     }
   },
   {
@@ -708,7 +709,8 @@
       "scale": "default",
       "tracking": "-0.015em",
       "photo": "colour",
-      "motion": "full"
+      "motion": "full",
+      "sectionStyle": "theme"
     },
     "resume": {
       "email": "",
@@ -863,7 +865,8 @@
       "scale": "default",
       "tracking": "-0.015em",
       "photo": "colour",
-      "motion": "full"
+      "motion": "full",
+      "sectionStyle": "theme"
     },
     "resume": {
       "email": "",
@@ -991,7 +994,8 @@
       "scale": "default",
       "tracking": "-0.015em",
       "photo": "colour",
-      "motion": "full"
+      "motion": "full",
+      "sectionStyle": "theme"
     },
     "resume": {
       "email": "",
@@ -1154,7 +1158,8 @@
       "scale": "default",
       "tracking": "-0.015em",
       "photo": "colour",
-      "motion": "full"
+      "motion": "full",
+      "sectionStyle": "theme"
     },
     "resume": {
       "email": "",

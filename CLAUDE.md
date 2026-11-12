@@ -226,31 +226,38 @@ chrome — that inconsistency is what this replaced.
   `Editor.tsx`) — by request; do not widen it to every component. It makes
   a new section named after the list with its component inside; it is a
   shortcut, not a different kind of section.
-- **Words in the editor, looks in the builder.** A gallery's layout and a
-  list's look are picked in the builder's Motion tab, under Layout
-  (`ComponentLooksControl` in `builder/controls.tsx`), beside the canvas
-  that shows the change. The editor's component panels have no look
-  controls; do not add one there.
-- **One section style for the page.** `p.layout.sectionStyle` (Theme, Cards,
-  Timeline, Carousel, Side tabs, List, Spotlight, Chips) is the shape the
-  page's *plain* sections take — the ones a theme would draw as cards — in
-  every theme, with the theme's own colours and corners. It is in the layout
-  JSON, so no migration; the API validates it as `Layout.section_style`.
-  `StyledSections` in `published/section-styles.tsx` wraps each theme's own
-  card markup and replaces it only when a style is picked; bands (sections
-  with components) follow unchanged, and Bio ignores it. It came from
-  `feature/section_style_changes`, where a style was chosen per tab; there
-  is no tab now, so it is one choice, applied to each run of plain sections.
-  Dates and the organisation are read off a description's first line
-  (`entryMeta`). `SectionStyleControl` shows `suggestStyle()` as a hint and
-  has a "Match everything to its content" button, which also sets each
-  resume list to its kind's default look. Nothing is applied without that
-  click.
-- **A resume list can borrow three of those shapes.** Carousel, Side tabs
-  and Spotlight are looks for Experience, Education, Certifications and
-  Awards. `ResumeListView` hands the entries to `renderStyle()` as stand-in
-  sections (id `resume-…`), and `SectionTitleLink` draws such a title as
-  plain text, because an entry has no page of its own to open.
+- **Words in the editor, looks in the builder.** How anything is laid out
+  is picked in the builder's Motion tab, under "Section styles"
+  (`SectionStyleControl` in `builder/controls.tsx`), beside the canvas that
+  shows the change. The editor's component panels have no look controls; do
+  not add one there.
+- **Seven shapes draw everything that is a set of entries.** Cards,
+  Timeline, Carousel, Side tabs, List, Spotlight and Chips
+  (`published/section-styles.tsx`, from `feature/section_style_changes`),
+  in every theme, with the theme's own colours and corners. Two things are
+  drawn by them:
+  - **A resume list component.** Its `look` is one of the seven, or "theme"
+    for "the one that suits this kind" (`LIST_DEFAULT_STYLE`; `lookOf()`
+    resolves it and maps the old "cards"/"tags"). `ResumeListView` hands
+    `listSections()` — the entries as stand-in sections, id `resume-…`,
+    organisation and dates on the description's first line where
+    `entryMeta()` reads them — to `renderStyle()`. There is no second,
+    list-only renderer; do not add one. `SectionTitleLink` draws a stand-in's
+    title as plain text, because an entry has no page of its own.
+  - **The page's plain sections** — the ones a theme would draw as cards.
+    One choice for the page, `p.layout.sectionStyle`; "theme" leaves them to
+    the theme. `StyledSections` wraps each theme's own card markup and
+    replaces it only when a style is picked. Bio ignores it. On the feature
+    branch this was per tab; there is no tab now.
+  Both are in JSON already stored, so no migration; the API validates them
+  (`Layout.section_style`, `ResumeListBlock.look`).
+- **The builder's panel is one row per thing.** Each list component gets a
+  row of seven tiles, the plain sections share one row of eight, a gallery
+  keeps its three layouts. A row marks its suggested style, and "Match
+  everything to its content" applies every suggestion. Nothing is applied
+  without a click. An earlier version styled only the plain sections, so a
+  style picked for the page did nothing to an Experience section — which is
+  what "the style is not applied" meant.
 - **The editor's outline is as tall as the window, never taller.** Its list
   scrolls inside it and "Add section" plus "Quick add" are
   pinned under the list, so they are in view however many sections there

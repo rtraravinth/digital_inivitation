@@ -123,7 +123,7 @@ async def test_a_resume_list_is_a_component(auth_client, portfolio):
     blocks = response.json()["blocks"]
     assert blocks[0] == {"id": "c-experience", "type": "experience", "title": "", "look": "timeline"}
     # The look has a default, and the component carries no entries of its own.
-    assert blocks[1] == {"id": "s", "type": "skills", "title": "", "look": "list"}
+    assert blocks[1] == {"id": "s", "type": "skills", "title": "", "look": "theme"}
 
 
 async def test_a_resume_list_component_holds_no_entries(auth_client, portfolio):

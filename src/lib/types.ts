@@ -95,19 +95,13 @@ export const GALLERY_LAYOUTS: Array<{ id: GalleryLayout; name: string; desc: str
  */
 export type GalleryBlock = BlockBase & { type: "gallery"; layout: GalleryLayout; imageIds: string[] };
 
-/** How the page draws one of the resume's lists. */
-export type ListLook = "list" | "cards" | "timeline" | "tags" | "carousel" | "tabs" | "spotlight";
-export const LOOK_NAME: Record<ListLook, { name: string; desc: string }> = {
-  timeline: { name: "Timeline", desc: "Dates down a rail, most recent first." },
-  list: { name: "List", desc: "Ruled rows, one entry each." },
-  cards: { name: "Cards", desc: "A grid of cards." },
-  tags: { name: "Tags", desc: "Short labels in a row." },
-  // The three below are section styles (published/section-styles.tsx) drawn
-  // over a list's entries, so a list and the page's plain sections can match.
-  carousel: { name: "Carousel", desc: "One row of cards that slides sideways." },
-  tabs: { name: "Side tabs", desc: "A list of titles beside the open entry." },
-  spotlight: { name: "Spotlight", desc: "Big rows, one entry each." },
-};
+/**
+ * How the page draws one of the resume's lists: one of the section styles
+ * (`SectionStyle`, below), so a list and the page's plain sections are drawn
+ * by the same seven shapes. "theme" means "the one that suits this kind of
+ * list" — see `lookOf()`.
+ */
+export type ListLook = SectionStyle;
 /**
  * One of the resume's lists, shown in this section. Like a gallery, it
  * holds nothing itself: the entries are `p.resume[type]`, structured, where
@@ -169,7 +163,7 @@ export function emptyBlock(type: BlockType, id: string, itemId: string): Block {
     case "certifications":
     case "languages":
     case "awards":
-      return { ...base, type, look: LIST_LOOKS[type][0] };
+      return { ...base, type, look: "theme" };
     case "gallery":
       return { ...base, type, layout: "mosaic", imageIds: [] };
     case "timeline":
@@ -1272,24 +1266,29 @@ export type ResumeBlock =
 export type PageBlock = "experience" | "education" | "skills" | "certifications" | "languages" | "awards";
 export const PAGE_BLOCKS: PageBlock[] = ["experience", "education", "skills", "certifications", "languages", "awards"];
 
-/** The looks each list can take on the page; the first is its default.
- *  A stored look a list does not have falls back to that default. */
-export const LIST_LOOKS: Record<PageBlock, ListLook[]> = {
-  experience: ["timeline", "cards", "list", "carousel", "tabs", "spotlight"],
-  education: ["list", "cards", "timeline", "carousel", "tabs", "spotlight"],
-  skills: ["tags", "list"],
-  certifications: ["list", "cards", "carousel", "tabs", "spotlight"],
-  languages: ["tags", "list"],
-  awards: ["list", "cards", "timeline", "carousel", "tabs", "spotlight"],
+/** The style each kind of list reads best in: what it gets until its
+ *  author picks another, and what the builder marks as suggested. */
+export const LIST_DEFAULT_STYLE: Record<PageBlock, Exclude<SectionStyle, "theme">> = {
+  experience: "timeline",
+  education: "timeline",
+  skills: "chips",
+  certifications: "list",
+  languages: "chips",
+  awards: "list",
 };
+
+/** Looks stored before a list was drawn by the section styles. */
+const LEGACY_LOOK: Record<string, SectionStyle> = { cards: "grid", tags: "chips" };
 
 export function isListBlock(b: Block): b is ResumeListBlock {
   return (PAGE_BLOCKS as string[]).includes(b.type);
 }
 
-/** The look a list component draws in: its own, if its list has it. */
-export function lookOf(b: ResumeListBlock): ListLook {
-  return LIST_LOOKS[b.type].includes(b.look) ? b.look : LIST_LOOKS[b.type][0];
+/** The style a list component is drawn in: the one picked for it, or the
+ *  one that suits its kind. */
+export function lookOf(b: ResumeListBlock): Exclude<SectionStyle, "theme"> {
+  const look = LEGACY_LOOK[b.look as string] ?? b.look;
+  return isSectionStyle(look) && look !== "theme" ? look : LIST_DEFAULT_STYLE[b.type];
 }
 
 export const RESUME_BLOCKS: ResumeBlock[] = [

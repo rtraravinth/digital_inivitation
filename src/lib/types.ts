@@ -107,8 +107,9 @@ export const LOOK_NAME: Record<ListLook, { name: string; desc: string }> = {
  * One of the resume's lists, shown in this section. Like a gallery, it
  * holds nothing itself: the entries are `p.resume[type]`, structured, where
  * the resume templates read them. The component is what puts the list on
- * the page — there is no other switch — so each list is placed at most once
- * in a portfolio.
+ * the page — there is no other switch. It can be placed as often as its
+ * author likes, each placement in its own look; every one draws the same
+ * list, because the resume has one.
  */
 export type ResumeListBlock = BlockBase & { type: PageBlock; look: ListLook };
 
@@ -125,23 +126,28 @@ export type Block =
   | ContactBlock;
 export type BlockType = Block["type"];
 
-/** Every component, in the order the "Add a component" menu offers them. */
+/**
+ * Every component, in the order "Add a component" and the editor's quick-add
+ * offer them: one list, the most reached-for first. The six that draw one of
+ * the resume's lists sit among the rest — to the person adding one, an
+ * Experience component is no different in kind from a Timeline.
+ */
 export const BLOCK_TYPES: Array<{ id: BlockType; name: string; desc: string }> = [
-  { id: "gallery", name: "Gallery", desc: "A set of pictures — as a mosaic, a grid or a strip." },
-  { id: "timeline", name: "Timeline", desc: "Milestones in order — a career, a project, a year." },
-  { id: "testimonials", name: "Testimonials", desc: "What clients and colleagues say about you." },
-  { id: "clients", name: "Clients", desc: "A wall of the names you have worked with." },
-  { id: "tabs", name: "Tabs", desc: "A few short panels a visitor switches between." },
-  { id: "stats", name: "Numbers", desc: "Two to four figures that make the point." },
-  { id: "services", name: "Services", desc: "What you offer, with a price if you like." },
-  { id: "faq", name: "Questions", desc: "The questions people ask before they reach out." },
-  { id: "contact", name: "Contact", desc: "Email, phone, a booking link and a message form." },
   { id: "experience", name: "Experience", desc: "Your roles, with their dates and what you did." },
   { id: "education", name: "Education", desc: "Degrees, schools and the years." },
   { id: "skills", name: "Skills", desc: "What you are good at, grouped if there are many." },
+  { id: "gallery", name: "Gallery", desc: "A set of pictures — as a mosaic, a grid or a strip." },
+  { id: "timeline", name: "Timeline", desc: "Milestones in order — a career, a project, a year." },
+  { id: "services", name: "Services", desc: "What you offer, with a price if you like." },
+  { id: "testimonials", name: "Testimonials", desc: "What clients and colleagues say about you." },
+  { id: "clients", name: "Clients", desc: "A wall of the names you have worked with." },
+  { id: "stats", name: "Numbers", desc: "Two to four figures that make the point." },
   { id: "certifications", name: "Certifications", desc: "Qualifications and who issued them." },
-  { id: "languages", name: "Languages", desc: "The languages you work in, and how well." },
   { id: "awards", name: "Awards", desc: "Recognition worth a line." },
+  { id: "languages", name: "Languages", desc: "The languages you work in, and how well." },
+  { id: "tabs", name: "Tabs", desc: "A few short panels a visitor switches between." },
+  { id: "faq", name: "Questions", desc: "The questions people ask before they reach out." },
+  { id: "contact", name: "Contact", desc: "Email, phone, a booking link and a message form." },
 ];
 
 /** Mirrors SECTION_IMAGES_MAX / SECTION_BLOCKS_MAX on the API. */

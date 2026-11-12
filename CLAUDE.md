@@ -206,15 +206,24 @@ chrome — that inconsistency is what this replaced.
   entries stay in `p.resume[type]` — see "The resume" for why — and the
   component's panel edits them there (`ResumeListRows` in
   `resume/ResumeContent.tsx`). **The component is the only thing that puts a
-  list on the page**: there is no Page switch for a list any more. A list is
-  one list, so it is placed at most once per portfolio — the picker disables
-  a kind that is already in a section and says which. Removing the component
-  keeps the entries; the editor's "Add a section from your resume" row is
-  where an unplaced list shows up again. `LIST_LOOKS` in `types.ts` says
-  which looks each list has (the first is its default) and `lookOf()` falls
-  back to it; the backend accepts any look so adding one is frontend-only.
+  list on the page**: there is no Page switch for a list any more. It can be
+  placed any number of times — do not restrict it to one — and every
+  placement draws the same list, in its own look, because the resume has one
+  list of each kind. Removing a component keeps the entries. `LIST_LOOKS` in
+  `types.ts` says which looks each list has (the first is its default) and
+  `lookOf()` falls back to it; the backend accepts any look so adding one is
+  frontend-only.
+- **One list of components, and no "resume" group in it.** `BLOCK_TYPES` is
+  the order both "Add a component" and the editor's "Quick add" offer, the
+  six resume lists mixed in with the rest. Quick add makes a new section
+  named after the component with it inside; it is a shortcut, not a
+  different kind of section.
+- **Words in the editor, looks in the builder.** A gallery's layout and a
+  list's look are picked in the builder's Look tab (`ComponentLooksControl`
+  in `builder/controls.tsx`), beside the canvas that shows the change. The
+  editor's component panels have no look controls; do not add one there.
 - **The editor's outline is as tall as the window, never taller.** Its list
-  scrolls inside it and "Add section" plus "Add from your resume" are
+  scrolls inside it and "Add section" plus "Quick add" are
   pinned under the list, so they are in view however many sections there
   are. The page title sits in the document column for the same reason: above
   both columns it pushed the outline down past a short window. Below `lg`

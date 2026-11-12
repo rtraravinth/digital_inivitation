@@ -9,10 +9,6 @@ import { newId } from "@/lib/store";
 import { ResumeListRows, listSummary } from "../resume/ResumeContent";
 import {
   BLOCK_TYPES,
-  GALLERY_LAYOUTS,
-  LIST_LOOKS,
-  LOOK_NAME,
-  PAGE_BLOCKS,
   SECTION_BLOCKS_MAX,
   SECTION_IMAGES_MAX,
   assetSrc,
@@ -21,7 +17,6 @@ import {
   emptyBlock,
   galleryImages,
   isListBlock,
-  lookOf,
   type Asset,
   type Block,
   type BlockType,
@@ -35,6 +30,10 @@ import {
 } from "@/lib/types";
 
 /* ── components in the editor ─────────────────────────────────────────────
+   What a component says is typed here; how it looks on the page — a
+   gallery's layout, a list's look — is picked in the builder, with the rest
+   of the page's design, and has no control in this file.
+
    A section is a heading and a cover picture; everything under that is a
    component, and every component is the same panel — `PanelShell`: a mark,
    a name, what it holds, then the rows its kind needs and nothing else. A
@@ -420,33 +419,12 @@ function PicturesField({
 
 /* ── the picker ───────────────────────────────────────────────────────── */
 
-/**
- * "Add a component": a disclosure that opens every kind, in two groups —
- * what the page adds, and the lists the resume already holds. A resume list
- * is one list, so it can be placed once: a kind already in a section says
- * which, and cannot be added again.
- */
-export function ComponentPicker({
-  count,
-  resume,
-  placed,
-  onAdd,
-}: {
-  count: number;
-  resume: Resume;
-  /** The section each placed list sits in, by name. */
-  placed: Map<PageBlock, string>;
-  onAdd: (type: BlockType) => void;
-}) {
+/** "Add a component": a disclosure that opens every kind, in one list. */
+export function ComponentPicker({ count, onAdd }: { count: number; onAdd: (type: BlockType) => void }) {
   const [open, setOpen] = useState(false);
   const panel = useId();
   const reduced = useReducedMotion();
   const full = count >= SECTION_BLOCKS_MAX;
-  const isList = (id: BlockType): id is PageBlock => (PAGE_BLOCKS as string[]).includes(id);
-  const groups = [
-    { title: "For the page", types: BLOCK_TYPES.filter((t) => !isList(t.id)) },
-    { title: "From your resume", types: BLOCK_TYPES.filter((t) => isList(t.id)) },
-  ];
 
   return (
     <div>
@@ -474,49 +452,32 @@ export function ComponentPicker({
             transition={{ duration: 0.3, ease: EASE }}
             className="overflow-hidden"
           >
-            {groups.map((g) => (
-              <div key={g.title} className="mt-4">
-                <p className="m-0 mb-2 text-[12px] font-medium" style={{ color: "var(--color-neutral-600)" }}>
-                  {g.title}
-                </p>
-                <ul className="m-0 grid list-none grid-cols-1 gap-2 p-0 sm:grid-cols-2">
-                  {g.types.map((t) => {
-                    const where = isList(t.id) ? placed.get(t.id) : undefined;
-                    const saved = isList(t.id) && resume[t.id].length > 0 ? listSummary(resume, t.id) : "";
-                    return (
-                      <li key={t.id}>
-                        <button
-                          type="button"
-                          disabled={where !== undefined}
-                          onClick={() => {
-                            onAdd(t.id);
-                            setOpen(false);
-                          }}
-                          className="flex w-full cursor-pointer items-start gap-3 rounded-xl p-3 text-left transition-colors hover:bg-[var(--color-neutral-100)] disabled:cursor-not-allowed disabled:opacity-55 disabled:hover:bg-transparent"
-                          style={{ boxShadow: "inset 0 0 0 1px var(--color-divider)" }}
-                        >
-                          <span
-                            className="grid h-9 w-9 flex-none place-items-center rounded-lg"
-                            style={{ background: "var(--color-neutral-100)", color: "var(--color-ink)" }}
-                          >
-                            <Icon d={COMPONENT_ICON[t.id]} size={18} />
-                          </span>
-                          <span className="min-w-0">
-                            <span className="block text-[13.5px] font-semibold">
-                              {t.name}
-                              {saved && !where && <span className="ml-2 font-normal text-muted">{saved} saved</span>}
-                            </span>
-                            <span className="block text-[12.5px] leading-snug text-muted">
-                              {where !== undefined ? `Already in “${where || "Untitled section"}”. A list is placed once.` : t.desc}
-                            </span>
-                          </span>
-                        </button>
-                      </li>
-                    );
-                  })}
-                </ul>
-              </div>
-            ))}
+            <ul className="m-0 mt-3 grid list-none grid-cols-1 gap-2 p-0 sm:grid-cols-2">
+              {BLOCK_TYPES.map((t) => (
+                <li key={t.id}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onAdd(t.id);
+                      setOpen(false);
+                    }}
+                    className="flex w-full cursor-pointer items-start gap-3 rounded-xl p-3 text-left transition-colors hover:bg-[var(--color-neutral-100)]"
+                    style={{ boxShadow: "inset 0 0 0 1px var(--color-divider)" }}
+                  >
+                    <span
+                      className="grid h-9 w-9 flex-none place-items-center rounded-lg"
+                      style={{ background: "var(--color-neutral-100)", color: "var(--color-ink)" }}
+                    >
+                      <Icon d={COMPONENT_ICON[t.id]} size={18} />
+                    </span>
+                    <span className="min-w-0">
+                      <span className="block text-[13.5px] font-semibold">{t.name}</span>
+                      <span className="block text-[12.5px] leading-snug text-muted">{t.desc}</span>
+                    </span>
+                  </button>
+                </li>
+              ))}
+            </ul>
           </motion.div>
         )}
       </AnimatePresence>
@@ -735,19 +696,9 @@ export function ComponentPanel({
         />
       </div>
       {isListBlock(block) ? (
-        <>
-          {LIST_LOOKS[block.type].length > 1 && (
-            <ChoiceField
-              label="Look on the page"
-              value={lookOf(block)}
-              options={LIST_LOOKS[block.type].map((id) => ({ id, ...LOOK_NAME[id] }))}
-              onChange={(look) => onChange({ ...block, look })}
-            />
-          )}
-          <ResumeListRows p={p} block={block.type} />
-        </>
+        <ResumeListRows p={p} block={block.type} />
       ) : block.type === "gallery" ? (
-        <GalleryFields block={block} section={section} onChange={onChange} onSection={onSection} />
+        <GalleryFields block={block} section={section} onSection={onSection} />
       ) : block.type === "contact" ? (
         <ContactFields block={block} onChange={onChange} />
       ) : (
@@ -757,60 +708,13 @@ export function ComponentPanel({
   );
 }
 
-/** A handful of looks to pick one from, each with a line saying what it is. */
-function ChoiceField<T extends string>({
-  label,
-  value,
-  options,
-  onChange,
-}: {
-  label: string;
-  value: T;
-  options: Array<{ id: T; name: string; desc: string }>;
-  onChange: (next: T) => void;
-}) {
-  // The builder mounts some controls twice; a radio name has to be unique.
-  const group = useId();
-  return (
-    <div className="field">
-      <label id={`${group}-label`}>{label}</label>
-      <div role="radiogroup" aria-labelledby={`${group}-label`} className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-        {options.map((o) => {
-          const on = value === o.id;
-          return (
-            <label
-              key={o.id}
-              className="flex cursor-pointer items-start gap-2.5 rounded-lg p-2.5"
-              style={{ boxShadow: `inset 0 0 0 ${on ? "1.5px var(--color-ink)" : "1px var(--color-divider)"}` }}
-            >
-              <input
-                type="radio"
-                name={`choice-${group}`}
-                className="mt-0.5 h-4 w-4 flex-none accent-[var(--color-ink)]"
-                checked={on}
-                onChange={() => onChange(o.id)}
-              />
-              <span className="min-w-0">
-                <span className="block text-[13px] font-semibold">{o.name}</span>
-                <span className="block text-[12px] leading-snug text-muted">{o.desc}</span>
-              </span>
-            </label>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
 function GalleryFields({
   block,
   section,
-  onChange,
   onSection,
 }: {
   block: GalleryBlock;
   section: Section;
-  onChange: (next: Block) => void;
   onSection: (recipe: (s: Section) => Section) => void;
 }) {
   // One change for both halves: the pictures the section holds and the ids
@@ -840,7 +744,6 @@ function GalleryFields({
 
   return (
     <>
-      <ChoiceField label="Layout" value={block.layout} options={GALLERY_LAYOUTS} onChange={(layout) => onChange({ ...block, layout })} />
       <PicturesField images={galleryImages(section, block)} room={SECTION_IMAGES_MAX - section.images.length} onChange={setPictures} />
     </>
   );

@@ -657,10 +657,10 @@ export function sectionGroups(p: Portfolio): Array<{ tab: string; items: Project
   const items: ProjectItem[] = [];
   for (const s of p.sections) {
     if (!s.onResume || !(s.title.trim() || s.description.trim())) continue;
-    // A section that only holds a resume list is that list's place on the
-    // page. The resume prints the list itself; its bare title would be an
-    // entry with nothing under it.
-    if (!s.description.trim() && s.links.length === 0 && s.blocks.some(isListBlock)) continue;
+    // A section that is only a title over its components has nothing for
+    // the resume: it prints no component but its own lists, and those it
+    // prints itself. The bare title would be an entry with nothing under it.
+    if (!s.description.trim() && s.links.length === 0 && s.blocks.length > 0) continue;
     items.push({
       id: s.id,
       title: s.title.trim(),
@@ -779,15 +779,6 @@ export function listEntries(resume: Resume, list: PageBlock): ListEntry[] {
           entry({ id: a.id, title: a.title.trim(), sub: a.issuer.trim(), date: a.date.trim(), lines: a.detail.trim() ? [a.detail.trim()] : [] }),
         );
   }
-}
-
-/** The section each list's component sits in, if it has one. */
-export function placedLists(p: Portfolio): Map<PageBlock, Section> {
-  const placed = new Map<PageBlock, Section>();
-  for (const s of p.sections) {
-    for (const b of s.blocks) if (isListBlock(b) && !placed.has(b.type)) placed.set(b.type, s);
-  }
-  return placed;
 }
 
 /**

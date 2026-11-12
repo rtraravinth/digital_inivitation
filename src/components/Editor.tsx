@@ -7,22 +7,22 @@ import { LinkEditor } from "./LinkEditor";
 import { PortfolioExtras, PortraitField, SectionExtras } from "./SectionExtras";
 import { PublishedLock } from "./PublishedLock";
 import { TagEditor } from "./TagEditor";
-import { ResumeContactFields, listSummary } from "./resume/ResumeContent";
+import { ResumeContactFields } from "./resume/ResumeContent";
 import { Card, Placeholder } from "./editor/card";
 import { COMPONENT_ICON, ComponentChip, ComponentPanel, ComponentPicker, CoverField, componentName, componentSummary, newComponent } from "./editor/components";
 import { ICON, Icon, IconButton, LookToggles, StatusPill } from "./ui";
 import { Glyph } from "@/lib/glyphs";
 import { LinkIcon, iconFor } from "@/lib/icons";
-import { BLOCK_LABEL, placedLists, resumePrintPath } from "@/lib/resume";
+import { resumePrintPath } from "@/lib/resume";
 import { usePortfolios } from "@/lib/store";
 import {
-  PAGE_BLOCKS,
+  BLOCK_TYPES,
   assetSrc,
   coverOf,
   previewPath,
   type LinkItem,
   type Portfolio,
-  type PageBlock,
+  type BlockType,
   type Resume,
   type Footer,
   type PortfolioHeader,
@@ -37,8 +37,9 @@ import {
    The header (which also holds the resume's private contact line), the
    sections, the footer. Experience, Education, Skills and the other resume
    lists are components like a gallery or a timeline: placed in whichever
-   section their author likes, in a look they pick, with the entries still
-   stored as the resume's structured facts. Every section carries Page and
+   sections their author likes, with the entries still stored as the
+   resume's structured facts. Words are typed here; looks — a list's, a
+   gallery's — are picked in the builder. Every section carries Page and
    Resume switches, so nothing is typed twice. An outline beside them on a
    desk jumps to any card. Every change saves as you type.
    ──────────────────────────────────────────────────────────────────────── */
@@ -107,11 +108,6 @@ export function Editor({ id }: { id: string }) {
   }
 
   const p: Portfolio = portfolio;
-  // Which section each resume list sits in. A list is one list, so it is
-  // placed once; the ones not placed yet are offered under the sections.
-  const placedIn = placedLists(p);
-  const placed = new Map([...placedIn].map(([list, section]) => [list, section.title] as const));
-  const unplaced = PAGE_BLOCKS.filter((list) => !placedIn.has(list));
   const hidden = p.sections.filter((s) => s.hidden).length;
 
   const setHeader = (recipe: (h: PortfolioHeader) => PortfolioHeader) =>
@@ -127,17 +123,12 @@ export function Editor({ id }: { id: string }) {
     setOpen(added);
   }
 
-  /** A new section holding one of the resume's lists, named after it. */
-  async function addList(list: PageBlock) {
+  /** Quick add: a new section named after a component, with it inside. */
+  async function quickAdd(type: BlockType) {
     const added = await addSectionAsync(p.id);
     if (!added) return;
-    updateSection(p.id, added, (s) => ({
-      ...s,
-      title: BLOCK_LABEL[list],
-      // The resume prints the list itself; the section is its place on the page.
-      onResume: false,
-      blocks: [newComponent(list)],
-    }));
+    updateSection(p.id, added, (s) => ({ ...s, title: componentName(type), blocks: [newComponent(type)] }));
+    justAdded.current = added;
     setOpen(added);
   }
 
@@ -276,41 +267,7 @@ export function Editor({ id }: { id: string }) {
                   <Glyph id="plus" size={14} />
                   Add section
                 </button>
-                {unplaced.length > 0 && (
-                  <div>
-                    <span className="mb-1.5 block px-1 text-[12px] font-medium" style={{ color: "var(--color-neutral-600)" }}>
-                      Add from your resume
-                    </span>
-                    {/* Two across only when there are enough to need it: at
-                        this width a pair clips "Experience". */}
-                    <ul className={`m-0 grid list-none gap-1 p-0 ${unplaced.length > 3 ? "grid-cols-2" : "grid-cols-1"}`}>
-                      {unplaced.map((list) => {
-                        const saved = p.resume[list].length;
-                        return (
-                          <li key={list} className="min-w-0">
-                            <button
-                              type="button"
-                              onClick={() => addList(list)}
-                              title={saved > 0 ? `${listSummary(p.resume, list)} saved, in no section yet` : undefined}
-                              className="flex min-h-[32px] w-full cursor-pointer items-center gap-1.5 rounded-lg px-2 text-left text-[12.5px] transition-colors hover:bg-[var(--color-neutral-100)]"
-                              style={{ boxShadow: "inset 0 0 0 1px var(--color-divider)" }}
-                            >
-                              <span className="flex-none">
-                                <Icon d={COMPONENT_ICON[list]} size={13} />
-                              </span>
-                              <span className="min-w-0 flex-1 truncate">{BLOCK_LABEL[list]}</span>
-                              {saved > 0 && (
-                                <span className="flex-none font-mono text-[11px]" style={{ color: "var(--color-neutral-600)" }}>
-                                  {saved}
-                                </span>
-                              )}
-                            </button>
-                          </li>
-                        );
-                      })}
-                    </ul>
-                  </div>
-                )}
+                <QuickAdd onAdd={quickAdd} compact />
               </div>
             </nav>
 
@@ -383,7 +340,6 @@ export function Editor({ id }: { id: string }) {
                       first={i === 0}
                       last={i === p.sections.length - 1}
                       resume={p.resume}
-                      placed={placed}
                       p={p}
                       open={open === s.id}
                       onOpen={() => setOpen(s.id)}
@@ -436,11 +392,9 @@ export function Editor({ id }: { id: string }) {
 
               {/* Beside the document on a desk, in the outline; here only
                   where there is no outline to hold it. */}
-              {unplaced.length > 0 && (
-                <div className="lg:hidden">
-                  <AddLists resume={p.resume} lists={unplaced} onAdd={addList} />
-                </div>
-              )}
+              <div className="lg:hidden">
+                <QuickAdd onAdd={quickAdd} />
+              </div>
 
               <div className="mt-4 flex items-baseline gap-3 px-1">
                 <h2 className="m-0 text-[16px] tracking-[-0.01em]">Footer</h2>
@@ -462,31 +416,48 @@ export function Editor({ id }: { id: string }) {
 }
 
 /**
- * The resume's lists that are in no section yet, each one click from being
- * one. It is also where a list goes when its component is removed: the
- * entries are the resume's and stay, so this says they are still there.
+ * Every component as a one-click start: a new section named after it, with
+ * it already inside. A shortcut and nothing more — the same components are
+ * under "Add a component" in any section, as often as their author likes.
+ * `compact` is the outline's copy: two across, scrolling inside its own box
+ * so the list of sections above it keeps its room.
  */
-function AddLists({ resume, lists, onAdd }: { resume: Resume; lists: PageBlock[]; onAdd: (list: PageBlock) => void }) {
-  const saved = lists.filter((list) => resume[list].length > 0);
+function QuickAdd({ onAdd, compact }: { onAdd: (type: BlockType) => void; compact?: boolean }) {
+  const chips = (
+    <ul className={`m-0 grid list-none gap-1 p-0 ${compact ? "grid-cols-2" : "grid-cols-2 sm:grid-cols-3"}`}>
+      {BLOCK_TYPES.map((t) => (
+        <li key={t.id} className="min-w-0">
+          <button
+            type="button"
+            onClick={() => onAdd(t.id)}
+            title={t.desc}
+            className="flex min-h-[32px] w-full cursor-pointer items-center gap-1.5 rounded-lg px-2 text-left text-[12.5px] transition-colors hover:bg-[var(--color-neutral-100)]"
+            style={{ boxShadow: "inset 0 0 0 1px var(--color-divider)" }}
+          >
+            <span className="flex-none">
+              <Icon d={COMPONENT_ICON[t.id]} size={13} />
+            </span>
+            <span className="min-w-0 flex-1 truncate">{t.name}</span>
+          </button>
+        </li>
+      ))}
+    </ul>
+  );
+  if (compact) {
+    return (
+      <div className="flex min-h-0 flex-col">
+        <span className="mb-1.5 block flex-none px-1 text-[12px] font-medium" style={{ color: "var(--color-neutral-600)" }}>
+          Quick add
+        </span>
+        <div className="-mr-2 max-h-[30dvh] overflow-y-auto overscroll-contain pr-2 pb-px">{chips}</div>
+      </div>
+    );
+  }
   return (
     <div className="rounded-2xl px-5 py-4 sm:px-6" style={{ border: "1px solid var(--color-divider)", background: "var(--color-bg)" }}>
-      <p className="m-0 text-[13px] font-semibold">Add a section from your resume</p>
-      <p className="m-0 mt-0.5 max-w-[64ch] text-[12.5px] leading-snug text-muted">
-        {saved.length > 0
-          ? "These lists have entries but are in no section, so the page does not show them. Your resume still prints them."
-          : "Roles, schools, skills — typed once, shown on your page and printed on your resume."}
-      </p>
-      <ul className="m-0 mt-3 flex list-none flex-wrap gap-2 p-0">
-        {lists.map((list) => (
-          <li key={list}>
-            <button type="button" className="btn btn-secondary" style={{ marginTop: 0, minHeight: 34 }} onClick={() => onAdd(list)}>
-              <Icon d={COMPONENT_ICON[list]} size={14} />
-              {BLOCK_LABEL[list]}
-              {resume[list].length > 0 && <span className="font-normal text-muted">{listSummary(resume, list)}</span>}
-            </button>
-          </li>
-        ))}
-      </ul>
+      <p className="m-0 text-[13px] font-semibold">Quick add</p>
+      <p className="m-0 mt-0.5 mb-3 max-w-[64ch] text-[12.5px] leading-snug text-muted">A new section with this component already in it.</p>
+      {chips}
     </div>
   );
 }
@@ -718,7 +689,6 @@ function SectionCard({
   first,
   last,
   resume,
-  placed,
   p,
   open,
   onOpen,
@@ -730,7 +700,6 @@ function SectionCard({
   onDelete,
 }: {
   resume: Resume;
-  placed: Map<PageBlock, string>;
   p: Portfolio;
   section: Section;
   number: string;
@@ -863,7 +832,7 @@ function SectionCard({
 
       <Grouped
         title="Components"
-        hint="Everything else this section shows on your page, in this order. Of these the resume prints only its own lists — experience, education, skills and the rest."
+        hint="Everything else this section shows on your page, in this order. How each one looks is picked in the builder."
       >
         {s.blocks.length > 0 && (
           <div className="flex flex-col gap-3">
@@ -883,7 +852,7 @@ function SectionCard({
             </AnimatePresence>
           </div>
         )}
-        <ComponentPicker count={s.blocks.length} resume={resume} placed={placed} onAdd={(type) => onChange((x) => ({ ...x, blocks: [...x.blocks, newComponent(type)] }))} />
+        <ComponentPicker count={s.blocks.length} onAdd={(type) => onChange((x) => ({ ...x, blocks: [...x.blocks, newComponent(type)] }))} />
       </Grouped>
 
       {/* Draws its own rule and "Attach (optional)" label. */}

@@ -4,12 +4,18 @@ import { useId, useState } from "react";
 import { ColourPicker } from "@/components/builder/ColourPicker";
 import { FontSelect } from "@/components/builder/FontSelect";
 import { ThemeThumb } from "./ThemeThumb";
+import { Segmented } from "@/components/ui";
 import { Glyph } from "@/lib/glyphs";
+import { usePortfolios } from "@/lib/store";
 import {
+  BLOCK_TYPES,
   DEFAULT_TRACKING,
   DENSITIES,
   FONTS,
+  GALLERY_LAYOUTS,
   GROUNDS,
+  LIST_LOOKS,
+  LOOK_NAME,
   MOTION_LEVELS,
   PHOTO_TREATMENTS,
   PROFESSIONS,
@@ -17,8 +23,13 @@ import {
   THEMES,
   TYPE_SCALES,
   applyProfession,
+  isListBlock,
+  lookOf,
+  type Block,
   type FontId,
+  type GalleryLayout,
   type GridCols,
+  type ListLook,
   type Portfolio,
   type ProfessionId,
   type ThemeId,
@@ -47,6 +58,89 @@ function Section({
       {note && <p className="m-0 mb-3 text-[12.5px] leading-snug text-muted">{note}</p>}
       {children}
     </section>
+  );
+}
+
+/* ── look: components ─────────────────────────────────────────────────── */
+
+/**
+ * How each component on the page is drawn: a gallery as a mosaic, a grid or
+ * a strip; a resume list as a timeline, rows, cards or tags. It lives here
+ * and not in the editor because it is design, not words — and here the
+ * canvas beside it shows the change as it is made.
+ *
+ * Only components that have a choice are listed. A component with one look
+ * has nothing to ask.
+ */
+export function ComponentLooksControl({ p }: { p: Portfolio }) {
+  const { updateSection } = usePortfolios();
+  // The builder mounts its controls twice; a sliding pill's id must not be
+  // shared between the copies.
+  const group = useId();
+
+  const rows = p.sections.flatMap((section) =>
+    section.blocks.flatMap((block) => {
+      const set = (next: Block) =>
+        updateSection(p.id, section.id, (s) => ({ ...s, blocks: s.blocks.map((b) => (b.id === block.id ? next : b)) }));
+      const name = BLOCK_TYPES.find((t) => t.id === block.type)?.name ?? block.type;
+      if (block.type === "gallery") {
+        return [
+          {
+            key: block.id,
+            section,
+            name,
+            value: block.layout as string,
+            options: GALLERY_LAYOUTS.map((l) => ({ id: l.id as string, label: l.name })),
+            onPick: (id: string) => set({ ...block, layout: id as GalleryLayout }),
+          },
+        ];
+      }
+      if (isListBlock(block) && LIST_LOOKS[block.type].length > 1) {
+        return [
+          {
+            key: block.id,
+            section,
+            name,
+            value: lookOf(block) as string,
+            options: LIST_LOOKS[block.type].map((id) => ({ id: id as string, label: LOOK_NAME[id].name })),
+            onPick: (id: string) => set({ ...block, look: id as ListLook }),
+          },
+        ];
+      }
+      return [];
+    }),
+  );
+
+  return (
+    <Section
+      title="Components"
+      note={
+        rows.length > 0
+          ? "How each gallery and list on your page is laid out."
+          : "A gallery, or a list such as Experience or Skills, can be laid out more than one way. Add one in Edit text and its looks appear here."
+      }
+    >
+      {rows.length > 0 && (
+        <ul className="m-0 flex list-none flex-col gap-3 p-0">
+          {rows.map((row) => (
+            <li key={row.key} className="flex flex-col items-start gap-1.5">
+              <span className="max-w-full truncate text-[12.5px]">
+                <span className="font-medium">{row.name}</span>
+                <span className="text-muted"> · {row.section.title.trim() || "Untitled section"}</span>
+                {row.section.hidden && <span className="text-muted"> · off the page</span>}
+              </span>
+              <Segmented
+                label={`${row.name} in ${row.section.title.trim() || "an untitled section"}`}
+                id={`look-${group}-${row.key}`}
+                value={row.value}
+                onChange={row.onPick}
+                options={row.options}
+              />
+            </li>
+          ))}
+        </ul>
+      )}
+    </Section>
   );
 }
 

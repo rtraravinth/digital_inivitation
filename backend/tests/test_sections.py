@@ -163,26 +163,28 @@ async def test_delete_leaves_positions_dense(auth_client, three_sections, db_ses
     ).status_code == 204
 
     rows = (
-        await db_session.execute(
-            select(Section).where(Section.portfolio_id == portfolio_id).order_by(Section.position)
+        (
+            await db_session.execute(
+                select(Section)
+                .where(Section.portfolio_id == portfolio_id)
+                .order_by(Section.position)
+            )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     assert [row.position for row in rows] == [0, 1]
     assert [str(row.id) for row in rows] == [ids[1], ids[2]]
 
 
 async def test_deleting_a_section_that_does_not_exist_is_404(auth_client, portfolio):
     missing = "01a00000-0000-7000-8000-000000000000"
-    response = await auth_client.delete(
-        f"/api/v1/portfolios/{portfolio['id']}/sections/{missing}"
-    )
+    response = await auth_client.delete(f"/api/v1/portfolios/{portfolio['id']}/sections/{missing}")
     assert response.status_code == 404
     assert response.json()["error"]["code"] == "section_not_found"
 
 
-async def test_touching_a_section_of_another_users_portfolio_is_404(
-    auth_client, other_auth_client
-):
+async def test_touching_a_section_of_another_users_portfolio_is_404(auth_client, other_auth_client):
     theirs = (
         await other_auth_client.post(
             "/api/v1/portfolios",

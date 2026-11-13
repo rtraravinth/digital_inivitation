@@ -25,9 +25,7 @@ from app.schemas.common import ERROR_RESPONSES
 from app.services.account import AccountService
 from app.services.storage import get_storage
 
-router = APIRouter(
-    tags=["account"], responses=ERROR_RESPONSES, route_class=TransactionRoute
-)
+router = APIRouter(tags=["account"], responses=ERROR_RESPONSES, route_class=TransactionRoute)
 
 
 @router.get("/account", response_model=AccountOut, summary="Everything on /account")

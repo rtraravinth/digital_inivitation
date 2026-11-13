@@ -71,8 +71,7 @@ async def test_two_accounts_can_hold_the_same_slug(auth_client, other_auth_clien
         created = (
             await owner.post(
                 "/api/v1/portfolios",
-                json={"name": "Investors", "slug": "investors",
-                      "startFrom": {"kind": "blank"}},
+                json={"name": "Investors", "slug": "investors", "startFrom": {"kind": "blank"}},
             )
         ).json()
         assert created["slug"] == "investors"
@@ -105,17 +104,14 @@ async def test_the_wrong_handle_does_not_reach_the_page(auth_client, client, pub
     assert (
         await client.get(f"/api/v1/public/p/{OTHER_HANDLE}/{published['slug']}")
     ).status_code == 404
-    assert (
-        await client.get(f"/api/v1/public/p/nobody/{published['slug']}")
-    ).status_code == 404
+    assert (await client.get(f"/api/v1/public/p/nobody/{published['slug']}")).status_code == 404
 
 
 async def test_recording_a_view_needs_the_handle_too(auth_client, client):
     created = (
         await auth_client.post(
             "/api/v1/portfolios",
-            json={"name": "Investors", "slug": "investors",
-                  "startFrom": {"kind": "blank"}},
+            json={"name": "Investors", "slug": "investors", "startFrom": {"kind": "blank"}},
         )
     ).json()
     await auth_client.post(f"/api/v1/portfolios/{created['id']}/publish")
@@ -140,18 +136,14 @@ async def test_the_seed_imports_and_reads_back(auth_client):
 
     rows = (await auth_client.get("/api/v1/portfolios")).json()
     assert len(rows) == 5
-    assert {row["slug"] for row in rows} == {
-        "full", "investors", "advisory", "writing", "board"
-    }
+    assert {row["slug"] for row in rows} == {"full", "investors", "advisory", "writing", "board"}
     # Every seeded portfolio has content; an empty one would mean the import
     # silently dropped its sections.
     assert all(row["sectionCount"] > 0 for row in rows)
 
 
 async def test_the_seeds_live_pages_publish_and_serve(auth_client, client):
-    await auth_client.post(
-        "/api/v1/import", json={"mode": "replace", "portfolios": seed_payload()}
-    )
+    await auth_client.post("/api/v1/import", json={"mode": "replace", "portfolios": seed_payload()})
 
     rows = (await auth_client.get("/api/v1/portfolios")).json()
     full = next(row for row in rows if row["slug"] == "full")
@@ -169,18 +161,14 @@ async def test_the_seeds_live_pages_publish_and_serve(auth_client, client):
 
 
 async def test_seeded_hidden_sections_stay_off_the_published_page(auth_client, client):
-    await auth_client.post(
-        "/api/v1/import", json={"mode": "replace", "portfolios": seed_payload()}
-    )
+    await auth_client.post("/api/v1/import", json={"mode": "replace", "portfolios": seed_payload()})
     payload = seed_payload()
 
     for portfolio in payload:
         hidden = [s for s in portfolio["sections"] if s.get("hidden")]
         if not hidden:
             continue
-        response = await client.get(
-            f"/api/v1/public/p/{TEST_HANDLE}/{portfolio['slug']}"
-        )
+        response = await client.get(f"/api/v1/public/p/{TEST_HANDLE}/{portfolio['slug']}")
         if response.status_code != 200:
             continue
         served = {s["title"] for s in response.json()["sections"]}

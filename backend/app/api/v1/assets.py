@@ -87,9 +87,7 @@ async def _readable(
     return asset
 
 
-@router.delete(
-    "/{asset_id}", status_code=status.HTTP_204_NO_CONTENT, summary="Delete an upload"
-)
+@router.delete("/{asset_id}", status_code=status.HTTP_204_NO_CONTENT, summary="Delete an upload")
 async def delete_asset(asset_id: uuid.UUID, session: SessionDep, user: CurrentUser) -> None:
     await AssetService(session).delete(user, asset_id)
 

@@ -31,8 +31,7 @@ depends_on: str | Sequence[str] | None = None
 #: Spelled out rather than imported, so this migration keeps describing the
 #: schema it actually produced once the tuple moves on.
 WIDE = (
-    "'editorial', 'index', 'poster', 'links', 'ledger', 'dossier', "
-    "'broadsheet', 'resume', 'site'"
+    "'editorial', 'index', 'poster', 'links', 'ledger', 'dossier', 'broadsheet', 'resume', 'site'"
 )
 FIVE = "'resume', 'editorial', 'poster', 'links', 'site'"
 

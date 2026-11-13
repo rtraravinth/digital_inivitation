@@ -105,9 +105,7 @@ class TransferService:
 
     # ── import ──────────────────────────────────────────────────────────
 
-    async def import_(
-        self, user: User, payload: list[Any], mode: str
-    ) -> ImportResultOut:
+    async def import_(self, user: User, payload: list[Any], mode: str) -> ImportResultOut:
         if not all(isinstance(item, dict) for item in payload):
             raise ValidationFailed(
                 "That file is not a FACET export.", code="invalid_import_payload"
@@ -121,11 +119,7 @@ class TransferService:
                 await self.session.delete(portfolio)
             await self.session.flush()
 
-        taken = set(
-            (
-                await self.session.scalars(select(Portfolio.slug))
-            ).all()
-        )
+        taken = set((await self.session.scalars(select(Portfolio.slug))).all())
 
         renamed: dict[str, str] = {}
         imported = 0
@@ -143,9 +137,7 @@ class TransferService:
         await self.session.flush()
         return ImportResultOut(imported=imported, renamed=renamed)
 
-    async def _create_from_dict(
-        self, user: User, raw: dict[str, Any], slug: str
-    ) -> Portfolio:
+    async def _create_from_dict(self, user: User, raw: dict[str, Any], slug: str) -> Portfolio:
         header_raw = raw.get("header") or {}
         sections_raw = [s for s in (raw.get("sections") or []) if isinstance(s, dict)]
         sections_raw = _page_block_sections(raw.get("resume")) + sections_raw

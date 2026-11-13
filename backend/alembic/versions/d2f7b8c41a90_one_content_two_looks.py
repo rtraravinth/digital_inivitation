@@ -60,7 +60,9 @@ def upgrade() -> None:
             if summary and not description.strip():
                 description = summary
             bind.execute(
-                sa.text("UPDATE portfolio_headers SET current = :c, description = :d WHERE id = :id"),
+                sa.text(
+                    "UPDATE portfolio_headers SET current = :c, description = :d WHERE id = :id"
+                ),
                 {"c": current, "d": description, "id": row["header_id"]},
             )
         bind.execute(

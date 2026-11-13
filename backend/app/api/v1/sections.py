@@ -61,9 +61,7 @@ async def update_section(
     return section_out(section)
 
 
-@router.delete(
-    "/{section_id}", status_code=status.HTTP_204_NO_CONTENT, summary="Delete a section"
-)
+@router.delete("/{section_id}", status_code=status.HTTP_204_NO_CONTENT, summary="Delete a section")
 async def delete_section(
     section_id: uuid.UUID, portfolio: EditablePortfolio, session: SessionDep
 ) -> None:

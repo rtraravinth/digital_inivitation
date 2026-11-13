@@ -10,15 +10,17 @@ from app.models import Portfolio, User
 async def test_get_account_returns_the_ui_shape_in_camel_case(auth_client):
     body = (await auth_client.get("/api/v1/account")).json()
 
-    assert set(body) == {
-        "profile", "security", "plan", "customDomain", "notifications", "privacy"
-    }
-    assert set(body["notifications"]) == {
-        "booking", "weekly", "brokenLink", "mention", "product"
-    }
+    assert set(body) == {"profile", "security", "plan", "customDomain", "notifications", "privacy"}
+    assert set(body["notifications"]) == {"booking", "weekly", "brokenLink", "mention", "product"}
     assert set(body["privacy"]) == {"indexable", "showContact", "countVisits", "badge"}
     assert set(body["profile"]) == {
-        "name", "handle", "current", "about", "tags", "links", "portrait"
+        "name",
+        "handle",
+        "current",
+        "about",
+        "tags",
+        "links",
+        "portrait",
     }
 
 
@@ -28,12 +30,18 @@ async def test_the_defaults_match_the_frontends(auth_client):
     assert body["plan"] == "free"
     assert body["customDomain"] == ""
     assert body["notifications"] == {
-        "booking": True, "weekly": True, "brokenLink": True,
-        "mention": False, "product": False,
+        "booking": True,
+        "weekly": True,
+        "brokenLink": True,
+        "mention": False,
+        "product": False,
     }
     # All four start permissive, and all four actually change what renders.
     assert body["privacy"] == {
-        "indexable": True, "showContact": True, "countVisits": True, "badge": True
+        "indexable": True,
+        "showContact": True,
+        "countVisits": True,
+        "badge": True,
     }
 
 
@@ -68,9 +76,7 @@ async def test_profile_link_round_trips_an_icon(auth_client):
     response = await auth_client.patch(
         "/api/v1/account/profile",
         json={
-            "links": [
-                {"id": "al1", "label": "LinkedIn", "url": "/in/rohan", "icon": "linkedin"}
-            ]
+            "links": [{"id": "al1", "label": "LinkedIn", "url": "/in/rohan", "icon": "linkedin"}]
         },
     )
     assert response.status_code == 200
@@ -92,9 +98,7 @@ async def test_handle_is_unique_across_users(auth_client, other_auth_client):
         await auth_client.patch("/api/v1/account/profile", json={"handle": "rohan"})
     ).status_code == 200
 
-    response = await other_auth_client.patch(
-        "/api/v1/account/profile", json={"handle": "rohan"}
-    )
+    response = await other_auth_client.patch("/api/v1/account/profile", json={"handle": "rohan"})
     assert response.status_code == 409
     assert response.json()["error"]["code"] == "handle_taken"
 
@@ -109,9 +113,7 @@ async def test_keeping_your_own_handle_is_not_a_conflict(auth_client):
 
 
 async def test_an_invalid_handle_is_422(auth_client):
-    response = await auth_client.patch(
-        "/api/v1/account/profile", json={"handle": "Not A Handle"}
-    )
+    response = await auth_client.patch("/api/v1/account/profile", json={"handle": "Not A Handle"})
     assert response.status_code == 422
 
 
@@ -147,9 +149,9 @@ async def test_patch_notifications_merges(auth_client):
 
 
 async def test_setting_the_plan_works_and_an_unknown_plan_is_422(auth_client):
-    assert (
-        await auth_client.patch("/api/v1/account/plan", json={"plan": "pro"})
-    ).json()["plan"] == "pro"
+    assert (await auth_client.patch("/api/v1/account/plan", json={"plan": "pro"})).json()[
+        "plan"
+    ] == "pro"
 
     response = await auth_client.patch("/api/v1/account/plan", json={"plan": "enterprise"})
     assert response.status_code == 422
@@ -167,9 +169,7 @@ async def test_security_patch_updates_phone_but_not_email(auth_client):
     assert response.json()["security"]["phone"] == "+91 98450"
 
     # Email is identity, not a preference: it is not patchable here.
-    refused = await auth_client.patch(
-        "/api/v1/account/security", json={"email": "new@example.com"}
-    )
+    refused = await auth_client.patch("/api/v1/account/security", json={"email": "new@example.com"})
     assert refused.status_code == 422
 
 

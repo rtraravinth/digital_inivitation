@@ -79,7 +79,11 @@ async def test_copying_another_users_portfolio_is_404(auth_client, other_auth_cl
 
     response = await auth_client.post(
         "/api/v1/portfolios",
-        json={"name": "Mine", "slug": "mine-copy", "startFrom": {"kind": "copy", "id": theirs["id"]}},
+        json={
+            "name": "Mine",
+            "slug": "mine-copy",
+            "startFrom": {"kind": "copy", "id": theirs["id"]},
+        },
     )
     assert response.status_code == 404
 
@@ -104,8 +108,7 @@ async def test_the_same_slug_across_accounts_is_fine(auth_client, other_auth_cli
     for owner in (auth_client, other_auth_client):
         response = await owner.post(
             "/api/v1/portfolios",
-            json={"name": "Investors", "slug": "shared-slug",
-                  "startFrom": {"kind": "blank"}},
+            json={"name": "Investors", "slug": "shared-slug", "startFrom": {"kind": "blank"}},
         )
         assert response.status_code == 201, response.text
 
@@ -128,7 +131,8 @@ async def test_slug_available_reports_both_answers(auth_client, portfolio):
 
 async def test_list_only_returns_my_portfolios(auth_client, other_auth_client):
     await auth_client.post(
-        "/api/v1/portfolios", json={"name": "Mine", "slug": "mine-x", "startFrom": {"kind": "blank"}}
+        "/api/v1/portfolios",
+        json={"name": "Mine", "slug": "mine-x", "startFrom": {"kind": "blank"}},
     )
     await other_auth_client.post(
         "/api/v1/portfolios",
@@ -198,9 +202,7 @@ async def test_patch_sets_a_custom_ground_colour(auth_client, portfolio):
 
 
 async def test_patch_clears_a_custom_ground_back_to_the_preset(auth_client, portfolio):
-    await auth_client.patch(
-        f"/api/v1/portfolios/{portfolio['id']}", json={"groundHex": "#2b3a67"}
-    )
+    await auth_client.patch(f"/api/v1/portfolios/{portfolio['id']}", json={"groundHex": "#2b3a67"})
     response = await auth_client.patch(
         f"/api/v1/portfolios/{portfolio['id']}", json={"groundHex": ""}
     )
@@ -326,7 +328,8 @@ async def test_patch_rejects_an_unknown_field(auth_client, portfolio):
 
 async def test_changing_a_slug_to_a_taken_one_is_409(auth_client, portfolio):
     await auth_client.post(
-        "/api/v1/portfolios", json={"name": "Other", "slug": "other-x", "startFrom": {"kind": "blank"}}
+        "/api/v1/portfolios",
+        json={"name": "Other", "slug": "other-x", "startFrom": {"kind": "blank"}},
     )
     response = await auth_client.patch(
         f"/api/v1/portfolios/{portfolio['id']}", json={"slug": "other-x"}
@@ -507,9 +510,7 @@ async def test_unpublishing_reopens_editing_and_deleting(auth_client, published)
     assert edit.status_code == 200
     assert edit.json()["name"] == "Renamed"
 
-    assert (
-        await auth_client.delete(f"/api/v1/portfolios/{published['id']}")
-    ).status_code == 204
+    assert (await auth_client.delete(f"/api/v1/portfolios/{published['id']}")).status_code == 204
 
 
 async def test_publishing_an_already_live_portfolio_still_works(auth_client, published):
@@ -571,7 +572,9 @@ async def test_layout_rejects_an_unknown_section_style(auth_client, portfolio):
     assert response.status_code == 422
 
 
-async def test_a_layout_stored_before_section_styles_reads_as_theme(auth_client, portfolio, db_session):
+async def test_a_layout_stored_before_section_styles_reads_as_theme(
+    auth_client, portfolio, db_session
+):
     from sqlalchemy import text
 
     await db_session.execute(

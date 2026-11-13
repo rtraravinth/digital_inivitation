@@ -48,9 +48,7 @@ class SectionService:
 
     async def get(self, portfolio: Portfolio, section_id: uuid.UUID) -> Section:
         section = await self.session.scalar(
-            select(Section).where(
-                Section.id == section_id, Section.portfolio_id == portfolio.id
-            )
+            select(Section).where(Section.id == section_id, Section.portfolio_id == portfolio.id)
         )
         if section is None:
             raise NotFound("That section does not exist.", code="section_not_found")
@@ -101,9 +99,7 @@ class SectionService:
         if wanted:
             owned = set(
                 await self.session.scalars(
-                    select(Asset.id).where(
-                        Asset.id.in_(wanted), Asset.user_id == portfolio.user_id
-                    )
+                    select(Asset.id).where(Asset.id.in_(wanted), Asset.user_id == portfolio.user_id)
                 )
             )
             if len(owned) != len(wanted):
@@ -115,8 +111,7 @@ class SectionService:
         section.images.clear()
         await self.session.flush()
         section.images.extend(
-            SectionImage(asset_id=asset_id, position=index)
-            for index, asset_id in enumerate(wanted)
+            SectionImage(asset_id=asset_id, position=index) for index, asset_id in enumerate(wanted)
         )
         await self.session.flush()
 
@@ -158,9 +153,7 @@ class SectionService:
 
     async def move(self, portfolio: Portfolio, section_id: uuid.UUID, delta: int) -> None:
         sections = await self._ordered(portfolio)
-        index = next(
-            (i for i, section in enumerate(sections) if section.id == section_id), None
-        )
+        index = next((i for i, section in enumerate(sections) if section.id == section_id), None)
         if index is None:
             raise NotFound("That section does not exist.", code="section_not_found")
 
@@ -239,5 +232,6 @@ async def reload_sections(session: AsyncSession, portfolio: Portfolio) -> None:
 
 
 def _dump_list(values: list) -> list:
-    return [item.model_dump(by_alias=True) if hasattr(item, "model_dump") else item
-            for item in values]
+    return [
+        item.model_dump(by_alias=True) if hasattr(item, "model_dump") else item for item in values
+    ]

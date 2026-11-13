@@ -89,9 +89,7 @@ async def update_portfolio(
     return service.to_out(await service.update(portfolio, payload))
 
 
-@router.patch(
-    "/{portfolio_id}/header", response_model=PortfolioOut, summary="Edit the header"
-)
+@router.patch("/{portfolio_id}/header", response_model=PortfolioOut, summary="Edit the header")
 async def update_header(
     payload: HeaderPatch, portfolio: EditablePortfolio, session: SessionDep
 ) -> PortfolioOut:

@@ -37,9 +37,7 @@ async def summary(
     return await AnalyticsService(session).summary(user, days)
 
 
-@router.delete(
-    "", status_code=status.HTTP_204_NO_CONTENT, summary="Delete your analytics"
-)
+@router.delete("", status_code=status.HTTP_204_NO_CONTENT, summary="Delete your analytics")
 async def reset(
     session: SessionDep,
     user: CurrentUser,

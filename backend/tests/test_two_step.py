@@ -151,7 +151,9 @@ async def test_a_recovery_code_works_once_and_then_does_not(
     assert second.status_code == 422
 
 
-async def test_issuing_new_codes_replaces_the_old_ones(client, auth_client, registered, totp_secret):
+async def test_issuing_new_codes_replaces_the_old_ones(
+    client, auth_client, registered, totp_secret
+):
     stale = (await auth_client.post("/api/v1/auth/recovery-codes")).json()["codes"]
     await auth_client.post("/api/v1/auth/recovery-codes")
 

@@ -14,9 +14,11 @@ from typing import Any
 
 from app.core.ids import request_id_var
 
-_BUILTIN_RECORD_FIELDS = frozenset(
-    logging.LogRecord("", 0, "", 0, "", None, None).__dict__
-) | {"message", "asctime", "taskName"}
+_BUILTIN_RECORD_FIELDS = frozenset(logging.LogRecord("", 0, "", 0, "", None, None).__dict__) | {
+    "message",
+    "asctime",
+    "taskName",
+}
 
 
 class JsonFormatter(logging.Formatter):

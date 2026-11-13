@@ -84,7 +84,6 @@ def downgrade() -> None:
     # constraint, so put those back on Archivo before narrowing it.
     for _, column in CONSTRAINTS:
         op.execute(
-            f"UPDATE portfolios SET {column} = 'archivo' "
-            f"WHERE {column} NOT IN ({sql_in(BEFORE)})"
+            f"UPDATE portfolios SET {column} = 'archivo' WHERE {column} NOT IN ({sql_in(BEFORE)})"
         )
     _swap(BEFORE)

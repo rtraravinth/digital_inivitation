@@ -114,9 +114,7 @@ class Portfolio(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         default=DEFAULT_BODY_FONT,
         server_default=DEFAULT_BODY_FONT,
     )
-    layout: Mapped[dict[str, Any]] = mapped_column(
-        JSONB, nullable=False, default=default_layout
-    )
+    layout: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False, default=default_layout)
     # The resume this portfolio downloads as - its facts and its template.
     # Never part of the published page: it carries an email and a phone
     # number. ``{}`` validates to the defaults; see app/schemas/resume.py.
@@ -155,8 +153,10 @@ class PortfolioHeader(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     __tablename__ = "portfolio_headers"
 
     portfolio_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("portfolios.id", ondelete="CASCADE"),
-        unique=True, nullable=False
+        UUID(as_uuid=True),
+        ForeignKey("portfolios.id", ondelete="CASCADE"),
+        unique=True,
+        nullable=False,
     )
     name: Mapped[str] = mapped_column(String(200), nullable=False, default="")
     current: Mapped[str] = mapped_column(Text, nullable=False, default="")
@@ -238,12 +238,16 @@ class SectionImage(UUIDPrimaryKeyMixin, Base):
     )
 
     section_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("sections.id", ondelete="CASCADE"),
-        nullable=False, index=True,
+        UUID(as_uuid=True),
+        ForeignKey("sections.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
     )
     asset_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("assets.id", ondelete="CASCADE"),
-        nullable=False, index=True,
+        UUID(as_uuid=True),
+        ForeignKey("assets.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
     )
     position: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
 

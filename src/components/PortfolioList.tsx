@@ -140,7 +140,6 @@ export function PortfolioList() {
     onEdit: (p) => setEditing(p),
     onShare: (id) => setSharing(id),
     onDelete: (p) => setDeleting(p),
-    onPublish: (id) => updatePortfolio(id, (prev) => ({ ...prev, status: "live" })),
     onUnpublish: (id) => updatePortfolio(id, (prev) => ({ ...prev, status: "draft" })),
   };
 
@@ -400,7 +399,6 @@ type Actions = {
   onEdit: (p: Portfolio) => void;
   onShare: (id: string) => void;
   onDelete: (p: Portfolio) => void;
-  onPublish: (id: string) => void;
   onUnpublish: (id: string) => void;
 };
 
@@ -718,38 +716,17 @@ function Card({
             <CardMenu portfolio={p} actions={actions} />
           </div>
 
+          {/* Status and age only. Opening the builder or the preview is the
+              dock over the picture on a pointer, and the ⋯ menu everywhere. */}
           <div className="mt-3 flex items-center gap-2">
             <StatusPill live={live} />
-            <span className="min-w-0 flex-1 truncate font-mono text-[11.5px]" style={{ color: "var(--color-neutral-600)" }}>
+            <span className="ml-auto min-w-0 truncate font-mono text-[11.5px]" style={{ color: "var(--color-neutral-600)" }}>
               {p.updatedAt && (
                 <time dateTime={p.updatedAt} title={`Updated ${UPDATED.format(new Date(p.updatedAt))}`}>
                   {ago(p.updatedAt, now)}
                 </time>
               )}
             </span>
-            {live ? (
-              <a
-                href={previewPath(p.id)}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="btn btn-secondary"
-                style={{ minHeight: 32, padding: "0.35rem 0.8rem", fontSize: 13, borderRadius: 999 }}
-              >
-                <Icon d={ICON.eye} size={14} />
-                Preview
-              </a>
-            ) : (
-              <Link
-                href={`/builder/${p.id}`}
-                className="btn btn-primary"
-                style={{ minHeight: 32, padding: "0.35rem 0.9rem", fontSize: 13, borderRadius: 999 }}
-              >
-                Open builder
-                <span aria-hidden className="transition-transform duration-300 group-hover:translate-x-0.5">
-                  →
-                </span>
-              </Link>
-            )}
           </div>
         </div>
       </div>
@@ -1213,14 +1190,14 @@ function CardMenu({ portfolio: p, actions }: { portfolio: Portfolio; actions: Ac
                 </Link>
               )}
               <div className="my-1 h-px" style={{ background: "var(--color-divider)" }} />
-              <button
-                role="menuitem"
-                type="button"
-                className={item}
-                onClick={run(() => (live ? actions.onUnpublish(p.id) : actions.onPublish(p.id)))}
-              >
-                {live ? "Unpublish" : "Publish"}
-              </button>
+              {/* Publishing happens after looking — from the editor, the builder
+                  or the preview — so a draft's menu has no Publish. Unpublish
+                  stays: it is the only way back into editing a live page. */}
+              {live && (
+                <button role="menuitem" type="button" className={item} onClick={run(() => actions.onUnpublish(p.id))}>
+                  Unpublish
+                </button>
+              )}
               {!live && (
                 <button role="menuitem" type="button" className={`${item} font-medium`} onClick={run(() => actions.onDelete(p))}>
                   Delete…

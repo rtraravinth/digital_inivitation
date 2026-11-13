@@ -9,6 +9,21 @@ updates:
       # One PR for the routine minor and patch bumps, separate PRs for majors.
       minor-and-patch:
         update-types: [minor, patch]
+    # Majors that cannot land on their own. Minor and patch updates still
+    # come. Remove a line when its reason no longer holds.
+    ignore:
+      # Tracks the Node we run (22: Dockerfile, CI). Bump with Node itself.
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
+      # TypeScript 7 and eslint 10: eslint-config-next and knip@5 do not
+      # accept them as peers yet, so `npm ci` fails with ERESOLVE.
+      - dependency-name: typescript
+        update-types: ["version-update:semver-major"]
+      - dependency-name: eslint
+        update-types: ["version-update:semver-major"]
+      # knip 6 reports more unused exported types; upgrade it in its own PR.
+      - dependency-name: knip
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: pip
     directory: /backend

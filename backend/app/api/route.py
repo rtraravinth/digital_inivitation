@@ -12,7 +12,9 @@ services still never commit — but to commit here, after the handler has
 produced a response and before that response goes out.
 
 Errors keep the old path: the handler raises, this never runs, and the
-session dependency rolls back.
+session dependency rolls back — unless the error is an ``AppError`` raised
+with ``keep_writes=True``, whose writes are committed before it propagates.
+That is how "your sessions were revoked" can revoke them.
 """
 
 from __future__ import annotations
@@ -23,6 +25,7 @@ from typing import Any
 from fastapi import Request, Response
 from fastapi.routing import APIRoute
 
+from app.core.errors import AppError
 from app.db.session import SESSION_STATE_ATTR
 
 
@@ -33,7 +36,13 @@ class TransactionRoute(APIRoute):
         handle = super().get_route_handler()
 
         async def commit_then_respond(request: Request) -> Response:
-            response = await handle(request)
+            try:
+                response = await handle(request)
+            except AppError as error:
+                session = getattr(request.state, SESSION_STATE_ATTR, None)
+                if error.keep_writes and session is not None:
+                    await session.commit()
+                raise
             session = getattr(request.state, SESSION_STATE_ATTR, None)
             if session is not None:
                 await session.commit()

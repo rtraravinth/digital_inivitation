@@ -7,7 +7,6 @@ field, so the Account page consumes it with no mapping layer.
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
 
 from pydantic import EmailStr, Field, field_validator
 
@@ -118,14 +117,14 @@ class ProfileOut(CamelModel):
 
 
 class SecurityOut(CamelModel):
-    """Never carries a secret or a hash — not the TOTP seed, not a code."""
+    """Never carries a credential. Firebase holds every one of them."""
 
-    email: EmailStr
+    #: None for an account made with a phone number.
+    email: EmailStr | None
     phone: str
-    password_changed: datetime | None
-    two_step: bool
     google: bool
-    recovery_codes_remaining: int
+    #: How the account last signed in, as Firebase names it.
+    sign_in_provider: str
 
 
 class AccountOut(CamelModel):

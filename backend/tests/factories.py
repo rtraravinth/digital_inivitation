@@ -6,15 +6,23 @@ app, and this stays about the domain.
 
 from __future__ import annotations
 
+import json
+import time
 from collections.abc import AsyncIterator
+from datetime import UTC, datetime
 
 import pytest
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy import select
 
+from app.core.errors import Unauthenticated
+from app.core.firebase import FirebaseIdentity
+from app.core.firebase_accounts import AccountState
 from app.models import User
 
-TEST_PASSWORD = "correct horse battery"
+#: Tokens the fake verifier accepts start with this. Anything else is refused,
+#: the way Google's keys would refuse a forgery.
+FAKE_TOKEN_PREFIX = "fake-firebase-token:"
 
 #: The first user's handle. Published addresses are
 #: /api/v1/public/p/<handle>/<slug>, so tests need it by name.
@@ -25,22 +33,93 @@ TEST_HANDLE = "rohan"
 OTHER_HANDLE = "priya"
 
 
+def firebase_token(
+    email: str | None,
+    *,
+    uid: str | None = None,
+    verified: bool = True,
+    provider: str = "password",
+    name: str = "",
+    phone: str | None = None,
+    auth_time: float | None = None,
+) -> str:
+    """What Firebase would hand the browser, for the fake verifier to read.
+
+    The uid defaults to one derived from the address, so signing in twice as
+    the same person gives the same uid — as Firebase does.
+    """
+    return FAKE_TOKEN_PREFIX + json.dumps(
+        {
+            "uid": uid or f"uid-{email or phone}",
+            "email": email,
+            "email_verified": verified,
+            "phone": phone,
+            "name": name,
+            "provider": provider,
+            "auth_time": auth_time if auth_time is not None else time.time(),
+        }
+    )
+
+
+async def fake_verify(token: str) -> FirebaseIdentity:
+    """Stands in for Google. Real verification is tested in test_firebase.py."""
+    if not token.startswith(FAKE_TOKEN_PREFIX):
+        raise Unauthenticated(
+            "That sign-in could not be confirmed. Please try again.",
+            code="invalid_firebase_token",
+        )
+    claims = json.loads(token[len(FAKE_TOKEN_PREFIX) :])
+    return FirebaseIdentity(
+        uid=claims["uid"],
+        # Lowercased as the real verifier does.
+        email=claims["email"].lower() if claims["email"] else None,
+        email_verified=claims["email_verified"],
+        phone=claims["phone"],
+        name=claims["name"],
+        provider=claims["provider"],
+        auth_time=datetime.fromtimestamp(claims["auth_time"], UTC),
+    )
+
+
+class FakeAccounts:
+    """Stands in for Firebase's admin lookup. A uid with no entry is unchecked."""
+
+    def __init__(self) -> None:
+        self.states: dict[str, AccountState | None] = {}
+        self.deleted: list[str] = []
+        self.unreachable = False
+
+    async def lookup(self, uid: str) -> AccountState | None:
+        return self.states.get(uid)
+
+    async def delete(self, uid: str) -> None:
+        if self.unreachable:
+            from app.core.errors import ServiceUnavailable
+
+            raise ServiceUnavailable(
+                "Could not reach the sign-in service.", code="firebase_unreachable"
+            )
+        self.deleted.append(uid)
+
+
+async def sign_in(client: AsyncClient, token: str, **extra) -> object:
+    """POST /auth/firebase. Returns the raw response for the caller to check."""
+    return await client.post("/api/v1/auth/firebase", json={"idToken": token, **extra})
+
+
 async def register(
     client: AsyncClient, email: str, *, name: str = "Test Person", handle: str | None = None
 ) -> dict:
     # The handle is the base of every address the account publishes, so it is
     # required at sign-up. Derived from the local part here so a test that
     # does not care about addresses still gets a valid one.
-    response = await client.post(
-        "/api/v1/auth/register",
-        json={
-            "email": email,
-            "password": TEST_PASSWORD,
-            "name": name,
-            "handle": handle or email.split("@")[0].replace(".", "-"),
-        },
+    response = await sign_in(
+        client,
+        firebase_token(email),
+        name=name,
+        handle=handle or email.split("@")[0].replace(".", "-"),
     )
-    assert response.status_code == 201, response.text
+    assert response.status_code == 200, response.text
     return response.json()
 
 
@@ -123,10 +202,7 @@ async def second_login(app, registered: dict) -> AsyncIterator[AsyncClient]:
         base_url="http://test",
         headers={"User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0) Safari/605.1"},
     ) as second:
-        response = await second.post(
-            "/api/v1/auth/login",
-            json={"email": registered["user"]["email"], "password": TEST_PASSWORD},
-        )
+        response = await sign_in(second, firebase_token(registered["user"]["email"]))
         assert response.status_code == 200, response.text
         bearer(second, response.json()["token"]["accessToken"])
         yield second

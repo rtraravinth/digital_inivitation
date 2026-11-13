@@ -1,37 +1,23 @@
-"""Registration, sign-in, session lifecycle, and the second factor."""
+"""Signing in through Firebase, and the FACET session that follows."""
 
 from __future__ import annotations
 
 import logging
-import secrets
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 
-import pyotp
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
-from app.core.errors import Conflict, NotFound, Unauthenticated, ValidationFailed
-from app.core.security import (
-    burn_dummy_verification,
-    create_access_token,
-    create_challenge_token,
-    decode_challenge_token,
-    hash_password,
-    hash_token,
-    new_refresh_token,
-    verify_password,
-)
-from app.models import AccountProfile, AccountSettings, AuthSession, RecoveryCode, User
+from app.core.errors import NotFound, PermissionDenied, Unauthenticated, ValidationFailed
+from app.core.firebase import FirebaseIdentity
+from app.core.firebase_accounts import AccountChecker
+from app.core.security import create_access_token, hash_token, new_refresh_token
+from app.models import AccountProfile, AccountSettings, AuthSession, User
 from app.services.account import assert_handle_available
 
 logger = logging.getLogger("app.auth")
-
-#: The alphabet from ``generateRecoveryCodes()`` in src/lib/account.ts —
-#: no I, O, 0 or 1, so a code read off a screen cannot be mistyped.
-RECOVERY_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
-RECOVERY_CODE_COUNT = 10
 
 
 @dataclass(frozen=True)
@@ -54,17 +40,93 @@ class AuthService:
         self.session = session
         self.settings = get_settings()
 
-    # ── registration ────────────────────────────────────────────────────
+    # ── sign in ─────────────────────────────────────────────────────────
 
-    async def register(
-        self, email: str, password: str, name: str, handle: str, device: DeviceInfo
+    async def sign_in(
+        self,
+        identity: FirebaseIdentity,
+        device: DeviceInfo,
+        accounts: AccountChecker,
+        *,
+        name: str | None = None,
+        handle: str | None = None,
     ) -> tuple[User, IssuedTokens]:
-        existing = await self.session.scalar(select(User).where(User.email == email))
-        if existing is not None:
-            raise Conflict(
-                "An account already uses that email address.",
-                code="email_taken",
-                details={"email": email},
+        """Open a session for whoever Firebase has verified.
+
+        Three cases, in this order:
+
+        1. The uid is already an account's — sign it in.
+        2. The email matches an account made before Firebase (or by the CLI).
+           It is linked, but **only if Firebase has verified the address**:
+           otherwise anyone could register ``someone@example.com`` with a
+           password in Firebase and walk into that person's portfolios.
+        3. Nobody yet — create the account. That needs a handle, because the
+           handle is the front of every address the account publishes; without
+           one this answers 422 ``handle_required`` and the sign-in page asks.
+        """
+        # Firebase's verdict first: a valid-looking ID token from before a
+        # password reset or a revocation, or for a disabled user, opens nothing.
+        state = await accounts.lookup(identity.uid)
+        if state is not None and not state.allows(identity.auth_time):
+            raise Unauthenticated(
+                "That sign-in is no longer valid. Please sign in again.",
+                code="firebase_session_revoked",
+            )
+
+        user = await self.session.scalar(select(User).where(User.firebase_uid == identity.uid))
+
+        if user is None and identity.email is not None:
+            user = await self._link_by_email(identity)
+
+        if user is None:
+            user = await self._create(identity, name, handle)
+
+        if not user.is_active:
+            raise Unauthenticated("This account is closed.", code="account_inactive")
+
+        # An address changed in Firebase since the last sign-in.
+        await self._follow_email(user, identity)
+
+        user.settings.sign_in_provider = identity.provider[:32]
+        if identity.provider == "google.com":
+            user.settings.google_linked = True
+
+        return user, await self._open_session(user, device, signed_in_at=identity.auth_time)
+
+    async def _link_by_email(self, identity: FirebaseIdentity) -> User | None:
+        user = await self.session.scalar(select(User).where(User.email == identity.email))
+        if user is None:
+            return None
+
+        if not identity.email_verified:
+            raise PermissionDenied(
+                "Verify your email address first — check your inbox for the link.",
+                code="email_unverified",
+            )
+
+        if user.firebase_uid is not None:
+            # Firebase keeps one account per address, so a second uid for the
+            # same verified address means the first Firebase account was
+            # deleted. Proving the mailbox is what recovers an account anyway.
+            logger.warning("firebase uid replaced for an account", extra={"user_id": str(user.id)})
+
+        user.firebase_uid = identity.uid
+        return user
+
+    async def _create(
+        self, identity: FirebaseIdentity, name: str | None, handle: str | None
+    ) -> User:
+        if identity.email is not None and not identity.email_verified:
+            raise PermissionDenied(
+                "Verify your email address first — check your inbox for the link.",
+                code="email_unverified",
+            )
+
+        if not handle:
+            raise ValidationFailed(
+                "Pick the address your pages will live at.",
+                code="handle_required",
+                details={"name": identity.name},
             )
 
         # Before the user row, so a taken handle does not leave a half-made
@@ -72,64 +134,21 @@ class AuthService:
         # index, which cannot tell "taken" from "reserved".
         await assert_handle_available(self.session, handle)
 
-        user = User(email=email, password_hash=hash_password(password), is_active=True)
-        user.profile = AccountProfile(name=name, handle=handle, tags=[], links=[])
-        user.settings = AccountSettings(password_changed_at=datetime.now(UTC))
+        user = User(email=identity.email, firebase_uid=identity.uid, is_active=True)
+        user.profile = AccountProfile(
+            name=(name or identity.name or "").strip()[:200], handle=handle, tags=[], links=[]
+        )
+        user.settings = AccountSettings()
 
         self.session.add(user)
         await self.session.flush()
-
-        tokens = await self._open_session(user, device)
-        return user, tokens
-
-    # ── sign in ─────────────────────────────────────────────────────────
-
-    async def authenticate(self, email: str, password: str) -> User:
-        user = await self.session.scalar(select(User).where(User.email == email))
-
-        if user is None:
-            # Spend the same time as a real verification so the response
-            # cannot be used to discover which addresses have accounts.
-            burn_dummy_verification()
-            raise self._invalid_credentials()
-
-        if not user.is_active or not verify_password(password, user.password_hash):
-            raise self._invalid_credentials()
-
         return user
-
-    async def login(
-        self, email: str, password: str, device: DeviceInfo
-    ) -> tuple[User, IssuedTokens] | tuple[User, str]:
-        """Returns tokens, or a challenge string when two-step is on."""
-        user = await self.authenticate(email, password)
-
-        if user.settings.two_step_enabled:
-            # No session exists until the second factor is satisfied.
-            return user, create_challenge_token(str(user.id))
-
-        return user, await self._open_session(user, device)
-
-    async def complete_two_step(
-        self, challenge: str, code: str, device: DeviceInfo
-    ) -> tuple[User, IssuedTokens]:
-        user_id = decode_challenge_token(challenge)
-        user = await self.session.get(User, user_id)
-        if user is None or not user.is_active:
-            raise self._invalid_credentials()
-
-        if not await self.verify_second_factor(user, code):
-            raise ValidationFailed("That code is not valid.", code="invalid_two_step_code")
-
-        return user, await self._open_session(user, device)
-
-    def _invalid_credentials(self) -> Unauthenticated:
-        # One message for a wrong password and an unknown address alike.
-        return Unauthenticated("Those details do not match an account.", code="invalid_credentials")
 
     # ── sessions ────────────────────────────────────────────────────────
 
-    async def _open_session(self, user: User, device: DeviceInfo) -> IssuedTokens:
+    async def _open_session(
+        self, user: User, device: DeviceInfo, *, signed_in_at: datetime
+    ) -> IssuedTokens:
         plaintext, hashed = new_refresh_token()
         now = datetime.now(UTC)
 
@@ -140,7 +159,11 @@ class AuthService:
             user_agent=device.user_agent,
             ip=device.ip,
             last_seen_at=now,
+            # Sliding: every refresh pushes this out, so an account in use is
+            # never signed out on a clock — only after this many idle days,
+            # or when Firebase revokes it (see refresh).
             expires_at=now + timedelta(days=self.settings.refresh_token_ttl_days),
+            signed_in_at=signed_in_at,
         )
         self.session.add(auth_session)
         await self.session.flush()
@@ -152,12 +175,19 @@ class AuthService:
             session=auth_session,
         )
 
-    async def refresh(self, plaintext: str, device: DeviceInfo) -> tuple[User, IssuedTokens]:
-        """Rotate a refresh token.
+    async def refresh(
+        self, plaintext: str, device: DeviceInfo, accounts: AccountChecker
+    ) -> tuple[User, IssuedTokens]:
+        """Rotate a refresh token — if Firebase still vouches for the account.
 
         The old token is revoked as the new one is issued. Presenting a token
         that is already revoked means it leaked — every session for that user
         is dropped rather than guessing which holder is the legitimate one.
+
+        Firebase is asked first, so its decisions reach FACET within one
+        access-token lifetime: a deleted or disabled user loses every session,
+        and a password reset or admin revocation ends every session signed in
+        before it — exactly the sessions Firebase itself would end.
         """
         hashed = hash_token(plaintext)
         auth_session = await self.session.scalar(
@@ -173,7 +203,9 @@ class AuthService:
                 extra={"user_id": str(auth_session.user_id)},
             )
             await self._revoke_all(auth_session.user_id)
-            raise Unauthenticated("Please sign in again.", code="invalid_refresh_token")
+            raise Unauthenticated(
+                "Please sign in again.", code="invalid_refresh_token", keep_writes=True
+            )
 
         if auth_session.expires_at <= datetime.now(UTC):
             raise Unauthenticated("Please sign in again.", code="invalid_refresh_token")
@@ -182,8 +214,26 @@ class AuthService:
         if user is None or not user.is_active:
             raise Unauthenticated("Please sign in again.", code="invalid_refresh_token")
 
+        if user.firebase_uid is not None:
+            state = await accounts.lookup(user.firebase_uid)
+            if state is not None and (not state.exists or state.disabled):
+                await self._revoke_all(user.id)
+                raise Unauthenticated(
+                    "This account has been turned off.", code="account_disabled", keep_writes=True
+                )
+            if state is not None:
+                await self._follow_email(user, state)
+            if state is not None and not state.allows(auth_session.signed_in_at):
+                # Every session from before the reset, not just this one.
+                await self._revoke_signed_in_before(user.id, state.valid_since)
+                raise Unauthenticated(
+                    "Your sign-in changed elsewhere. Please sign in again.",
+                    code="firebase_session_revoked",
+                    keep_writes=True,
+                )
+
         auth_session.revoked_at = datetime.now(UTC)
-        return user, await self._open_session(user, device)
+        return user, await self._open_session(user, device, signed_in_at=auth_session.signed_in_at)
 
     async def logout(self, plaintext: str | None, session_id: str | None) -> None:
         """Revoke by refresh token if we have one, else by access-token sid."""
@@ -237,124 +287,37 @@ class AuthService:
         )
         return int(result.rowcount or 0)
 
+    async def _follow_email(self, user: User, state) -> None:
+        """Copy an address changed in Firebase, once Firebase has verified it.
+
+        Only a verified address, and only one no other account holds: the
+        email is how an account made before Firebase is claimed, so it must
+        never point at somebody else's.
+        """
+        if not state.email or not state.email_verified or state.email == user.email:
+            return
+        taken = await self.session.scalar(
+            select(User.id).where(User.email == state.email, User.id != user.id)
+        )
+        if taken is None:
+            user.email = state.email
+
+    async def _revoke_signed_in_before(self, user_id, moment: datetime | None) -> None:
+        if moment is None:
+            return
+        await self.session.execute(
+            update(AuthSession)
+            .where(
+                AuthSession.user_id == user_id,
+                AuthSession.revoked_at.is_(None),
+                AuthSession.signed_in_at < moment,
+            )
+            .values(revoked_at=datetime.now(UTC))
+        )
+
     async def _revoke_all(self, user_id) -> None:
         await self.session.execute(
             update(AuthSession)
             .where(AuthSession.user_id == user_id, AuthSession.revoked_at.is_(None))
             .values(revoked_at=datetime.now(UTC))
         )
-
-    # ── password ────────────────────────────────────────────────────────
-
-    async def change_password(
-        self, user: User, current: str, new: str, keep_session_id: str
-    ) -> None:
-        if not verify_password(current, user.password_hash):
-            raise Unauthenticated("That is not your current password.", code="invalid_credentials")
-
-        user.password_hash = hash_password(new)
-        user.settings.password_changed_at = datetime.now(UTC)
-        # A password change that leaves other devices signed in is not a
-        # password change.
-        await self.revoke_other_sessions(user, keep_session_id)
-
-    # ── two-step ────────────────────────────────────────────────────────
-
-    async def begin_two_step(self, user: User) -> tuple[str, str]:
-        if user.settings.two_step_enabled:
-            raise Conflict("Two-step is already on.", code="two_step_already_enabled")
-
-        secret = pyotp.random_base32()
-        # Held aside until a code proves the authenticator app has it. A
-        # secret written straight to two_step_secret could lock the user out.
-        user.settings.two_step_pending_secret = secret
-
-        uri = pyotp.TOTP(secret).provisioning_uri(name=user.email, issuer_name="FACET")
-        return secret, uri
-
-    async def confirm_two_step(self, user: User, code: str) -> None:
-        pending = user.settings.two_step_pending_secret
-        if not pending:
-            raise Conflict("Start two-step setup first.", code="two_step_not_started")
-
-        if not pyotp.TOTP(pending).verify(code, valid_window=1):
-            raise ValidationFailed("That code is not valid.", code="invalid_two_step_code")
-
-        user.settings.two_step_secret = pending
-        user.settings.two_step_pending_secret = None
-        user.settings.two_step_enabled = True
-
-    async def disable_two_step(self, user: User, code: str) -> None:
-        if not user.settings.two_step_enabled:
-            raise Conflict("Two-step is not on.", code="two_step_not_enabled")
-
-        if not await self.verify_second_factor(user, code):
-            raise ValidationFailed("That code is not valid.", code="invalid_two_step_code")
-
-        user.settings.two_step_enabled = False
-        user.settings.two_step_secret = None
-        user.settings.two_step_pending_secret = None
-        await self._clear_recovery_codes(user)
-
-    async def verify_second_factor(self, user: User, code: str) -> bool:
-        """A TOTP code, or one unused recovery code."""
-        secret = user.settings.two_step_secret
-        candidate = code.strip().upper().replace(" ", "")
-
-        # valid_window=1 tolerates one 30-second step of clock skew between
-        # the server and the authenticator app.
-        totp_ok = (
-            secret is not None
-            and candidate.isdigit()
-            and pyotp.TOTP(secret).verify(code.strip(), valid_window=1)
-        )
-        if totp_ok:
-            return True
-
-        return await self._consume_recovery_code(user, candidate)
-
-    # ── recovery codes ──────────────────────────────────────────────────
-
-    async def issue_recovery_codes(self, user: User) -> list[str]:
-        """Replace the set. Returned in plaintext once and never again."""
-        await self._clear_recovery_codes(user)
-
-        codes = [self._generate_recovery_code() for _ in range(RECOVERY_CODE_COUNT)]
-        for code in codes:
-            self.session.add(RecoveryCode(user_id=user.id, code_hash=hash_password(code)))
-        await self.session.flush()
-        return codes
-
-    @staticmethod
-    def _generate_recovery_code() -> str:
-        body = "".join(secrets.choice(RECOVERY_ALPHABET) for _ in range(8))
-        return f"{body[:4]}-{body[4:]}"
-
-    async def _clear_recovery_codes(self, user: User) -> None:
-        rows = await self.session.scalars(
-            select(RecoveryCode).where(RecoveryCode.user_id == user.id)
-        )
-        for row in rows:
-            await self.session.delete(row)
-        await self.session.flush()
-
-    async def _consume_recovery_code(self, user: User, candidate: str) -> bool:
-        rows = await self.session.scalars(
-            select(RecoveryCode).where(
-                RecoveryCode.user_id == user.id, RecoveryCode.used_at.is_(None)
-            )
-        )
-        for row in rows:
-            if verify_password(candidate, row.code_hash):
-                row.used_at = datetime.now(UTC)
-                await self.session.flush()
-                return True
-        return False
-
-    async def count_recovery_codes(self, user: User) -> int:
-        rows = await self.session.scalars(
-            select(RecoveryCode).where(
-                RecoveryCode.user_id == user.id, RecoveryCode.used_at.is_(None)
-            )
-        )
-        return len(list(rows))

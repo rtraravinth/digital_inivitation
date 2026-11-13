@@ -39,11 +39,17 @@ class AppError(Exception):
         *,
         code: str | None = None,
         details: dict[str, Any] | None = None,
+        keep_writes: bool = False,
     ) -> None:
         super().__init__(message)
         self.message = message
         self.code = code or self.default_code
         self.details = details or {}
+        #: Commit what the request wrote before failing, instead of rolling it
+        #: back. For an error that is the *result* of a write — "every session
+        #: is revoked, sign in again" — where rolling back would undo the very
+        #: revocation the error reports. ``TransactionRoute`` reads it.
+        self.keep_writes = keep_writes
 
     def envelope(self) -> dict[str, Any]:
         return {
@@ -89,6 +95,13 @@ class UnsupportedMedia(AppError):
 class ValidationFailed(AppError):
     status_code = 422
     default_code = "validation_failed"
+
+
+class ServiceUnavailable(AppError):
+    """A service this request depends on could not be reached."""
+
+    status_code = 503
+    default_code = "service_unavailable"
 
 
 class RateLimited(AppError):

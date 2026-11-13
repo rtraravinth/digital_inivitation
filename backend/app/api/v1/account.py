@@ -12,6 +12,7 @@ from fastapi import APIRouter, status
 
 from app.api.deps import CurrentUser, SessionDep
 from app.api.route import TransactionRoute
+from app.core.firebase_accounts import AccountCheckerDep
 from app.schemas.account import (
     AccountOut,
     DomainPatch,
@@ -106,8 +107,20 @@ async def update_privacy(
     status_code=status.HTTP_204_NO_CONTENT,
     summary="Delete the account and everything in it",
 )
-async def delete_account(session: SessionDep, user: CurrentUser) -> None:
+async def delete_account(
+    session: SessionDep, user: CurrentUser, accounts: AccountCheckerDep
+) -> None:
+    """Delete the FACET account and its Firebase login, both or neither.
+
+    The rows are deleted first but not yet committed; then Firebase is told.
+    If Firebase cannot be reached this raises, the transaction rolls back and
+    nothing is gone — rather than leaving a Firebase login that would sign
+    straight back in to a fresh, empty account.
+    """
+    uid = user.firebase_uid
     keys = await AccountService(session).delete_account(user)
+    if uid is not None:
+        await accounts.delete(uid)
 
     storage = get_storage()
     for key in keys:

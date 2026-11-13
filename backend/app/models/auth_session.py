@@ -38,6 +38,11 @@ class AuthSession(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     ip: Mapped[str | None] = mapped_column(String(64), nullable=True)
     last_seen_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    # When the person signed in to Firebase — not when this row was made.
+    # Rotation makes a new row every hour and carries this across, so
+    # it can be compared with Firebase's validSince: a password reset or an
+    # admin revocation after this moment ends the session.
+    signed_in_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     user: Mapped[User] = relationship(back_populates="sessions")

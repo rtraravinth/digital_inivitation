@@ -10,7 +10,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.db.base import Base, TimestampMixin, UUIDPrimaryKeyMixin
 
 if TYPE_CHECKING:
-    from app.models.account import AccountProfile, AccountSettings, RecoveryCode
+    from app.models.account import AccountProfile, AccountSettings
     from app.models.asset import Asset
     from app.models.auth_session import AuthSession
     from app.models.portfolio import Portfolio
@@ -20,9 +20,14 @@ class User(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     __tablename__ = "users"
 
     # Stored lowercase; the service normalises before writing so the unique
-    # index is a real "one account per address" guarantee.
-    email: Mapped[str] = mapped_column(String(320), unique=True, nullable=False, index=True)
-    password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
+    # index is a real "one account per address" guarantee. Nullable because
+    # an account made with a phone number has no address at all.
+    email: Mapped[str | None] = mapped_column(String(320), unique=True, nullable=True, index=True)
+    # The Firebase uid this account signs in as. Firebase holds every
+    # credential — FACET stores no password, second factor or recovery code.
+    # Nullable only for an account made before Firebase (or by the CLI) that
+    # has not signed in since; its first verified sign-in fills it.
+    firebase_uid: Mapped[str | None] = mapped_column(String(128), unique=True, nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
 
     # Every child cascades, so DELETE /account is one statement and leaves
@@ -34,9 +39,6 @@ class User(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         back_populates="user", cascade="all, delete-orphan", uselist=False, lazy="selectin"
     )
     sessions: Mapped[list[AuthSession]] = relationship(
-        back_populates="user", cascade="all, delete-orphan"
-    )
-    recovery_codes: Mapped[list[RecoveryCode]] = relationship(
         back_populates="user", cascade="all, delete-orphan"
     )
     portfolios: Mapped[list[Portfolio]] = relationship(

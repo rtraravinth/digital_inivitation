@@ -173,38 +173,22 @@ export async function updatePrivacy(patch: Partial<AccountSettings["privacy"]>) 
   );
 }
 
-/* ── security actions, all of them real now ───────────────────────────── */
-
-export async function changePassword(currentPassword: string, newPassword: string) {
-  await api.post("/auth/password", { currentPassword, newPassword });
-  // The server revoked every other device; reflect that in the list.
-  await load();
-}
-
-export type TwoStepSetup = { secret: string; otpauthUri: string };
-
-export async function beginTwoStep(): Promise<TwoStepSetup> {
-  return api.post<TwoStepSetup>("/auth/two-step/enable");
-}
-
-export async function confirmTwoStep(code: string) {
-  await api.post("/auth/two-step/verify", { code });
-  await load();
-}
-
-export async function disableTwoStep(code: string) {
-  await api.post("/auth/two-step/disable", { code });
-  await load();
-}
+/* ── security actions ──────────────────────────────────────────────────── */
 
 /**
- * Ten one-time codes, readable exactly once. The server stores only hashes,
- * so there is no second chance to read them — the UI has to say so.
+ * Firebase holds the password, so a change is Firebase's reset email. The
+ * SDK is loaded here only, so /account does not carry it until it is used.
  */
-export async function generateRecoveryCodes(): Promise<string[]> {
-  const { codes } = await api.post<{ codes: string[] }>("/auth/recovery-codes");
-  await load();
-  return codes;
+export async function sendPasswordReset(email: string) {
+  const [{ firebaseAuth, firebaseMessage }, { sendPasswordResetEmail }] = await Promise.all([
+    import("./firebase"),
+    import("firebase/auth"),
+  ]);
+  try {
+    await sendPasswordResetEmail(firebaseAuth(), email);
+  } catch (caught) {
+    throw new Error(firebaseMessage(caught) ?? "Could not send the reset email.");
+  }
 }
 
 export type DeviceSession = {

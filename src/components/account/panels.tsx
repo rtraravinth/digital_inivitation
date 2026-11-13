@@ -3,21 +3,15 @@
 import { AnimatePresence, motion } from "motion/react";
 import { useRouter } from "next/navigation";
 import { useId, useState } from "react";
-import { PasswordField } from "../PasswordField";
-import { QrCode } from "../QrCode";
 import { UploadButton } from "../UploadButton";
 import { ICON, Icon, TiltPanel } from "../ui";
 import {
-  beginTwoStep,
   clearAccountError,
-  changePassword,
-  confirmTwoStep,
   deleteAccount,
-  disableTwoStep,
-  generateRecoveryCodes,
   listSessions,
   revokeOtherSessions,
   revokeSession,
+  sendPasswordReset,
   setCustomDomain,
   setPlan,
   updateNotifications,
@@ -25,7 +19,6 @@ import {
   updateProfile,
   updateSecurity,
   type DeviceSession,
-  type TwoStepSetup,
 } from "@/lib/account";
 import { resetAnalytics, type Analytics } from "@/lib/analytics";
 import { messageFor } from "@/lib/api";
@@ -36,7 +29,6 @@ import { usePortfolios } from "@/lib/store";
 import {
   NEEDS_SERVER,
   NOTIFICATIONS,
-  PASSWORD_MIN,
   PLANS,
   PRIVACY_SETTINGS,
   assetSrc,
@@ -420,17 +412,6 @@ export function ProfilePanel({ account }: PanelProps) {
 
 /* ── 2. sign-in & security ────────────────────────────────────────────── */
 
-/** "Last changed fourteen months ago", from an ISO timestamp. */
-function describeAge(iso: string | null): string {
-  if (!iso) return "Never changed.";
-  const days = Math.floor((Date.now() - new Date(iso).getTime()) / 86_400_000);
-  if (days < 1) return "Changed today.";
-  if (days === 1) return "Changed yesterday.";
-  if (days < 30) return `Last changed ${days} days ago.`;
-  const months = Math.round(days / 30);
-  return `Last changed ${months} month${months === 1 ? "" : "s"} ago.`;
-}
-
 /** Everything here is enforced by the server. */
 export function SecurityPanel({ account }: PanelProps) {
   const s = account.security;
@@ -439,31 +420,6 @@ export function SecurityPanel({ account }: PanelProps) {
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-
-  const [changingPassword, setChangingPassword] = useState(false);
-  const [currentPassword, setCurrentPassword] = useState("");
-  const [newPassword, setNewPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
-
-  /* The only two things worth checking before the request goes out: that the
-     new one is long enough, and that it was typed the same way twice. Whether
-     the *current* password is right is the server's answer, against the
-     stored hash. */
-  const mismatch = confirmPassword.length > 0 && newPassword !== confirmPassword;
-  const newPasswordUsable = newPassword.length >= PASSWORD_MIN && newPassword === confirmPassword;
-
-  function closePasswordForm() {
-    setChangingPassword(false);
-    setCurrentPassword("");
-    setNewPassword("");
-    setConfirmPassword("");
-  }
-
-  // `setup` holds an enrolment in progress. An empty otpauthUri means the
-  // opposite direction: a code is being collected to turn two-step off.
-  const [setup, setSetup] = useState<TwoStepSetup | null>(null);
-  const [code, setCode] = useState("");
-  const [codes, setCodes] = useState<string[] | null>(null);
 
   async function run(work: () => Promise<void>) {
     setBusy(true);
@@ -497,9 +453,9 @@ export function SecurityPanel({ account }: PanelProps) {
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div className="field">
             <label htmlFor="ac-email">Email</label>
-            <input id="ac-email" className="input" value={s.email} readOnly disabled />
+            <input id="ac-email" className="input" value={s.email ?? ""} readOnly disabled />
             <p className="m-0 mt-1.5 text-[12px] text-muted">
-              Your sign-in address. Changing it needs a mail service to confirm the new one.
+              {s.email ? "Your sign-in address, as Firebase has it." : "You sign in with your phone number."}
             </p>
           </div>
           <div className="field">
@@ -517,238 +473,28 @@ export function SecurityPanel({ account }: PanelProps) {
         </div>
       </Card>
 
-      <Card title="Signing in">
-        <SettingRow title="Password" desc={describeAge(s.passwordChanged)}>
-          <button
-            type="button"
-            className="btn btn-secondary"
-            style={small}
-            onClick={() => (changingPassword ? closePasswordForm() : setChangingPassword(true))}
-          >
-            {changingPassword ? "Cancel" : "Change password"}
-          </button>
-        </SettingRow>
-
-        <AnimatePresence initial={false}>
-          {changingPassword && (
-            <motion.div
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: "auto" }}
-              exit={{ opacity: 0, height: 0 }}
-              transition={{ duration: 0.25, ease: EASE }}
-              className="overflow-hidden"
+      {/* Firebase holds the password, so changing it is Firebase's reset
+          email. A phone-only account has no address to send it to. */}
+      {s.email && (
+        <Card title="Change password">
+          <SettingRow title="Password" desc={`We’ll email a reset link to ${s.email}.`}>
+            <button
+              type="button"
+              className="btn btn-secondary"
+              style={small}
+              disabled={busy}
+              onClick={() =>
+                run(async () => {
+                  await sendPasswordReset(s.email as string);
+                  setNote(`Reset link sent to ${s.email}. It expires in an hour.`);
+                })
+              }
             >
-              <div className="mb-3 grid grid-cols-1 gap-3 rounded-xl p-4 sm:grid-cols-2" style={{ background: "var(--color-surface)" }}>
-                <div className="field sm:col-span-2">
-                  <label htmlFor="ac-pw-current">Current password</label>
-                  <PasswordField
-                    id="ac-pw-current"
-                    autoComplete="current-password"
-                    value={currentPassword}
-                    onChange={(e) => setCurrentPassword(e.target.value)}
-                  />
-                </div>
-                <div className="field">
-                  <label htmlFor="ac-pw-new">New password</label>
-                  <PasswordField
-                    id="ac-pw-new"
-                    autoComplete="new-password"
-                    value={newPassword}
-                    onChange={(e) => setNewPassword(e.target.value)}
-                  />
-                  <p className="m-0 mt-1.5 text-[12px] text-muted">
-                    At least {PASSWORD_MIN} characters. A passphrase is easier to remember.
-                  </p>
-                </div>
-                <div className="field">
-                  <label htmlFor="ac-pw-confirm">Type it again</label>
-                  <PasswordField
-                    id="ac-pw-confirm"
-                    autoComplete="new-password"
-                    value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
-                    aria-invalid={mismatch || undefined}
-                  />
-                  {mismatch && <p className="m-0 mt-1.5 text-[12px] font-medium">Those two don’t match.</p>}
-                </div>
-                <div className="sm:col-span-2">
-                  <button
-                    type="button"
-                    className="btn btn-primary"
-                    disabled={busy || !currentPassword || !newPasswordUsable}
-                    onClick={() =>
-                      run(async () => {
-                        await changePassword(currentPassword, newPassword);
-                        closePasswordForm();
-                        setSessions(null);
-                        // The server signs every other device out on a change.
-                        setNote("Password changed. Every other device has been signed out.");
-                      })
-                    }
-                  >
-                    {busy ? "Saving…" : "Change password"}
-                  </button>
-                </div>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        <SettingRow
-          title="Two-step verification"
-          desc="Asks for a code from your authenticator app as well as your password."
-        >
-          <Pill on={s.twoStep}>{s.twoStep ? "On" : "Off"}</Pill>
-          <button
-            type="button"
-            className={`btn ${s.twoStep ? "btn-secondary" : "btn-primary"}`}
-            style={small}
-            disabled={busy}
-            onClick={() =>
-              run(async () => {
-                setCode("");
-                // Turning it off needs a current code too, so both directions
-                // open the same panel — only the copy differs.
-                setSetup(s.twoStep ? { secret: "", otpauthUri: "" } : await beginTwoStep());
-              })
-            }
-          >
-            {s.twoStep ? "Turn off" : "Set up"}
-          </button>
-        </SettingRow>
-
-        <AnimatePresence initial={false}>
-          {setup && (
-            <motion.div
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: "auto" }}
-              exit={{ opacity: 0, height: 0 }}
-              transition={{ duration: 0.25, ease: EASE }}
-              className="overflow-hidden"
-            >
-              <div className="mb-3 rounded-xl p-4" style={{ background: "var(--color-surface)" }}>
-                {setup.otpauthUri ? (
-                  <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
-                    {/* The hand-rolled encoder /stats also uses — a CDN is not an
-                        option and this has to actually scan. */}
-                    <span className="flex-none rounded-lg bg-white p-2">
-                      <QrCode text={setup.otpauthUri} size={148} />
-                    </span>
-                    <div className="min-w-0 text-[13.5px]">
-                      <ol className="m-0 flex list-decimal flex-col gap-1.5 pl-5">
-                        <li>Open your authenticator app and add an account.</li>
-                        <li>Scan this code.</li>
-                        <li>Enter the six-digit code it shows below.</li>
-                      </ol>
-                      <p className="m-0 mt-3 text-[12px] break-all text-muted">
-                        Can’t scan? Enter this key by hand: <span className="font-mono">{setup.secret}</span>
-                      </p>
-                    </div>
-                  </div>
-                ) : (
-                  <p className="m-0 text-[13.5px]">
-                    Enter a current code from your authenticator app to turn two-step off. A
-                    recovery code works too.
-                  </p>
-                )}
-
-                <div className="mt-4 flex flex-wrap items-end gap-2">
-                  <div className="field w-[180px]">
-                    <label htmlFor="ac-code">Code</label>
-                    <input
-                      id="ac-code"
-                      className="input font-mono tracking-[0.2em]"
-                      inputMode="numeric"
-                      value={code}
-                      onChange={(e) => setCode(e.target.value)}
-                      autoComplete="one-time-code"
-                    />
-                  </div>
-                  <button
-                    type="button"
-                    className="btn btn-primary"
-                    disabled={busy || code.trim().length < 4}
-                    onClick={() =>
-                      run(async () => {
-                        if (setup.otpauthUri) {
-                          await confirmTwoStep(code.trim());
-                          setNote("Two-step verification is on.");
-                        } else {
-                          await disableTwoStep(code.trim());
-                          setNote("Two-step verification is off.");
-                        }
-                        setSetup(null);
-                        setCode("");
-                      })
-                    }
-                  >
-                    {busy ? "Checking…" : "Confirm"}
-                  </button>
-                  <button
-                    type="button"
-                    className="btn btn-ghost"
-                    onClick={() => {
-                      setSetup(null);
-                      setCode("");
-                    }}
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        <SettingRow
-          title="Recovery codes"
-          desc="Ten one-time codes to keep somewhere safe, for when you can’t reach your authenticator."
-        >
-          <Pill on={s.recoveryCodesRemaining > 0}>
-            {s.recoveryCodesRemaining > 0 ? `${s.recoveryCodesRemaining} left` : "None"}
-          </Pill>
-          <button
-            type="button"
-            className="btn btn-secondary"
-            style={small}
-            disabled={busy}
-            onClick={() => run(async () => setCodes(await generateRecoveryCodes()))}
-          >
-            {s.recoveryCodesRemaining > 0 ? "Make new codes" : "Generate"}
-          </button>
-        </SettingRow>
-
-        <AnimatePresence initial={false}>
-          {codes && (
-            <motion.div
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: "auto" }}
-              exit={{ opacity: 0, height: 0 }}
-              className="overflow-hidden"
-            >
-              <div className="mt-3 rounded-xl p-4" style={{ background: "var(--color-surface)" }}>
-                <div className="mb-3 flex items-center">
-                  <span className="text-[14px] font-medium">Your recovery codes</span>
-                  <button type="button" className="btn btn-ghost ml-auto" onClick={() => setCodes(null)}>
-                    Hide
-                  </button>
-                </div>
-                <div className="grid grid-cols-2 gap-2 font-mono text-[13px] sm:grid-cols-5">
-                  {codes.map((c) => (
-                    <span key={c} className="rounded-md px-2 py-1 text-center" style={{ background: "var(--color-bg)" }}>
-                      {c}
-                    </span>
-                  ))}
-                </div>
-                <p className="m-0 mt-3 text-[12px] text-muted">
-                  Copy these somewhere safe now. Only fingerprints of them are stored, so this
-                  is the one time they can be read — and making new ones replaces these.
-                </p>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </Card>
+              Email me a reset link
+            </button>
+          </SettingRow>
+        </Card>
+      )}
 
       <Card title="Where you’re signed in" desc="Every browser and device that has a session on your account.">
         {sessions === null ? (
@@ -1393,6 +1139,5 @@ export const GROUPS: Array<{
 export function groupFlag(id: GroupId, account: AccountSettings): string {
   if (id === "profile" && !account.profile.handle) return "Needs a handle";
   if (id === "addresses" && !account.profile.handle) return "No address";
-  if (id === "security" && !account.security.twoStep) return "Set up 2-step";
   return "";
 }

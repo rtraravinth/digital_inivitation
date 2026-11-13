@@ -11,9 +11,10 @@ python -m alembic upgrade head
 
 # An optional demo account with the five seeded portfolios. Only on the run
 # that creates the account — create-user fails once it exists — so a restart
-# never loads the seed twice.
-if [ -n "$FACET_DEMO_EMAIL" ] && [ -n "$FACET_DEMO_PASSWORD" ]; then
-  if python -m app.cli create-user --email "$FACET_DEMO_EMAIL" --password "$FACET_DEMO_PASSWORD" \
+# never loads the seed twice. It has no password: sign in through Firebase
+# with this address (verified) and the account is yours.
+if [ -n "$FACET_DEMO_EMAIL" ]; then
+  if python -m app.cli create-user --email "$FACET_DEMO_EMAIL" \
       --handle "${FACET_DEMO_HANDLE:-demo}" --name "Demo"; then
     python -m app.cli seed --email "$FACET_DEMO_EMAIL" || echo "seed failed; the account exists without it"
   else

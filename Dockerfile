@@ -7,7 +7,10 @@
 # loopback (see `rewrites` in next.config.ts).
 #
 #   docker build -t facet .
-#   docker run -p 3000:3000 -e FACET_DATABASE_URL=postgresql://… -e FACET_JWT_SECRET=… -e FACET_ENV=prod facet
+#   docker build -t facet --build-arg NEXT_PUBLIC_FIREBASE_API_KEY=… (and the
+#     other three NEXT_PUBLIC_FIREBASE_* values) .
+#   docker run -p 3000:3000 -e FACET_DATABASE_URL=postgresql://… -e FACET_JWT_SECRET=… \
+#     -e FACET_FIREBASE_PROJECT_ID=… -e FACET_ENV=prod facet
 
 # ── build the frontend ────────────────────────────────────────────────────
 FROM node:22-slim AS web
@@ -15,9 +18,20 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci
 COPY . .
+# The Firebase web config is public by design (it ships to every browser) and
+# read at build time, so it comes in as build args. Render passes a service's
+# environment variables to a Docker build as build args of the same name.
+ARG NEXT_PUBLIC_FIREBASE_API_KEY=""
+ARG NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=""
+ARG NEXT_PUBLIC_FIREBASE_PROJECT_ID=""
+ARG NEXT_PUBLIC_FIREBASE_APP_ID=""
 # Both are read at build time. An empty API URL makes every browser request
 # relative, i.e. same-origin; the proxy target is where Next forwards them.
 ENV NEXT_PUBLIC_API_URL="" \
+    NEXT_PUBLIC_FIREBASE_API_KEY=$NEXT_PUBLIC_FIREBASE_API_KEY \
+    NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=$NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN \
+    NEXT_PUBLIC_FIREBASE_PROJECT_ID=$NEXT_PUBLIC_FIREBASE_PROJECT_ID \
+    NEXT_PUBLIC_FIREBASE_APP_ID=$NEXT_PUBLIC_FIREBASE_APP_ID \
     API_PROXY_TARGET="http://127.0.0.1:8000" \
     NEXT_TELEMETRY_DISABLED=1
 RUN npm run build && npm prune --omit=dev

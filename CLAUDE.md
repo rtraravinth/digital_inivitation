@@ -268,6 +268,11 @@ chrome — that inconsistency is what this replaced.
   "Blank" used to add one empty section, which was a thing to delete first.
   Only "Copy a page" and "Founder" start with sections, because picking
   either asks for them. The test fixture `portfolio` adds one itself.
+- **The builder's two left rails are one design.** "Sections" (Page) and
+  "Blocks" (Resume): a name and a count, then numbered rows that are the
+  title only — something off the page or off the resume is dimmed, with its
+  state in the row's tooltip and eye button — then one "Edit page content" /
+  "Edit resume content" button. Sections are added in the editor, not here.
 - **The builder: Page / Resume heads the left rail on a desk** (in the top
   bar only below `lg`, where there is no rail). Its top bar links to the
   editor as "Edit content". Layout controls a theme does not read —

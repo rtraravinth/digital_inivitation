@@ -365,7 +365,7 @@ function Chip({ children }: { children: React.ReactNode }) {
 /* ── the section rail ─────────────────────────────────────────────────── */
 
 function SectionRail({ p }: { p: Portfolio }) {
-  const { addSection, moveSection, toggleSectionHidden } = usePortfolios();
+  const { moveSection, toggleSectionHidden } = usePortfolios();
   const reduced = useReducedMotion();
   return (
     <div className="flex flex-col">
@@ -389,9 +389,10 @@ function SectionRail({ p }: { p: Portfolio }) {
               <span className="w-5 flex-none font-mono text-[11px]" style={{ color: "var(--color-neutral-600)" }}>
                 {String(i + 1).padStart(2, "0")}
               </span>
-              <span className="flex min-w-0 flex-1 flex-col">
-                <span className="truncate text-[13px] font-medium">{s.title || "Untitled section"}</span>
-                {s.hidden && <span className="truncate text-[11.5px] text-muted">Off the page</span>}
+              {/* Title only, as in the resume's Blocks rail. A section off the
+                  page is dimmed; its eye button says so in words. */}
+              <span className="min-w-0 flex-1 truncate text-[13px] font-medium" title={s.hidden ? "Off the page" : undefined}>
+                {s.title || "Untitled section"}
               </span>
               {/* The row's actions float over its right edge when the row is
                   pointed at or tabbed into, so a long title gets the whole row
@@ -427,12 +428,13 @@ function SectionRail({ p }: { p: Portfolio }) {
         </AnimatePresence>
       </ul>
 
+      {p.sections.length === 0 && (
+        <p className="m-0 px-4 pb-1 text-[12.5px] leading-snug text-muted">No sections yet. Add them in Edit page content.</p>
+      )}
+
+      {/* Sections are added where they are written, in the editor. */}
       <div className="flex flex-col gap-2 p-3">
-        <button type="button" className="btn btn-secondary btn-block" style={{ justifyContent: "center" }} onClick={() => addSection(p.id)}>
-          <Glyph id="plus" size={14} />
-          Add section
-        </button>
-        <Link href={`/editor/${p.id}`} className="btn btn-ghost btn-block" style={{ justifyContent: "center", marginTop: 0 }}>
+        <Link href={`/editor/${p.id}`} className="btn btn-secondary btn-block" style={{ justifyContent: "center" }}>
           Edit page content
           <Glyph id="arrow" size={14} />
         </Link>

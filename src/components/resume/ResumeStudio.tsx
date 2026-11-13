@@ -322,15 +322,12 @@ function BlockRail({ p, onChange }: { p: Portfolio; onChange: (recipe: (r: Resum
       <div className="flex items-baseline px-4 pt-4 pb-2">
         <h2 className="m-0 text-[14px] tracking-[-0.01em]">Blocks</h2>
         <span className="ml-auto font-mono text-[11px]" style={{ color: "var(--color-neutral-600)" }}>
-          top to bottom
+          {inUse.length}
         </span>
       </div>
 
       {inUse.length === 0 && (
-        <p className="m-0 px-4 pb-3 text-[12.5px] leading-snug text-muted">
-          Nothing to arrange yet. Write an About in your header, add a section, or add Experience, Skills and the rest
-          from Edit content.
-        </p>
+        <p className="m-0 px-4 pb-1 text-[12.5px] leading-snug text-muted">No blocks yet. Add them in Edit resume content.</p>
       )}
       <ul className="m-0 flex list-none flex-col gap-0.5 p-0 px-2">
         {inUse.map((b, i) => {
@@ -342,14 +339,18 @@ function BlockRail({ p, onChange }: { p: Portfolio; onChange: (recipe: (r: Resum
               layout={!reduced}
               transition={{ duration: 0.3, ease: EASE }}
               className="group relative flex items-center gap-2 rounded-lg px-2 py-2 transition-colors hover:bg-[var(--color-surface)] focus-within:bg-[var(--color-surface)]"
-              style={{ opacity: off ? 0.5 : 1 }}
+              style={{ opacity: off || empty ? 0.5 : 1 }}
             >
               <span className="w-5 flex-none font-mono text-[11px]" style={{ color: "var(--color-neutral-600)" }}>
                 {String(i + 1).padStart(2, "0")}
               </span>
-              <span className="flex min-w-0 flex-1 flex-col">
-                <span className="truncate text-[13px] font-medium">{BLOCK_LABEL[b]}</span>
-                <span className="truncate text-[11.5px] text-muted">{off ? "Hidden" : empty ? "Nothing to print yet" : "On the sheet"}</span>
+              {/* Title only, as in the page's Sections rail. A block left off
+                  the resume, or with nothing to print, is dimmed. */}
+              <span
+                className="min-w-0 flex-1 truncate text-[13px] font-medium"
+                title={off ? "Not printed" : empty ? "Nothing to print yet" : undefined}
+              >
+                {BLOCK_LABEL[b]}
               </span>
               <span
                 className="flex flex-none items-center rounded-md transition-opacity lg:pointer-events-none lg:absolute lg:top-1/2 lg:right-1 lg:-translate-y-1/2 lg:opacity-0 lg:group-focus-within:pointer-events-auto lg:group-focus-within:opacity-100 lg:group-hover:pointer-events-auto lg:group-hover:opacity-100"
@@ -383,9 +384,9 @@ function BlockRail({ p, onChange }: { p: Portfolio; onChange: (recipe: (r: Resum
           <Glyph id="arrow" size={14} />
         </Link>
       </div>
-      <p className="m-0 mx-3 mb-4 rounded-xl p-3 text-[12px] leading-snug text-muted" style={{ background: "var(--color-surface)" }}>
-        {live && "The page is live, so the order is fixed until you unpublish. "}Only what you have added is listed. “Your sections” are the page’s sections switched on for the resume; a list such as Experience prints once a section holds it. In two-column templates, Skills, Certifications, Languages and Awards sit in the narrow column.
-      </p>
+      {live && (
+        <p className="m-0 mx-3 mb-4 text-[12px] leading-snug text-muted">The page is live, so the order is fixed until you unpublish.</p>
+      )}
     </div>
   );
 }

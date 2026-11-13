@@ -5,6 +5,8 @@ Keyed by slug, in the shape Stats.tsx already reads.
 
 from __future__ import annotations
 
+from pydantic import Field
+
 from app.schemas.common import CamelModel
 
 
@@ -28,5 +30,5 @@ class SummaryOut(CamelModel):
     #: slug -> UTC calendar day ("YYYY-MM-DD") -> that day's counts. Sparse: a
     #: day with nothing on it is absent rather than zero, and the client fills
     #: the gaps, because the window decides which days exist, not the events.
-    daily: dict[str, dict[str, DayCount]] = {}
+    daily: dict[str, dict[str, DayCount]] = Field(default_factory=dict)
     totals: Totals

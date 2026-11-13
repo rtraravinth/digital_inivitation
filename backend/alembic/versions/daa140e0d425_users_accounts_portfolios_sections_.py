@@ -394,7 +394,7 @@ def upgrade() -> None:
             nullable=False,
         ),
         sa.CheckConstraint(
-            "kind IN ('link', 'venture', 'contact', 'booking', 'testimonial', 'gallery', 'numbers', 'document')",
+            "kind IN ('link', 'venture', 'contact', 'booking', 'testimonial', 'gallery', 'numbers', 'document')",  # noqa: E501
             name=op.f("ck_sections_kind_is_known"),
         ),
         sa.CheckConstraint("position >= 0", name=op.f("ck_sections_position_is_not_negative")),

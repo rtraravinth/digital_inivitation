@@ -37,6 +37,9 @@ jobs:
           cache: npm
       - name: Install from the lockfile
         run: npm ci
+      - name: Generate route types (PageProps, LayoutProps)
+        # A fresh checkout has no .next; the type-aware lint and tsc need them.
+        run: npx next typegen
       - name: ESLint (Next, React Compiler, type-aware promises, a11y)
         run: npm run lint
       - name: TypeScript

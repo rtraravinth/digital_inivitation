@@ -14,7 +14,7 @@ export { SectionDetail } from "./section-detail";
 export { Arcade, Aurora, Bio, Journey, Meridian, Stage };
 
 /**
- * Every theme, the builder canvas, the card previews and /print come through
+ * Every theme, the builder canvas, and the card previews come through
  * here, so this is where the structured blocks switched on for the page join
  * the sections — once, for all five themes.
  */

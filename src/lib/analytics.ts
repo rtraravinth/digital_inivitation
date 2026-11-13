@@ -161,8 +161,9 @@ export function recordClick(handle: string, slug: string, sectionId: string, url
   void api.post(`/public/p/${handle}/${slug}/clicks`, { sectionId, url }).catch(() => {});
 }
 
-export async function resetAnalytics() {
-  await api.del("/analytics");
+/** Delete recorded views and clicks: one portfolio's, or all of them. */
+export async function resetAnalytics(portfolioId?: string) {
+  await api.del(portfolioId ? `/analytics?portfolio=${encodeURIComponent(portfolioId)}` : "/analytics");
   await load();
 }
 

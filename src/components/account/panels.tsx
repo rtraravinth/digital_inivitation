@@ -2,7 +2,7 @@
 
 import { AnimatePresence, motion } from "motion/react";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useId, useState } from "react";
 import { PasswordField } from "../PasswordField";
 import { QrCode } from "../QrCode";
 import { UploadButton } from "../UploadButton";
@@ -1244,25 +1244,87 @@ function DataTools({
           onMessage(`Imported ${count} portfolios.`);
         }}
       />
-      {/* The browser's own print pipeline already renders these themes, so
-          /print stacks them and its Save-as-PDF destination does the rest. */}
-      <a href="/print?auto=1" target="_blank" rel="noopener noreferrer" className="btn btn-secondary">
-        Download all pages as PDF
-      </a>
-      <button
-        type="button"
-        className="btn btn-ghost"
-        onClick={async () => {
-          try {
-            await resetAnalytics();
-            onMessage("View and click counts cleared.");
-          } catch (error) {
-            onError(messageFor(error));
-          }
-        }}
-      >
-        Clear stats
+      <ClearStats portfolios={portfolios} onMessage={onMessage} onError={onError} />
+    </div>
+  );
+}
+
+/**
+ * Delete recorded views and clicks — one page's or every page's — after a
+ * confirmation that says exactly what goes. It cannot be undone, and it is
+ * the only way to erase what visitors' visits recorded, so it is a choice
+ * made in two steps, never a single click.
+ */
+function ClearStats({
+  portfolios,
+  onMessage,
+  onError,
+}: {
+  portfolios: Portfolio[];
+  onMessage: (m: string) => void;
+  onError: (e: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [which, setWhich] = useState("all");
+  const [busy, setBusy] = useState(false);
+  const id = useId();
+  const chosen = portfolios.find((p) => p.id === which);
+
+  if (!open) {
+    return (
+      <button type="button" className="btn btn-ghost" onClick={() => setOpen(true)}>
+        Clear stats…
       </button>
+    );
+  }
+
+  return (
+    <div className="mt-2 flex w-full flex-col gap-3 rounded-xl p-4" style={{ boxShadow: "inset 0 0 0 1px var(--color-ink)" }} role="group" aria-labelledby={`${id}-t`}>
+      <p id={`${id}-t`} className="m-0 text-[14px] font-semibold">
+        Clear recorded views and clicks
+      </p>
+      <div className="field">
+        <label htmlFor={`${id}-which`}>Which pages</label>
+        <select id={`${id}-which`} className="input" value={which} onChange={(e) => setWhich(e.target.value)}>
+          <option value="all">All pages</option>
+          {portfolios.map((p) => (
+            <option key={p.id} value={p.id}>
+              {p.name}
+            </option>
+          ))}
+        </select>
+      </div>
+      <p className="m-0 text-[13px] leading-snug">
+        {which === "all"
+          ? "Every view and link click recorded for every page is deleted, and /stats starts again from zero."
+          : `Every view and link click recorded for ${chosen?.name ?? "this page"} is deleted. Your other pages keep theirs.`}{" "}
+        This cannot be undone.
+      </p>
+      <div className="flex flex-wrap gap-2">
+        <button
+          type="button"
+          className="btn btn-primary"
+          disabled={busy}
+          onClick={async () => {
+            setBusy(true);
+            try {
+              await resetAnalytics(which === "all" ? undefined : which);
+              onMessage(which === "all" ? "Views and clicks cleared for every page." : `Views and clicks cleared for ${chosen?.name ?? "that page"}.`);
+              setOpen(false);
+              setWhich("all");
+            } catch (error) {
+              onError(messageFor(error));
+            } finally {
+              setBusy(false);
+            }
+          }}
+        >
+          {busy ? "Clearing…" : "Clear"}
+        </button>
+        <button type="button" className="btn btn-ghost" onClick={() => setOpen(false)}>
+          Cancel
+        </button>
+      </div>
     </div>
   );
 }

@@ -29,7 +29,7 @@ because the connection never arrives. Pass flags through when you need them:
 ```
 npm run build
 npm run lint
-cd backend && .venv/bin/python -m pytest    # 356 tests (.venv/Scripts on Windows)
+cd backend && .venv/bin/python -m pytest    # 358 tests (.venv/Scripts on Windows)
 ```
 
 `NEXT_PUBLIC_API_URL` points the frontend at the API; see
@@ -129,10 +129,6 @@ redeploys). `scripts/start.sh` migrates, optionally creates a demo account
   until "Use this look". `controls.tsx` holds the Profession / Theme / Colour /
   Type / Motion / Layout controls **shared** with the editor's drawer so the
   two cannot drift.
-- `src/components/PrintAll.tsx` — `/print` stacks every published page with a
-  page break between so the browser's own **Save as PDF** can export them.
-  That is what "Download all pages as PDF" on `/account` opens; generating a
-  PDF in-process would mean a library, and the themes already print correctly.
 - `src/components/resume/` — the resume, a portfolio's second look; see "The
   resume" below. `ResumeDocument.tsx` draws all six templates from one markup,
   `src/app/resume.css` gives each its look, `ResumeSheet.tsx` is the scaled
@@ -678,7 +674,7 @@ it, but two rules matter from this side:
   signature *or* a bearer token. An `<img>` cannot send an `Authorization`
   header, and the access token lives in memory in `src/lib/api.ts` and never
   reaches the markup — without the signature every owner-side image (editor,
-  builder canvas, `/preview`, `/print`) is a 401 and renders
+  builder canvas, `/preview`) is a 401 and renders
   broken. The token names one asset and expires
   (`FACET_ASSET_URL_TTL_MINUTES`, 24h). Published pages are unaffected: they
   use `/api/v1/public/assets/{id}`, which needs nothing.
@@ -739,8 +735,8 @@ the *visitor's* account, which meant a signed-out visitor saw the defaults and
 a signed-in one had their own settings applied to somebody else's page.
 
 **A preview knows it is one, and every theme asks.** `PreviewProvider` wraps
-`PublishedBody` wherever it is *not* the published page — `/preview/[id]`,
-the builder canvas and `/print` — and two things read that context.
+`PublishedBody` wherever it is *not* the published page — `/preview/[id]`
+and the builder canvas — and two things read that context.
 `useRecordClick` goes quiet, so the owner's own clicks never reach analytics.
 `usePageHref` returns `/preview/<id>` instead of `/p/<handle>/<slug>`, because
 the public address does not resolve until the portfolio is published: a
@@ -757,6 +753,15 @@ say otherwise. It used to show "About you" and "Starting tags and links"
 promising exactly that; both were removed. `AccountProfile.about`, `tags`
 and `links` stay in the API and the database, unshown, so nothing stored
 is lost.
+
+**Privacy & data has no "all pages as PDF" and no `/print`.** Each page
+prints from its own preview, the resume has its own Download PDF, and a stack
+of every page in one file was a thing nobody sends anyone. **"Clear stats…"
+is two steps, never one click**: it opens a confirmation that picks "All
+pages" or one portfolio (`DELETE /analytics?portfolio=<id>`; omitted means
+all of yours) and says it cannot be undone. It quotes no counts, because the
+counts in the analytics store cover only the /stats window, not what is
+deleted.
 
 ## Known gaps
 
@@ -787,7 +792,7 @@ is lost.
 - **Slugs are global.** Two accounts cannot both hold `rohan`, because the
   address is `facet.page/<slug>` with nothing in front of it. The create
   dialog surfaces the 409 as a message.
-- **The frontend has no test runner.** The backend has 356 pytest tests;
+- **The frontend has no test runner.** The backend has 358 pytest tests;
   changes here are checked with `npm run lint`, `npm run build` and by
   actually opening the app.
 

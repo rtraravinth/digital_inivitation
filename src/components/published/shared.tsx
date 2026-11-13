@@ -298,7 +298,7 @@ export function groundStyle(p: Portfolio): CSSProperties {
     // the viewport needs the minimum, and `body` is a flex column whose
     // child does not grow on the main axis unless told to. `flexGrow` is
     // inert wherever the parent is not a flex container, which covers the
-    // builder's canvas and `/print`. The minimum is dropped on paper, where
+    // builder's canvas. The minimum is dropped on paper, where
     // a stacked sheet must not be a viewport tall.
     minHeight: "var(--ground-min-h, 100dvh)",
     flexGrow: 1,

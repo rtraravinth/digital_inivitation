@@ -211,3 +211,32 @@ async def test_reset_clears_my_events_only(
 async def test_the_summary_requires_a_token(client):
     client.headers.pop("Authorization", None)
     assert (await client.get("/api/v1/analytics/summary")).status_code == 401
+
+
+async def test_reset_can_clear_one_portfolio(auth_client, client, published):
+    other = (
+        await auth_client.post(
+            "/api/v1/portfolios",
+            json={"name": "Second", "slug": "second-stats", "startFrom": {"kind": "blank"}},
+        )
+    ).json()
+    await auth_client.post(f"/api/v1/portfolios/{other['id']}/publish")
+    for slug, key in ((published["slug"], "a"), (other["slug"], "b")):
+        await client.post(
+            f"/api/v1/public/p/{TEST_HANDLE}/{slug}/views", json={"referrer": "", "dedupeKey": key}
+        )
+
+    response = await auth_client.delete(f"/api/v1/analytics?portfolio={published['id']}")
+    assert response.status_code == 204
+    assert (await auth_client.get("/api/v1/analytics/summary")).json()["views"] == {other["slug"]: 1}
+
+
+async def test_reset_cannot_reach_someone_elses_portfolio(
+    auth_client, other_auth_client, client, published
+):
+    await client.post(
+        f"/api/v1/public/p/{TEST_HANDLE}/{published['slug']}/views", json={"referrer": "", "dedupeKey": "a"}
+    )
+    response = await other_auth_client.delete(f"/api/v1/analytics?portfolio={published['id']}")
+    assert response.status_code == 204
+    assert (await auth_client.get("/api/v1/analytics/summary")).json()["views"] == {published["slug"]: 1}

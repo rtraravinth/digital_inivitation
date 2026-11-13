@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import uuid
+
 from fastapi import APIRouter, Query, status
 
 from app.api.deps import CurrentUser, SessionDep
@@ -36,7 +38,13 @@ async def summary(
 
 
 @router.delete(
-    "", status_code=status.HTTP_204_NO_CONTENT, summary="Delete all your analytics"
+    "", status_code=status.HTTP_204_NO_CONTENT, summary="Delete your analytics"
 )
-async def reset(session: SessionDep, user: CurrentUser) -> None:
-    await AnalyticsService(session).reset(user)
+async def reset(
+    session: SessionDep,
+    user: CurrentUser,
+    portfolio: uuid.UUID | None = Query(
+        default=None, description="Only this portfolio's. Omit for all of yours."
+    ),
+) -> None:
+    await AnalyticsService(session).reset(user, portfolio)

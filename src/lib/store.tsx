@@ -53,7 +53,7 @@ function setState(next: Portfolio[]) {
 let loadStarted = false;
 
 async function fetchAll(): Promise<Portfolio[]> {
-  // expand=sections because /print stacks whole pages and /stats labels
+  // expand=sections because the editor and builder need whole pages and /stats labels
   // clicks by section — one request rather than one per portfolio.
   const rows = await api.get<Portfolio[]>("/portfolios?expand=sections");
   return rows.map(normalize);

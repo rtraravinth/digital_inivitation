@@ -173,8 +173,12 @@ class AnalyticsService:
             ),
         )
 
-    async def reset(self, user: User) -> None:
+    async def reset(self, user: User, portfolio_id: uuid.UUID | None = None) -> None:
+        """Delete the view and click events of the user's portfolios — or of
+        one of them. Someone else's portfolio id simply matches nothing."""
         owned = select(Portfolio.id).where(Portfolio.user_id == user.id)
+        if portfolio_id is not None:
+            owned = owned.where(Portfolio.id == portfolio_id)
         await self.session.execute(
             delete(PageView).where(PageView.portfolio_id.in_(owned))
         )

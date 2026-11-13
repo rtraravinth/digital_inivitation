@@ -1,0 +1,14 @@
+# Paths the local CodeQL scan skips. See "Security scan" in AGENTS.md.
+name: facet-codeql
+paths-ignore:
+  - "**/node_modules/**"
+  - "**/.venv/**"
+  - "**/venv/**"
+  - "**/dist/**"
+  - "**/build/**"
+  - ".next/**"
+  - "out/**"
+  - "graphify-out/**"
+  - "codeql-dbs/**"
+  - "codeql-results/**"
+  - "**/*.egg-info/**"

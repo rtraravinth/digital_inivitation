@@ -3,10 +3,8 @@
 import { AnimatePresence, motion } from "motion/react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { LinkEditor } from "../LinkEditor";
 import { PasswordField } from "../PasswordField";
 import { QrCode } from "../QrCode";
-import { TagEditor } from "../TagEditor";
 import { UploadButton } from "../UploadButton";
 import { ICON, Icon, TiltPanel } from "../ui";
 import {
@@ -306,7 +304,7 @@ export function ProfilePanel({ account }: PanelProps) {
     <div>
       <PanelHeader
         title="Profile"
-        desc="Who you are. This fills the header of every new portfolio — each one can change it in its own editor."
+        desc="Who you are on your account. Each portfolio’s header — its name, line, about, tags and links — is written in that portfolio’s own editor."
       />
       {error && <Message kind="error">{error}</Message>}
 
@@ -333,7 +331,7 @@ export function ProfilePanel({ account }: PanelProps) {
         </div>
       </Card>
 
-      <Card title="About you">
+      <Card title="Your details">
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div className="field">
             <label htmlFor="ac-name">Full name</label>
@@ -360,34 +358,18 @@ export function ProfilePanel({ account }: PanelProps) {
             </p>
           </div>
           <div className="field sm:col-span-2">
-            <label htmlFor="ac-current">What you do now</label>
+            <label htmlFor="ac-current">What you do now (profession)</label>
             <input
               id="ac-current"
               className="input"
-              placeholder="Founder, Northwell Kitchens · Bengaluru"
+              placeholder="Product designer"
               value={p.current}
               onChange={(e) => set({ current: e.target.value })}
             />
           </div>
-          <div className="field sm:col-span-2">
-            <label htmlFor="ac-about">About you</label>
-            <textarea id="ac-about" className="input" rows={4} value={p.about} onChange={(e) => set({ about: e.target.value })} />
-          </div>
         </div>
       </Card>
 
-      <Card title="Starting tags and links" desc="Copied into each new portfolio’s header.">
-        <div className="flex flex-col gap-4">
-          <div className="field">
-            <label>Tags</label>
-            <TagEditor tags={p.tags} onChange={(tags) => set({ tags })} accentFirst />
-          </div>
-          <div className="field">
-            <label>Links</label>
-            <LinkEditor links={p.links} onChange={(links) => set({ links })} />
-          </div>
-        </div>
-      </Card>
 
       <AnimatePresence>
         {saved && !dirty && (
@@ -1337,7 +1319,7 @@ export const GROUPS: Array<{
   sub: string;
   Panel: (props: PanelProps) => React.ReactElement;
 }> = [
-  { id: "profile", label: "Profile", sub: "Name, photo, handle, about you", Panel: ProfilePanel },
+  { id: "profile", label: "Profile", sub: "Name, photo, handle, profession", Panel: ProfilePanel },
   { id: "security", label: "Sign-in & security", sub: "Password, two-step, devices", Panel: SecurityPanel },
   { id: "addresses", label: "Page addresses", sub: "Handle, links, your own domain", Panel: AddressesPanel },
   { id: "plan", label: "Plan & billing", sub: "What you’re on", Panel: PlanPanel },

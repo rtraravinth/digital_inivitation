@@ -748,6 +748,16 @@ section title inside a draft preview used to link straight to a 404. Render
 `PublishedBody` anywhere new and wrap it in both providers, or it will quietly
 claim to be the live page.
 
+## The account page
+
+**Profile is the account's, not a portfolio's.** Name, photo, handle and
+"What you do now (profession)". Nothing in it is copied into a new
+portfolio — each header is written in its own editor — so the page must not
+say otherwise. It used to show "About you" and "Starting tags and links"
+promising exactly that; both were removed. `AccountProfile.about`, `tags`
+and `links` stay in the API and the database, unshown, so nothing stored
+is lost.
+
 ## Known gaps
 
 - **Artboard 3b — the block manager, at `/blocks/[id]` — is deliberately not

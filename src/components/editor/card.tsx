@@ -36,8 +36,22 @@ export function Card({
     >
       <div id={`card-${id}`} className="scroll-mt-20" />
       <div className="flex items-center gap-2 px-5 pt-4 sm:px-6">
-        <span className="min-w-0 flex-1 text-[12px] font-medium" style={{ color: "var(--color-neutral-600)" }}>
-          {label}
+        <span className="flex min-w-0 flex-1 items-center gap-3 text-[12px] font-medium" style={{ color: "var(--color-neutral-600)" }}>
+          <span className="min-w-0 truncate">{label}</span>
+          {/* Beside the card's name rather than under its content, so it is
+              in the same place on every card however long the preview runs. */}
+          {!open && (
+            <button
+              type="button"
+              onClick={onOpen}
+              tabIndex={-1}
+              className="inline-flex flex-none cursor-pointer items-center gap-1 text-[12px] font-medium"
+              style={{ color: "var(--color-neutral-700)", borderBottom: "1px dotted currentColor", lineHeight: 1.4 }}
+            >
+              <Icon d={ICON.pencil} size={11} />
+              Click to edit
+            </button>
+          )}
         </span>
         {tools}
       </div>
@@ -52,13 +66,6 @@ export function Card({
           style={{ opacity: dim ? 0.55 : 1 }}
         >
           {preview}
-          <span
-            className="mt-3 inline-flex items-center gap-1.5 text-[12.5px] font-medium"
-            style={{ color: "var(--color-neutral-700)" }}
-          >
-            <Icon d={ICON.pencil} size={12} />
-            Click to edit
-          </span>
         </button>
       )}
     </TiltPanel>

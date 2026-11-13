@@ -287,6 +287,12 @@ chrome — that inconsistency is what this replaced.
   alike, when drawn in the accent (the headings' colour). A colour picked
   for the pattern itself (`style.backdropColor`; empty means the accent —
   `patternColour()`) is drawn at full strength, as picked.
+- **"Click to edit" sits beside a closed card's name**, dotted-underlined, so
+  it is in one place on every card however long the preview runs.
+- **Done puts the closed card back at the top of the view.** Collapsing a
+  tall form shortens the page under a fixed scroll offset, which used to
+  drop you near the footer; a layout effect in `Editor.tsx` scrolls the
+  card back before the frame paints.
 - **One Done per card, at its foot.** An open card's top bar carries only
   its switches and move buttons. The editor's top bar has "Open builder",
   "Preview" and "Publish"; the resume PDF is downloaded from the builder's

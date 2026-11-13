@@ -2,7 +2,7 @@
 
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { LinkEditor } from "./LinkEditor";
 import { PortfolioExtras, PortraitField, SectionExtras } from "./SectionExtras";
 import { PublishedLock } from "./PublishedLock";
@@ -67,6 +67,21 @@ export function Editor({ id }: { id: string }) {
   const [open, setOpen] = useState<string | null>(null);
   /** Refs, not state: focusing a new section must not cost a render of its own. */
   const justAdded = useRef<string | null>(null);
+  const wasOpen = useRef<string | null>(null);
+
+  // Closing a card collapses a tall form into a short preview. The window
+  // keeps its scroll offset, so a page that just got shorter is clamped to
+  // its end — Done used to drop you at the footer. Put the closed card back
+  // at the top of the view instead, before the frame is painted.
+  useLayoutEffect(() => {
+    const closed = wasOpen.current;
+    wasOpen.current = open;
+    if (open || !closed) return;
+    const node = document.getElementById(`card-${closed}`);
+    if (!node) return;
+    const top = node.getBoundingClientRect().top;
+    if (top < 80 || top > window.innerHeight - 120) node.scrollIntoView({ block: "start" });
+  }, [open]);
 
   // Opening a card brings it into view; a section just added also gets the
   // cursor in its title, since typing one is the next thing anyone does.

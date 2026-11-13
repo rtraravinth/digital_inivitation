@@ -43,7 +43,7 @@ each other's rows. Uploads go to a temporary directory, never your `media/`.
 ## Development commands
 
 ```bash
-.venv/Scripts/python -m app.cli create-user --email you@example.com --password "..."
+.venv/Scripts/python -m app.cli create-user --email you@example.com --handle you
 .venv/Scripts/python -m app.cli seed --email you@example.com
 .venv/Scripts/python -m app.cli routes
 ```
@@ -133,8 +133,10 @@ say so plainly:
 - **Custom domains** — needs DNS and a host.
 - **Email notifications** — needs a mail service.
 
-Two-step verification is *not* on that list: TOTP needs nobody else, so it is
-genuinely implemented, along with single-use recovery codes.
+Sign-in is not on that list: Firebase Authentication does it (see
+`app/core/firebase.py`), and this API holds no password or second factor.
+`create-user` makes an account with no credential; signing in through
+Firebase with the same address, once Firebase has verified it, claims it.
 
 If you add one of these backends, delete the corresponding `<ServerNotice>`
 from the frontend in the same change. A stale notice is a defect.

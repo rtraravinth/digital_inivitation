@@ -24,7 +24,7 @@ PREFLIGHT = {
 )
 async def test_local_and_lan_origins_are_allowed_outside_production(client, origin):
     response = await client.options(
-        "/api/v1/auth/register", headers={"Origin": origin, **PREFLIGHT}
+        "/api/v1/auth/firebase", headers={"Origin": origin, **PREFLIGHT}
     )
     assert response.status_code == 200
     assert response.headers["access-control-allow-origin"] == origin
@@ -42,7 +42,7 @@ async def test_local_and_lan_origins_are_allowed_outside_production(client, orig
 )
 async def test_other_origins_are_refused(client, origin):
     response = await client.options(
-        "/api/v1/auth/register", headers={"Origin": origin, **PREFLIGHT}
+        "/api/v1/auth/firebase", headers={"Origin": origin, **PREFLIGHT}
     )
     assert response.status_code == 400
 

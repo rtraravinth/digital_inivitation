@@ -62,8 +62,9 @@ cd backend && .venv/Scripts/python -m pytest && .venv/Scripts/python -m ruff che
 
 ## What is real, and what is not
 
-Real: accounts, sign-in, passwords, two-step verification (TOTP), single-use
-recovery codes, the signed-in device list and its revoke buttons, portfolios,
+Real: accounts, sign-in through Firebase Authentication (Google, GitHub,
+email and password, email link, phone), the signed-in device list and its
+revoke buttons, portfolios,
 sections, uploads, publishing, all four privacy switches, view and click
 analytics, and export/import.
 
@@ -83,9 +84,13 @@ and `render.yaml` describes that container and its database for
 1. In Render, choose **New → Blueprint** and pick this repository.
 2. Approve the two resources it lists (`facet`, `facet-db`) and wait for the
    first deploy.
-3. Open the service's `…onrender.com` address. Create an account, or sign in
-   as `demo@example.com` — its generated password is `FACET_DEMO_PASSWORD`
-   under the service's **Environment** tab.
+3. Before the first deploy, fill in the Firebase values it asks for
+   (`FACET_FIREBASE_PROJECT_ID` and the four `NEXT_PUBLIC_FIREBASE_*`, from
+   Firebase → Project settings → Your apps) and add the `…onrender.com`
+   host under Firebase → Authentication → Settings → Authorised domains.
+4. Open the service's `…onrender.com` address and sign in. If you set
+   `FACET_DEMO_EMAIL`, signing in with that (verified) address claims the
+   demo account and its five seeded portfolios.
 
 Every push to the deployed branch redeploys. The blueprint uses Render's free
 plan, which sleeps when idle and does not keep uploaded pictures or the
@@ -94,9 +99,12 @@ database for long; `render.yaml` says what to change before relying on it.
 To run the same container anywhere else:
 
 ```bash
-docker build -t facet .
+docker build -t facet --build-arg NEXT_PUBLIC_FIREBASE_API_KEY=… \
+  --build-arg NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=… \
+  --build-arg NEXT_PUBLIC_FIREBASE_PROJECT_ID=… \
+  --build-arg NEXT_PUBLIC_FIREBASE_APP_ID=… .
 ```
 
 ```bash
-docker run -p 3000:3000 -e FACET_ENV=prod -e FACET_JWT_SECRET=<long random string> -e FACET_DATABASE_URL=postgresql://user:password@host:5432/facet facet
+docker run -p 3000:3000 -e FACET_ENV=prod -e FACET_JWT_SECRET=<long random string> -e FACET_DATABASE_URL=postgresql://user:password@host:5432/facet -e FACET_FIREBASE_PROJECT_ID=… facet
 ```

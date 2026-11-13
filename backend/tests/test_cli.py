@@ -13,7 +13,7 @@ import typer
 import app.cli
 from app.cli import create_user
 
-VALID = {"email": "someone@example.com", "password": "correct horse battery", "handle": "someone"}
+VALID = {"email": "someone@example.com", "handle": "someone"}
 
 
 def test_create_user_rejects_an_email_the_api_would_refuse():
@@ -21,11 +21,6 @@ def test_create_user_rejects_an_email_the_api_would_refuse():
     # rejected at login, leaving an account nobody can use.
     with pytest.raises(typer.BadParameter):
         create_user(**{**VALID, "email": "demo@facet.test"}, name="R")
-
-
-def test_create_user_rejects_a_short_password():
-    with pytest.raises(typer.BadParameter):
-        create_user(**{**VALID, "password": "short"}, name="R")
 
 
 def test_create_user_rejects_a_malformed_address():
@@ -42,13 +37,13 @@ def test_create_user_passes_validation_and_forwards_the_handle(monkeypatch):
     """The regression the other tests could not see.
 
     They all assert BadParameter, and for a while every call raised it: the
-    command validated through RegisterRequest, which requires a handle, and
-    never sent one. A valid call has to get past validation and reach the
+    command validated through a model that required a handle, and never sent
+    one. A valid call has to get past validation and reach the
     write — with the handle, or the account has no address to publish under.
     """
     seen = {}
 
-    async def fake_create(email, password, name, handle):
+    async def fake_create(email, name, handle):
         seen.update(email=email, name=name, handle=handle)
         return "an-id"
 

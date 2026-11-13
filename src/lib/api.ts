@@ -64,15 +64,21 @@ export function onUnauthenticated(handler: () => void) {
 const RETRYABLE = new Set(["token_expired", "invalid_token", "session_revoked"]);
 
 /**
- * Codes where the 401 is about credentials *in the request*, not the session
- * carrying it. Changing your password with the wrong current one answers 401
- * `invalid_credentials` while your session is perfectly valid — treating that
- * as "you are signed out" threw the user to /signin over a typo.
+ * Codes where the 401 is about credentials *in the request*, not a session
+ * carrying it — a Firebase sign-in that did not verify, on the sign-in page,
+ * where there is no session to lose. Treating those as "you are signed out"
+ * would bounce the page that is trying to sign you in.
  *
  * Anything not listed here still signs out, which is the safe default: an
  * unrecognised 401 is more likely to be a dead session than a bad field.
  */
-const CREDENTIAL_ERRORS = new Set(["invalid_credentials"]);
+const CREDENTIAL_ERRORS = new Set([
+  "invalid_firebase_token",
+  "firebase_sign_in_stale",
+  "firebase_unreachable",
+  "firebase_not_configured",
+  "account_inactive",
+]);
 
 async function toApiError(response: Response): Promise<ApiError> {
   const requestId = response.headers.get("X-Request-ID") ?? "";

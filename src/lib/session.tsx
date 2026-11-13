@@ -15,10 +15,10 @@ import { ApiError, api, onUnauthenticated, refreshSession, setAccessToken } from
 
 export type SessionUser = {
   id: string;
-  email: string;
+  /** Null for an account made with a phone number. */
+  email: string | null;
   name: string;
   handle: string | null;
-  twoStep: boolean;
 };
 
 export type SessionStatus = "loading" | "in" | "out";
@@ -27,8 +27,6 @@ type AuthResponse = {
   user: SessionUser;
   token: { accessToken: string; tokenType: string; expiresIn: number };
 };
-
-type TwoStepResponse = { twoStepRequired: true; challenge: string };
 
 type State = {
   user: SessionUser | null;
@@ -62,7 +60,7 @@ function bootstrap() {
       try {
         const account = await api.get<{
           profile: { name: string; handle: string | null };
-          security: { email: string; twoStep: boolean };
+          security: { email: string | null };
         }>("/account");
         emit({
           user: {
@@ -70,7 +68,6 @@ function bootstrap() {
             email: account.security.email,
             name: account.profile.name,
             handle: account.profile.handle,
-            twoStep: account.security.twoStep,
           },
           status: "in",
         });
@@ -102,32 +99,18 @@ function adopt(response: AuthResponse) {
   emit({ user: response.user, status: "in" });
 }
 
-export async function register(
-  email: string,
-  password: string,
-  name: string,
-  handle: string,
-) {
-  adopt(await api.post<AuthResponse>("/auth/register", { email, password, name, handle }));
-}
-
 /**
- * Returns a challenge string when the account has two-step on — the password
- * was right, but no session exists until the code is too.
+ * Trade a Firebase ID token for a FACET session.
+ *
+ * Firebase has proved who this is; the API decides which account that is.
+ * A token nobody owns yet answers 422 `handle_required` — the sign-in page
+ * then asks for a name and handle and calls this again with them.
  */
-export async function signIn(email: string, password: string): Promise<string | null> {
-  const response = await api.post<AuthResponse | TwoStepResponse>("/auth/login", {
-    email,
-    password,
-  });
-
-  if ("twoStepRequired" in response) return response.challenge;
-  adopt(response);
-  return null;
-}
-
-export async function completeTwoStep(challenge: string, code: string) {
-  adopt(await api.post<AuthResponse>("/auth/login/two-step", { challenge, code }));
+export async function exchange(
+  idToken: string,
+  newAccount?: { name: string; handle: string },
+) {
+  adopt(await api.post<AuthResponse>("/auth/firebase", { idToken, ...newAccount }));
 }
 
 export async function signOut() {
@@ -156,9 +139,7 @@ export function useSession() {
     user,
     status,
     signedIn: status === "in",
-    register,
-    signIn,
-    completeTwoStep,
+    exchange,
     signOut,
   };
 }

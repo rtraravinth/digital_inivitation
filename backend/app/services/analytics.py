@@ -63,9 +63,7 @@ class AnalyticsService:
         # all — not written and hidden.
         return bool((settings.privacy or {}).get("countVisits", True))
 
-    async def record_view(
-        self, portfolio: Portfolio, referrer: str, dedupe_key: str
-    ) -> bool:
+    async def record_view(self, portfolio: Portfolio, referrer: str, dedupe_key: str) -> bool:
         if not await self._counting_allowed(portfolio):
             return False
 
@@ -89,9 +87,7 @@ class AnalyticsService:
         result = await self.session.execute(statement)
         return bool(result.rowcount)
 
-    async def record_click(
-        self, portfolio: Portfolio, section_id: uuid.UUID, url: str
-    ) -> bool:
+    async def record_click(self, portfolio: Portfolio, section_id: uuid.UUID, url: str) -> bool:
         if not await self._counting_allowed(portfolio):
             return False
 
@@ -179,10 +175,6 @@ class AnalyticsService:
         owned = select(Portfolio.id).where(Portfolio.user_id == user.id)
         if portfolio_id is not None:
             owned = owned.where(Portfolio.id == portfolio_id)
-        await self.session.execute(
-            delete(PageView).where(PageView.portfolio_id.in_(owned))
-        )
-        await self.session.execute(
-            delete(LinkClick).where(LinkClick.portfolio_id.in_(owned))
-        )
+        await self.session.execute(delete(PageView).where(PageView.portfolio_id.in_(owned)))
+        await self.session.execute(delete(LinkClick).where(LinkClick.portfolio_id.in_(owned)))
         await self.session.flush()

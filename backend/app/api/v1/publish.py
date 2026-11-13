@@ -45,9 +45,7 @@ router = APIRouter(
 )
 
 
-async def _load_published(
-    session: SessionDep, handle: str, slug: str
-) -> tuple[Portfolio, dict]:
+async def _load_published(session: SessionDep, handle: str, slug: str) -> tuple[Portfolio, dict]:
     """The published portfolio at ``<handle>/<slug>`` and its privacy switches.
 
     One query with eager loads: a published page must not issue a query per
@@ -86,9 +84,7 @@ async def _load_published(
     response_model=PublicPortfolioOut,
     summary="Read a published page",
 )
-async def read_published(
-    handle: str, slug: str, session: SessionDep, response: Response
-):
+async def read_published(handle: str, slug: str, session: SessionDep, response: Response):
     portfolio, privacy = await _load_published(session, handle, slug)
 
     indexable = privacy.get("indexable", True)

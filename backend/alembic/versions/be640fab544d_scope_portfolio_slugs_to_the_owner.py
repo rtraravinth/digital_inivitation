@@ -32,7 +32,7 @@ _UNSAFE = re.compile(r"[^a-z0-9-]+")
 
 
 def _flatten(slug: str) -> str:
-    """"rohan/investors" -> "investors"; anything odd -> a safe fallback."""
+    """ "rohan/investors" -> "investors"; anything odd -> a safe fallback."""
     last = slug.strip("/").split("/")[-1].strip().lower()
     cleaned = _UNSAFE.sub("-", last).strip("-")
     return cleaned[:120] or "page"
@@ -69,9 +69,7 @@ def upgrade() -> None:
             )
 
     op.create_index("ix_portfolios_slug", "portfolios", ["slug"], unique=False)
-    op.create_unique_constraint(
-        "uq_portfolios_user_id_slug", "portfolios", ["user_id", "slug"]
-    )
+    op.create_unique_constraint("uq_portfolios_user_id_slug", "portfolios", ["user_id", "slug"])
 
 
 def downgrade() -> None:

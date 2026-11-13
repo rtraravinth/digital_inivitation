@@ -31,9 +31,20 @@ depends_on: str | Sequence[str] | None = None
 #: Spelled out rather than imported, so this migration keeps describing the
 #: schema it actually produced once the tuple moves on.
 FACES = (
-    "archivo", "inter", "dm-sans", "space-grotesk", "manrope", "fraunces",
-    "playfair-display", "source-serif-4", "lora", "roboto-slab", "bitter",
-    "oswald", "syne", "jetbrains-mono",
+    "archivo",
+    "inter",
+    "dm-sans",
+    "space-grotesk",
+    "manrope",
+    "fraunces",
+    "playfair-display",
+    "source-serif-4",
+    "lora",
+    "roboto-slab",
+    "bitter",
+    "oswald",
+    "syne",
+    "jetbrains-mono",
 )
 
 

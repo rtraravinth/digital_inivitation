@@ -109,7 +109,11 @@ ASSET_KINDS: Final[tuple[str, ...]] = ("image", "file")
 
 NotificationKey = Literal["booking", "weekly", "brokenLink", "mention", "product"]
 NOTIFICATION_KEYS: Final[tuple[str, ...]] = (
-    "booking", "weekly", "brokenLink", "mention", "product",
+    "booking",
+    "weekly",
+    "brokenLink",
+    "mention",
+    "product",
 )
 
 PrivacyKey = Literal["indexable", "showContact", "countVisits", "badge"]
@@ -144,10 +148,24 @@ def sql_in(values: tuple[str, ...]) -> str:
 #: of client names, quotes from people the author worked with. Mirrors
 #: BLOCK_TYPES in src/lib/types.ts.
 BlockType = Literal[
-    "timeline", "testimonials", "clients", "tabs", "stats", "services", "faq", "contact",
+    "timeline",
+    "testimonials",
+    "clients",
+    "tabs",
+    "stats",
+    "services",
+    "faq",
+    "contact",
 ]
 BLOCK_TYPES: Final[tuple[str, ...]] = (
-    "timeline", "testimonials", "clients", "tabs", "stats", "services", "faq", "contact",
+    "timeline",
+    "testimonials",
+    "clients",
+    "tabs",
+    "stats",
+    "services",
+    "faq",
+    "contact",
 )
 
 #: How many images one section may carry, and how many components. Generous

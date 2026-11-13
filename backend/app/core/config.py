@@ -30,9 +30,7 @@ class Settings(BaseSettings):
     env: Env = "dev"
 
     database_url: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/facet"
-    test_database_url: str = (
-        "postgresql+asyncpg://postgres:postgres@localhost:5432/facet_test"
-    )
+    test_database_url: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/facet_test"
 
     jwt_secret: str = "insecure-development-secret-do-not-ship"
     jwt_algorithm: str = "HS256"

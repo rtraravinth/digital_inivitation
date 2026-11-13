@@ -112,7 +112,14 @@ DEFAULT_ORDER: list[str] = [
     "languages",
     "awards",
 ]
-PAGE_BLOCKS: list[str] = ["experience", "education", "skills", "certifications", "languages", "awards"]
+PAGE_BLOCKS: list[str] = [
+    "experience",
+    "education",
+    "skills",
+    "certifications",
+    "languages",
+    "awards",
+]
 
 _ID = Field(max_length=64)
 _LINE = Field(default="", max_length=300)

@@ -20,8 +20,7 @@ if TYPE_CHECKING:
 
 def default_notifications() -> dict[str, bool]:
     """Matches ``defaultAccount()`` in src/lib/types.ts."""
-    return {"booking": True, "weekly": True, "brokenLink": True,
-            "mention": False, "product": False}
+    return {"booking": True, "weekly": True, "brokenLink": True, "mention": False, "product": False}
 
 
 def default_privacy() -> dict[str, bool]:
@@ -37,8 +36,7 @@ class AccountProfile(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     __tablename__ = "account_profiles"
 
     user_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"),
-        unique=True, nullable=False
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), unique=True, nullable=False
     )
     name: Mapped[str] = mapped_column(String(200), nullable=False, default="")
     # Nullable so two accounts without a handle do not collide on "".
@@ -57,22 +55,17 @@ class AccountProfile(UUIDPrimaryKeyMixin, TimestampMixin, Base):
 
 class AccountSettings(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     __tablename__ = "account_settings"
-    __table_args__ = (
-        CheckConstraint(f"plan IN ({sql_in(PLANS)})", name="plan_is_known"),
-    )
+    __table_args__ = (CheckConstraint(f"plan IN ({sql_in(PLANS)})", name="plan_is_known"),)
 
     user_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"),
-        unique=True, nullable=False
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), unique=True, nullable=False
     )
     plan: Mapped[str] = mapped_column(String(16), nullable=False, default="free")
     custom_domain: Mapped[str] = mapped_column(String(255), nullable=False, default="")
     notifications: Mapped[dict[str, bool]] = mapped_column(
         JSONB, nullable=False, default=default_notifications
     )
-    privacy: Mapped[dict[str, bool]] = mapped_column(
-        JSONB, nullable=False, default=default_privacy
-    )
+    privacy: Mapped[dict[str, bool]] = mapped_column(JSONB, nullable=False, default=default_privacy)
 
     phone: Mapped[str] = mapped_column(String(32), nullable=False, default="")
     google_linked: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
@@ -102,8 +95,7 @@ class RecoveryCode(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     __tablename__ = "recovery_codes"
 
     user_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"),
-        nullable=False, index=True
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
     )
     code_hash: Mapped[str] = mapped_column(String(255), nullable=False)
     used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

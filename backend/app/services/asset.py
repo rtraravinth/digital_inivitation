@@ -208,9 +208,7 @@ class AssetService:
                 details={"limit": FILE_MAX_BYTES},
             )
 
-        return ProcessedUpload(
-            data=raw, mime=mime, extension=extension, width=None, height=None
-        )
+        return ProcessedUpload(data=raw, mime=mime, extension=extension, width=None, height=None)
 
     def _sniff(self, raw: bytes, declared: str | None) -> tuple[str, str]:
         for signature, mime, extension in FILE_SIGNATURES:

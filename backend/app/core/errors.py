@@ -210,8 +210,9 @@ def install_error_handlers(app: FastAPI) -> None:
         # Log the real one; tell the client only that it conflicts.
         logger.warning("integrity error: %s", exc.orig, exc_info=exc)
         return _render(
-            Conflict("That change conflicts with something already stored.",
-                     code="constraint_violation")
+            Conflict(
+                "That change conflicts with something already stored.", code="constraint_violation"
+            )
         )
 
     @app.exception_handler(Exception)

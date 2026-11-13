@@ -17,8 +17,13 @@ def png_bytes(width: int = 2400, height: int = 1200, colour=(120, 90, 60)) -> by
     return buffer.getvalue()
 
 
-async def upload(client, data: bytes, name: str = "photo.png", kind: str = "image",
-                 content_type: str = "image/png"):
+async def upload(
+    client,
+    data: bytes,
+    name: str = "photo.png",
+    kind: str = "image",
+    content_type: str = "image/png",
+):
     return await client.post(
         "/api/v1/assets",
         files={"file": (name, data, content_type)},
@@ -75,8 +80,11 @@ async def test_an_empty_upload_is_refused(auth_client):
 
 async def test_a_pdf_attachment_is_accepted(auth_client):
     response = await upload(
-        auth_client, b"%PDF-1.4\n" + b"0" * 2048, name="one-pager.pdf",
-        kind="file", content_type="application/pdf",
+        auth_client,
+        b"%PDF-1.4\n" + b"0" * 2048,
+        name="one-pager.pdf",
+        kind="file",
+        content_type="application/pdf",
     )
     assert response.status_code == 201
     assert response.json()["mime"] == "application/pdf"
@@ -84,8 +92,11 @@ async def test_a_pdf_attachment_is_accepted(auth_client):
 
 async def test_an_oversized_attachment_is_413(auth_client):
     response = await upload(
-        auth_client, b"%PDF-1.4\n" + b"0" * (900 * 1024), name="big.pdf",
-        kind="file", content_type="application/pdf",
+        auth_client,
+        b"%PDF-1.4\n" + b"0" * (900 * 1024),
+        name="big.pdf",
+        kind="file",
+        content_type="application/pdf",
     )
     assert response.status_code == 413
     assert response.json()["error"]["code"] == "payload_too_large"
@@ -93,8 +104,11 @@ async def test_an_oversized_attachment_is_413(auth_client):
 
 async def test_an_unsupported_attachment_type_is_415(auth_client):
     response = await upload(
-        auth_client, b"MZ\x90\x00 executable", name="tool.exe",
-        kind="file", content_type="application/octet-stream",
+        auth_client,
+        b"MZ\x90\x00 executable",
+        name="tool.exe",
+        kind="file",
+        content_type="application/octet-stream",
     )
     assert response.status_code == 415
 

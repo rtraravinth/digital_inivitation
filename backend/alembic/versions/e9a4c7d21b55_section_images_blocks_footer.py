@@ -37,19 +37,23 @@ def upgrade() -> None:
         sa.Column("section_id", postgresql.UUID(as_uuid=True), nullable=False),
         sa.Column("asset_id", postgresql.UUID(as_uuid=True), nullable=False),
         sa.Column("position", sa.Integer(), nullable=False),
-        sa.CheckConstraint("position >= 0", name=op.f("ck_section_images_position_is_not_negative")),
-        sa.ForeignKeyConstraint(
-            ["section_id"], ["sections.id"],
-            name=op.f("fk_section_images_section_id_sections"), ondelete="CASCADE",
+        sa.CheckConstraint(
+            "position >= 0", name=op.f("ck_section_images_position_is_not_negative")
         ),
         sa.ForeignKeyConstraint(
-            ["asset_id"], ["assets.id"],
-            name=op.f("fk_section_images_asset_id_assets"), ondelete="CASCADE",
+            ["section_id"],
+            ["sections.id"],
+            name=op.f("fk_section_images_section_id_sections"),
+            ondelete="CASCADE",
+        ),
+        sa.ForeignKeyConstraint(
+            ["asset_id"],
+            ["assets.id"],
+            name=op.f("fk_section_images_asset_id_assets"),
+            ondelete="CASCADE",
         ),
         sa.PrimaryKeyConstraint("id", name=op.f("pk_section_images")),
-        sa.UniqueConstraint(
-            "section_id", "position", name="uq_section_images_section_id_position"
-        ),
+        sa.UniqueConstraint("section_id", "position", name="uq_section_images_section_id_position"),
     )
     op.create_index(op.f("ix_section_images_section_id"), "section_images", ["section_id"])
     op.create_index(op.f("ix_section_images_asset_id"), "section_images", ["asset_id"])
@@ -68,15 +72,19 @@ def upgrade() -> None:
     op.add_column(
         "sections",
         sa.Column(
-            "blocks", postgresql.JSONB(astext_type=sa.Text()),
-            nullable=False, server_default="[]",
+            "blocks",
+            postgresql.JSONB(astext_type=sa.Text()),
+            nullable=False,
+            server_default="[]",
         ),
     )
     op.add_column(
         "portfolios",
         sa.Column(
-            "footer", postgresql.JSONB(astext_type=sa.Text()),
-            nullable=False, server_default="{}",
+            "footer",
+            postgresql.JSONB(astext_type=sa.Text()),
+            nullable=False,
+            server_default="{}",
         ),
     )
 
@@ -91,8 +99,12 @@ def downgrade() -> None:
         sa.Column("image_asset_id", postgresql.UUID(as_uuid=True), nullable=True),
     )
     op.create_foreign_key(
-        "fk_sections_image_asset_id_assets", "sections", "assets",
-        ["image_asset_id"], ["id"], ondelete="SET NULL",
+        "fk_sections_image_asset_id_assets",
+        "sections",
+        "assets",
+        ["image_asset_id"],
+        ["id"],
+        ondelete="SET NULL",
     )
     op.execute(
         """

@@ -42,9 +42,7 @@ class User(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     portfolios: Mapped[list[Portfolio]] = relationship(
         back_populates="user", cascade="all, delete-orphan"
     )
-    assets: Mapped[list[Asset]] = relationship(
-        back_populates="user", cascade="all, delete-orphan"
-    )
+    assets: Mapped[list[Asset]] = relationship(back_populates="user", cascade="all, delete-orphan")
 
     def __repr__(self) -> str:  # pragma: no cover - debugging aid
         return f"<User {self.email}>"

@@ -4,7 +4,10 @@ from __future__ import annotations
 
 import pytest
 
-PREFLIGHT = {"Access-Control-Request-Method": "POST", "Access-Control-Request-Headers": "content-type"}
+PREFLIGHT = {
+    "Access-Control-Request-Method": "POST",
+    "Access-Control-Request-Headers": "content-type",
+}
 
 
 @pytest.mark.parametrize(

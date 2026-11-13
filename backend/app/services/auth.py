@@ -119,17 +119,13 @@ class AuthService:
             raise self._invalid_credentials()
 
         if not await self.verify_second_factor(user, code):
-            raise ValidationFailed(
-                "That code is not valid.", code="invalid_two_step_code"
-            )
+            raise ValidationFailed("That code is not valid.", code="invalid_two_step_code")
 
         return user, await self._open_session(user, device)
 
     def _invalid_credentials(self) -> Unauthenticated:
         # One message for a wrong password and an unknown address alike.
-        return Unauthenticated(
-            "Those details do not match an account.", code="invalid_credentials"
-        )
+        return Unauthenticated("Those details do not match an account.", code="invalid_credentials")
 
     # ── sessions ────────────────────────────────────────────────────────
 
@@ -169,9 +165,7 @@ class AuthService:
         )
 
         if auth_session is None:
-            raise Unauthenticated(
-                "Please sign in again.", code="invalid_refresh_token"
-            )
+            raise Unauthenticated("Please sign in again.", code="invalid_refresh_token")
 
         if auth_session.revoked_at is not None:
             logger.warning(
@@ -223,9 +217,7 @@ class AuthService:
 
     async def revoke_session(self, user: User, session_id: str) -> None:
         target = await self.session.scalar(
-            select(AuthSession).where(
-                AuthSession.id == session_id, AuthSession.user_id == user.id
-            )
+            select(AuthSession).where(AuthSession.id == session_id, AuthSession.user_id == user.id)
         )
         # Another user's session id is "not found", never "forbidden" — a 403
         # would confirm the id exists.
@@ -258,9 +250,7 @@ class AuthService:
         self, user: User, current: str, new: str, keep_session_id: str
     ) -> None:
         if not verify_password(current, user.password_hash):
-            raise Unauthenticated(
-                "That is not your current password.", code="invalid_credentials"
-            )
+            raise Unauthenticated("That is not your current password.", code="invalid_credentials")
 
         user.password_hash = hash_password(new)
         user.settings.password_changed_at = datetime.now(UTC)

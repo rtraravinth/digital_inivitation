@@ -12,9 +12,7 @@ from app.schemas.common import ERROR_RESPONSES
 from app.schemas.transfer import ImportRequest, ImportResultOut
 from app.services.transfer import TransferService
 
-router = APIRouter(
-    tags=["transfer"], responses=ERROR_RESPONSES, route_class=TransactionRoute
-)
+router = APIRouter(tags=["transfer"], responses=ERROR_RESPONSES, route_class=TransactionRoute)
 
 
 @router.get(

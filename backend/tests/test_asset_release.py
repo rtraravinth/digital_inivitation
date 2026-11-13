@@ -41,9 +41,7 @@ async def rows(db_session) -> set[str]:
 
 async def test_replacing_a_section_image_drops_the_old_one(auth_client, portfolio, db_session):
     section = (
-        await auth_client.post(
-            f"/api/v1/portfolios/{portfolio['id']}/sections", json={}
-        )
+        await auth_client.post(f"/api/v1/portfolios/{portfolio['id']}/sections", json={})
     ).json()
     first, second = await upload(auth_client, (1, 2, 3)), await upload(auth_client, (4, 5, 6))
     path = f"/api/v1/portfolios/{portfolio['id']}/sections/{section['id']}"
@@ -59,9 +57,7 @@ async def test_replacing_a_section_image_drops_the_old_one(auth_client, portfoli
 
 async def test_clearing_a_section_image_drops_it(auth_client, portfolio, db_session):
     section = (
-        await auth_client.post(
-            f"/api/v1/portfolios/{portfolio['id']}/sections", json={}
-        )
+        await auth_client.post(f"/api/v1/portfolios/{portfolio['id']}/sections", json={})
     ).json()
     asset = await upload(auth_client, (7, 8, 9))
     path = f"/api/v1/portfolios/{portfolio['id']}/sections/{section['id']}"
@@ -92,9 +88,7 @@ async def test_an_upload_still_used_elsewhere_survives(auth_client, portfolio, d
 async def test_an_unattached_upload_is_left_alone(auth_client, portfolio, db_session):
     """The window between uploading and attaching must not collect it."""
     section = (
-        await auth_client.post(
-            f"/api/v1/portfolios/{portfolio['id']}/sections", json={}
-        )
+        await auth_client.post(f"/api/v1/portfolios/{portfolio['id']}/sections", json={})
     ).json()
     attached, loose = await upload(auth_client, (1, 1, 1)), await upload(auth_client, (2, 2, 2))
     path = f"/api/v1/portfolios/{portfolio['id']}/sections/{section['id']}"
@@ -106,9 +100,7 @@ async def test_an_unattached_upload_is_left_alone(auth_client, portfolio, db_ses
     assert loose in await rows(db_session)
 
 
-async def test_replacing_the_header_portrait_drops_the_old_one(
-    auth_client, portfolio, db_session
-):
+async def test_replacing_the_header_portrait_drops_the_old_one(auth_client, portfolio, db_session):
     first, second = await upload(auth_client, (3, 3, 3)), await upload(auth_client, (5, 5, 5))
     path = f"/api/v1/portfolios/{portfolio['id']}/header"
 

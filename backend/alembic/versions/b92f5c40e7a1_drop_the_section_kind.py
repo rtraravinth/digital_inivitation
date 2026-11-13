@@ -30,8 +30,14 @@ branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
 KINDS = (
-    "link", "venture", "contact", "booking", "testimonial", "gallery",
-    "numbers", "document",
+    "link",
+    "venture",
+    "contact",
+    "booking",
+    "testimonial",
+    "gallery",
+    "numbers",
+    "document",
 )
 
 

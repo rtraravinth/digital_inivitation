@@ -92,9 +92,8 @@ def _drop_database(maintenance_url: str, name: str) -> None:
 
 
 def _run_migrations() -> None:
-    from alembic.config import Config
-
     from alembic import command
+    from alembic.config import Config
 
     backend_dir = Path(__file__).resolve().parents[1]
     config = Config(str(backend_dir / "alembic.ini"))

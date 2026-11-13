@@ -99,13 +99,9 @@ async def register(
     "/login",
     response_model=AuthOut | TwoStepRequiredOut,
     summary="Sign in",
-    responses={
-        202: {"model": TwoStepRequiredOut, "description": "A second factor is required"}
-    },
+    responses={202: {"model": TwoStepRequiredOut, "description": "A second factor is required"}},
 )
-async def login(
-    payload: LoginRequest, response: Response, session: SessionDep, device: DeviceDep
-):
+async def login(payload: LoginRequest, response: Response, session: SessionDep, device: DeviceDep):
     service = AuthService(session)
     user, result = await service.login(payload.email, payload.password, device)
 
@@ -185,9 +181,7 @@ async def revoke_other_sessions(session: SessionDep, caller: CallerDep) -> dict[
     return {"revoked": revoked}
 
 
-@router.post(
-    "/password", status_code=status.HTTP_204_NO_CONTENT, summary="Change your password"
-)
+@router.post("/password", status_code=status.HTTP_204_NO_CONTENT, summary="Change your password")
 async def change_password(
     payload: ChangePasswordRequest, session: SessionDep, caller: CallerDep
 ) -> None:

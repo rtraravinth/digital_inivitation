@@ -113,9 +113,7 @@ async def _seed(email: str, mode: str) -> int:
 @app.command()
 def seed(
     email: str = typer.Option(..., help="The account to load the seed into"),
-    replace: bool = typer.Option(
-        False, "--replace", help="Delete that account's portfolios first"
-    ),
+    replace: bool = typer.Option(False, "--replace", help="Delete that account's portfolios first"),
 ) -> None:
     """Load the five seeded portfolios from src/lib/seed.ts."""
     count = _run(_seed(email, "replace" if replace else "merge"))

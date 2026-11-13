@@ -148,13 +148,19 @@ async def test_components_round_trip_in_order(auth_client, portfolio):
 async def test_every_component_type_is_accepted(auth_client, portfolio):
     blocks = [
         TIMELINE,
-        {"id": "c", "type": "testimonials",
-         "items": [{"id": "1", "quote": "Calm under pressure.", "name": "Asha", "role": "CEO"}]},
+        {
+            "id": "c",
+            "type": "testimonials",
+            "items": [{"id": "1", "quote": "Calm under pressure.", "name": "Asha", "role": "CEO"}],
+        },
         {"id": "d", "type": "clients", "items": [{"id": "1", "name": "Zerodha", "url": ""}]},
         {"id": "e", "type": "tabs", "items": [{"id": "1", "label": "Approach", "text": "Listen."}]},
         {"id": "f", "type": "stats", "items": [{"id": "1", "value": "40+", "label": "Clients"}]},
-        {"id": "g", "type": "services",
-         "items": [{"id": "1", "title": "Audit", "text": "Two weeks.", "price": "From ₹40,000"}]},
+        {
+            "id": "g",
+            "type": "services",
+            "items": [{"id": "1", "title": "Audit", "text": "Two weeks.", "price": "From ₹40,000"}],
+        },
         {"id": "h", "type": "faq", "items": [{"id": "1", "question": "Remote?", "answer": "Yes."}]},
         CONTACT,
         {"id": "i", "type": "gallery", "title": "", "layout": "grid", "imageIds": []},
@@ -167,7 +173,13 @@ async def test_every_component_type_is_accepted(auth_client, portfolio):
 async def test_a_gallery_names_the_sections_pictures(auth_client, portfolio):
     """The pictures stay the section's rows; the gallery holds their order."""
     cover, one, two = [await upload(auth_client, (n, n, n)) for n in (1, 2, 3)]
-    gallery = {"id": "g", "type": "gallery", "title": "On site", "layout": "strip", "imageIds": [two, one]}
+    gallery = {
+        "id": "g",
+        "type": "gallery",
+        "title": "On site",
+        "layout": "strip",
+        "imageIds": [two, one],
+    }
     response = await auth_client.patch(
         section_path(portfolio),
         json={"imageAssetIds": [cover, one, two], "blocks": [gallery]},
@@ -184,7 +196,11 @@ async def test_a_gallery_defaults_to_a_mosaic(auth_client, portfolio):
     )
     assert response.status_code == 200, response.text
     assert response.json()["blocks"][0] == {
-        "id": "g", "type": "gallery", "title": "", "layout": "mosaic", "imageIds": []
+        "id": "g",
+        "type": "gallery",
+        "title": "",
+        "layout": "mosaic",
+        "imageIds": [],
     }
 
 
@@ -324,7 +340,9 @@ async def test_export_and_import_carry_components_and_footer(auth_client, portfo
     # One malformed component must not sink the rest.
     exported[0]["sections"][0]["blocks"].append({"id": "z", "type": "nonsense"})
 
-    response = await auth_client.post("/api/v1/import", json={"mode": "replace", "portfolios": exported})
+    response = await auth_client.post(
+        "/api/v1/import", json={"mode": "replace", "portfolios": exported}
+    )
     assert response.status_code == 200, response.text
 
     imported = (await auth_client.get("/api/v1/portfolios?expand=sections")).json()[0]

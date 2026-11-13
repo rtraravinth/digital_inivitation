@@ -96,7 +96,9 @@ async def test_changing_the_password_works_and_the_old_one_stops(auth_client, cl
     assert response.status_code == 204
 
     email = registered["user"]["email"]
-    stale = await client.post("/api/v1/auth/login", json={"email": email, "password": TEST_PASSWORD})
+    stale = await client.post(
+        "/api/v1/auth/login", json={"email": email, "password": TEST_PASSWORD}
+    )
     assert stale.status_code == 401
 
     fresh = await client.post(

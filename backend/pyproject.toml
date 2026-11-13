@@ -49,6 +49,11 @@ target-version = "py312"
 select = ["E", "F", "I", "UP", "B", "C4", "SIM", "RUF"]
 ignore = ["B008"]
 
+[tool.ruff.lint.isort]
+# backend/alembic/ holds our migrations, which makes ruff guess the alembic
+# package is first-party and sort it in with app.*. It is a dependency.
+known-third-party = ["alembic"]
+
 [tool.ruff.lint.per-file-ignores]
 "tests/*" = ["E501"]
 "app/seed_data.py" = ["E501"]

@@ -24,9 +24,7 @@ if TYPE_CHECKING:
 
 class AuthSession(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     __tablename__ = "auth_sessions"
-    __table_args__ = (
-        Index("ix_auth_sessions_user_id_revoked_at", "user_id", "revoked_at"),
-    )
+    __table_args__ = (Index("ix_auth_sessions_user_id_revoked_at", "user_id", "revoked_at"),)
 
     user_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False

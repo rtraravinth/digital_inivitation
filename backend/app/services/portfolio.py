@@ -90,7 +90,7 @@ def header_out(header: PortfolioHeader, *, public: bool = False, links: bool = T
 
 
 def describe_meta(section_count: int, updated_at: datetime) -> str:
-    """"3 sections · 2 days ago" — computed, so it can never go stale."""
+    """ "3 sections · 2 days ago" — computed, so it can never go stale."""
     plural = "" if section_count == 1 else "s"
     return f"{section_count} section{plural} · {relative_time(updated_at)}"
 
@@ -198,9 +198,7 @@ class PortfolioService:
     async def slug_available(
         self, user_id: uuid.UUID, slug: str, *, exclude_id: uuid.UUID | None = None
     ) -> bool:
-        query = select(Portfolio.id).where(
-            Portfolio.user_id == user_id, Portfolio.slug == slug
-        )
+        query = select(Portfolio.id).where(Portfolio.user_id == user_id, Portfolio.slug == slug)
         if exclude_id is not None:
             query = query.where(Portfolio.id != exclude_id)
         return await self.session.scalar(query) is None
@@ -231,9 +229,7 @@ class PortfolioService:
             summary=payload.summary,
             layout=default_layout(),
         )
-        portfolio.header = PortfolioHeader(
-            tags=[], links=[], numbers=[], dates=[]
-        )
+        portfolio.header = PortfolioHeader(tags=[], links=[], numbers=[], dates=[])
         portfolio.sections = await self._starting_sections(user, payload, portfolio)
 
         self.session.add(portfolio)
@@ -248,8 +244,9 @@ class PortfolioService:
 
         if start.kind == "founder":
             return [
-                Section(position=index, title=title, description=description,
-                        tab=DEFAULT_TAB, links=[])
+                Section(
+                    position=index, title=title, description=description, tab=DEFAULT_TAB, links=[]
+                )
                 for index, (title, description) in enumerate(FOUNDER_TEMPLATE)
             ]
 
@@ -303,8 +300,15 @@ class PortfolioService:
             )
 
         for field in (
-            "name", "slug", "summary", "theme", "accent",
-            "ground", "ground_hex", "font", "body_font",
+            "name",
+            "slug",
+            "summary",
+            "theme",
+            "accent",
+            "ground",
+            "ground_hex",
+            "font",
+            "body_font",
         ):
             if field in changes:
                 setattr(portfolio, field, changes[field])

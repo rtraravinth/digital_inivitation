@@ -132,8 +132,16 @@ class ResumeListBlock(_Block):
     #: called before lists were drawn by the section styles; they are still
     #: accepted so a stored component keeps validating.
     look: Literal[
-        "theme", "grid", "timeline", "carousel", "tabs", "list", "spotlight", "chips",
-        "cards", "tags",
+        "theme",
+        "grid",
+        "timeline",
+        "carousel",
+        "tabs",
+        "list",
+        "spotlight",
+        "chips",
+        "cards",
+        "tags",
     ] = "theme"
 
 

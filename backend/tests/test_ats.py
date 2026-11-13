@@ -47,7 +47,9 @@ def test_the_title_years_and_skills_are_read_from_the_description():
 def test_a_title_joined_by_small_words_is_read_whole():
     jd = "About us\nWe are looking for a Head of Operations to scale our kitchens."
     assert job_title(jd) == "Head of Operations"
-    assert job_title("Role: Director of Data and Analytics\n...") == "Director of Data and Analytics"
+    assert (
+        job_title("Role: Director of Data and Analytics\n...") == "Director of Data and Analytics"
+    )
 
 
 def test_a_skill_is_found_under_another_spelling():

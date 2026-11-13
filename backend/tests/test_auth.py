@@ -212,7 +212,7 @@ async def test_register_without_a_handle_is_422(client):
 
 
 async def test_a_handle_is_lowercased_not_rejected(client):
-    """"Aravinth" is a typo, not a format error — addresses are lowercase."""
+    """ "Aravinth" is a typo, not a format error — addresses are lowercase."""
     response = await client.post(
         "/api/v1/auth/register",
         json={
@@ -273,9 +273,7 @@ async def test_a_rejected_handle_leaves_no_account_behind(client, registered, db
             "handle": "rohan",
         },
     )
-    assert await db_session.scalar(
-        select(User).where(User.email == "leftover@example.com")
-    ) is None
+    assert await db_session.scalar(select(User).where(User.email == "leftover@example.com")) is None
 
 
 async def test_a_bad_handle_shape_is_422(client):

@@ -94,9 +94,7 @@ async def test_export_then_import_replace_roundtrips(auth_client):
 
 
 async def test_import_replace_removes_what_was_there(auth_client, portfolio):
-    response = await auth_client.post(
-        "/api/v1/import", json={"mode": "replace", "portfolios": []}
-    )
+    response = await auth_client.post("/api/v1/import", json={"mode": "replace", "portfolios": []})
     assert response.json()["imported"] == 0
     assert (await auth_client.get("/api/v1/portfolios")).json() == []
 
@@ -130,8 +128,7 @@ async def test_a_legacy_export_with_a_data_uri_becomes_a_real_asset(auth_client)
     assert response.status_code == 200
 
     imported = next(
-        p for p in (await auth_client.get("/api/v1/portfolios")).json()
-        if p["slug"] == "legacy-x"
+        p for p in (await auth_client.get("/api/v1/portfolios")).json() if p["slug"] == "legacy-x"
     )
     full = (await auth_client.get(f"/api/v1/portfolios/{imported['id']}")).json()
 
@@ -147,12 +144,9 @@ async def test_a_legacy_export_with_a_data_uri_becomes_a_real_asset(auth_client)
 
 
 async def test_a_legacy_export_keeps_its_content(auth_client):
-    await auth_client.post(
-        "/api/v1/import", json={"mode": "merge", "portfolios": legacy_export()}
-    )
+    await auth_client.post("/api/v1/import", json={"mode": "merge", "portfolios": legacy_export()})
     imported = next(
-        p for p in (await auth_client.get("/api/v1/portfolios")).json()
-        if p["slug"] == "legacy-x"
+        p for p in (await auth_client.get("/api/v1/portfolios")).json() if p["slug"] == "legacy-x"
     )
     full = (await auth_client.get(f"/api/v1/portfolios/{imported['id']}")).json()
 
@@ -177,7 +171,8 @@ async def test_a_legacy_exports_section_numbers_move_up_to_the_header(auth_clien
 
     await auth_client.post("/api/v1/import", json={"mode": "merge", "portfolios": payload})
     imported = next(
-        p for p in (await auth_client.get("/api/v1/portfolios")).json()
+        p
+        for p in (await auth_client.get("/api/v1/portfolios")).json()
         if p["slug"] == "legacy-extras"
     )
     full = (await auth_client.get(f"/api/v1/portfolios/{imported['id']}")).json()
@@ -206,7 +201,8 @@ async def test_a_legacy_export_with_no_tags_lands_on_the_default_tab(auth_client
 
     await auth_client.post("/api/v1/import", json={"mode": "merge", "portfolios": payload})
     imported = next(
-        p for p in (await auth_client.get("/api/v1/portfolios")).json()
+        p
+        for p in (await auth_client.get("/api/v1/portfolios")).json()
         if p["slug"] == "legacy-untagged"
     )
     full = (await auth_client.get(f"/api/v1/portfolios/{imported['id']}")).json()
@@ -222,7 +218,8 @@ async def test_an_unknown_theme_in_an_import_falls_back(auth_client):
     await auth_client.post("/api/v1/import", json={"mode": "merge", "portfolios": payload})
 
     imported = next(
-        p for p in (await auth_client.get("/api/v1/portfolios")).json()
+        p
+        for p in (await auth_client.get("/api/v1/portfolios")).json()
         if p["slug"] == "dropped-theme"
     )
     assert imported["theme"] == "aurora"
@@ -247,21 +244,18 @@ async def test_a_retired_theme_in_an_import_lands_on_its_successor(auth_client, 
     await auth_client.post("/api/v1/import", json={"mode": "merge", "portfolios": payload})
 
     imported = next(
-        p for p in (await auth_client.get("/api/v1/portfolios")).json()
+        p
+        for p in (await auth_client.get("/api/v1/portfolios")).json()
         if p["slug"] == f"retired-{old}"
     )
     assert imported["theme"] == new
 
 
 async def test_a_custom_ground_survives_an_export_and_import(auth_client, portfolio):
-    await auth_client.patch(
-        f"/api/v1/portfolios/{portfolio['id']}", json={"groundHex": "#2b3a67"}
-    )
+    await auth_client.patch(f"/api/v1/portfolios/{portfolio['id']}", json={"groundHex": "#2b3a67"})
     exported = (await auth_client.get("/api/v1/export")).json()
 
-    await auth_client.post(
-        "/api/v1/import", json={"mode": "replace", "portfolios": exported}
-    )
+    await auth_client.post("/api/v1/import", json={"mode": "replace", "portfolios": exported})
 
     restored = (await auth_client.get("/api/v1/portfolios")).json()[0]
     assert restored["groundHex"] == "#2b3a67"
@@ -273,9 +267,7 @@ async def test_both_faces_survive_an_export_and_import(auth_client, portfolio):
         json={"font": "syne", "bodyFont": "lora"},
     )
     exported = (await auth_client.get("/api/v1/export")).json()
-    await auth_client.post(
-        "/api/v1/import", json={"mode": "replace", "portfolios": exported}
-    )
+    await auth_client.post("/api/v1/import", json={"mode": "replace", "portfolios": exported})
 
     restored = (await auth_client.get("/api/v1/portfolios")).json()[0]
     assert restored["font"] == "syne"
@@ -291,7 +283,8 @@ async def test_a_legacy_export_with_no_body_font_lands_on_archivo(auth_client):
     await auth_client.post("/api/v1/import", json={"mode": "merge", "portfolios": payload})
 
     imported = next(
-        p for p in (await auth_client.get("/api/v1/portfolios")).json()
+        p
+        for p in (await auth_client.get("/api/v1/portfolios")).json()
         if p["slug"] == "no-body-font"
     )
     assert imported["bodyFont"] == "archivo"
@@ -306,7 +299,8 @@ async def test_a_junk_ground_colour_in_an_import_falls_back(auth_client):
     await auth_client.post("/api/v1/import", json={"mode": "merge", "portfolios": payload})
 
     imported = next(
-        p for p in (await auth_client.get("/api/v1/portfolios")).json()
+        p
+        for p in (await auth_client.get("/api/v1/portfolios")).json()
         if p["slug"] == "junk-ground"
     )
     assert imported["groundHex"] == ""
@@ -322,8 +316,7 @@ async def test_a_corrupt_data_uri_does_not_fail_the_import(auth_client):
     assert response.status_code == 200
 
     imported = next(
-        p for p in (await auth_client.get("/api/v1/portfolios")).json()
-        if p["slug"] == "legacy-x"
+        p for p in (await auth_client.get("/api/v1/portfolios")).json() if p["slug"] == "legacy-x"
     )
     full = (await auth_client.get(f"/api/v1/portfolios/{imported['id']}")).json()
     # The section survives; only the attachment is dropped.

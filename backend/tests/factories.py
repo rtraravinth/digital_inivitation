@@ -74,9 +74,7 @@ async def other_auth_client(app) -> AsyncIterator[AsyncClient]:
         base_url="http://test",
         headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0) Firefox/133.0"},
     ) as other:
-        payload = await register(
-            other, "priya@example.com", name="Priya Nair", handle=OTHER_HANDLE
-        )
+        payload = await register(other, "priya@example.com", name="Priya Nair", handle=OTHER_HANDLE)
         bearer(other, payload["token"]["accessToken"])
         yield other
 
@@ -103,9 +101,7 @@ async def three_sections(auth_client: AsyncClient, portfolio: dict) -> tuple[str
     """A portfolio with exactly three sections, in a known order."""
     ids = [portfolio["sections"][0]["id"]]
     for _ in range(2):
-        response = await auth_client.post(
-            f"/api/v1/portfolios/{portfolio['id']}/sections", json={}
-        )
+        response = await auth_client.post(f"/api/v1/portfolios/{portfolio['id']}/sections", json={})
         assert response.status_code == 201, response.text
         ids.append(response.json()["id"])
     return portfolio["id"], ids

@@ -43,7 +43,9 @@ async def test_field_messages_are_written_for_a_person(client):
     @-sign." is a developer's sentence; the envelope promises a person's.
     """
     response = await client.post("/api/v1/auth/register", json={"email": "not-an-email"})
-    messages = {item["field"]: item["message"] for item in response.json()["error"]["details"]["fields"]}
+    messages = {
+        item["field"]: item["message"] for item in response.json()["error"]["details"]["fields"]
+    }
 
     assert messages["email"] == "Enter an email address in the form name@example.com."
     assert messages["password"] == "This is required."
@@ -64,7 +66,8 @@ async def test_an_unknown_field_says_so_plainly(auth_client, portfolio):
 async def test_a_validator_keeps_its_own_wording(auth_client):
     """Messages written in app/schemas are already for a person — keep them."""
     response = await auth_client.post(
-        "/api/v1/portfolios", json={"name": "X", "slug": "Not A Slug!", "startFrom": {"kind": "blank"}}
+        "/api/v1/portfolios",
+        json={"name": "X", "slug": "Not A Slug!", "startFrom": {"kind": "blank"}},
     )
     assert response.status_code == 422
     message = response.json()["error"]["details"]["fields"][0]["message"]

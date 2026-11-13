@@ -22,14 +22,28 @@ FULL_RESUME = {
         }
     ],
     "education": [
-        {"id": "d1", "degree": "B.Com", "school": "Christ University", "start": "2010", "end": "2013"}
+        {
+            "id": "d1",
+            "degree": "B.Com",
+            "school": "Christ University",
+            "start": "2010",
+            "end": "2013",
+        }
     ],
     "skills": [{"id": "s1", "name": "Operations", "items": ["P&L", "Hiring"]}],
     "certifications": [{"id": "c1", "name": "SEBI RIA", "issuer": "SEBI", "date": "2021"}],
     "languages": [{"id": "l1", "name": "Hindi", "level": "Native"}],
     "awards": [],
-    "order": ["experience", "summary", "education", "projects", "skills",
-              "certifications", "languages", "awards"],
+    "order": [
+        "experience",
+        "summary",
+        "education",
+        "projects",
+        "skills",
+        "certifications",
+        "languages",
+        "awards",
+    ],
     "hidden": ["awards"],
     "style": {
         "template": "sidebar",
@@ -55,7 +69,9 @@ async def test_a_new_portfolio_has_the_default_resume(auth_client, portfolio):
 
 
 async def test_put_replaces_the_resume_and_reads_back(auth_client, portfolio):
-    response = await auth_client.put(f"/api/v1/portfolios/{portfolio['id']}/resume", json=FULL_RESUME)
+    response = await auth_client.put(
+        f"/api/v1/portfolios/{portfolio['id']}/resume", json=FULL_RESUME
+    )
     assert response.status_code == 200
 
     resume = (await auth_client.get(f"/api/v1/portfolios/{portfolio['id']}")).json()["resume"]
@@ -121,7 +137,12 @@ async def test_a_resume_list_is_a_component(auth_client, portfolio):
     )
     assert response.status_code == 200, response.text
     blocks = response.json()["blocks"]
-    assert blocks[0] == {"id": "c-experience", "type": "experience", "title": "", "look": "timeline"}
+    assert blocks[0] == {
+        "id": "c-experience",
+        "type": "experience",
+        "title": "",
+        "look": "timeline",
+    }
     # The look has a default, and the component carries no entries of its own.
     assert blocks[1] == {"id": "s", "type": "skills", "title": "", "look": "theme"}
 
@@ -185,12 +206,17 @@ async def test_a_stored_page_blocks_key_does_not_break_a_read(auth_client, portf
     assert "pageBlocks" not in resume
 
 
-async def test_old_headline_and_summary_keys_do_not_break_a_read(auth_client, portfolio, db_session):
+async def test_old_headline_and_summary_keys_do_not_break_a_read(
+    auth_client, portfolio, db_session
+):
     from sqlalchemy import text
 
     await db_session.execute(
         text("UPDATE portfolios SET resume = CAST(:r AS jsonb) WHERE id = :id"),
-        {"r": '{"headline": "Old", "summary": "Old", "email": "kept@example.com"}', "id": portfolio["id"]},
+        {
+            "r": '{"headline": "Old", "summary": "Old", "email": "kept@example.com"}',
+            "id": portfolio["id"],
+        },
     )
     resume = (await auth_client.get(f"/api/v1/portfolios/{portfolio['id']}")).json()["resume"]
     assert resume["email"] == "kept@example.com"
@@ -233,7 +259,11 @@ async def test_a_copy_takes_the_resume_along(auth_client, portfolio):
     copy = (
         await auth_client.post(
             "/api/v1/portfolios",
-            json={"name": "Copy", "slug": "copy-resume", "startFrom": {"kind": "copy", "id": portfolio["id"]}},
+            json={
+                "name": "Copy",
+                "slug": "copy-resume",
+                "startFrom": {"kind": "copy", "id": portfolio["id"]},
+            },
         )
     ).json()
     assert copy["resume"]["experience"][0]["role"] == "Founder & CEO"
@@ -246,7 +276,9 @@ async def test_export_and_import_carry_the_resume(auth_client, portfolio):
     exported = (await auth_client.get("/api/v1/export")).json()
     assert exported[0]["resume"]["email"] == "rohan@example.com"
 
-    imported = await auth_client.post("/api/v1/import", json={"mode": "replace", "portfolios": exported})
+    imported = await auth_client.post(
+        "/api/v1/import", json={"mode": "replace", "portfolios": exported}
+    )
     assert imported.status_code in (200, 201)
     rows = (await auth_client.get("/api/v1/portfolios?expand=sections")).json()
     assert rows[0]["resume"]["languages"][0]["name"] == "Hindi"
@@ -256,7 +288,9 @@ async def test_an_import_with_a_broken_resume_lands_on_the_defaults(auth_client,
     exported = (await auth_client.get("/api/v1/export")).json()
     exported[0]["resume"] = {"style": {"template": "retired-template"}}
 
-    imported = await auth_client.post("/api/v1/import", json={"mode": "replace", "portfolios": exported})
+    imported = await auth_client.post(
+        "/api/v1/import", json={"mode": "replace", "portfolios": exported}
+    )
     assert imported.status_code in (200, 201)
     rows = (await auth_client.get("/api/v1/portfolios?expand=sections")).json()
     assert rows[0]["resume"]["style"]["template"] == "classic"
@@ -272,7 +306,9 @@ def test_the_template_list_matches_the_frontend():
     from app.schemas.resume import ResumeTemplate
 
     types_ts = Path(__file__).resolve().parents[2] / "src" / "lib" / "types.ts"
-    block = re.search(r"RESUME_TEMPLATE_IDS = \[(.*?)\] as const", types_ts.read_text(encoding="utf-8"), re.S)
+    block = re.search(
+        r"RESUME_TEMPLATE_IDS = \[(.*?)\] as const", types_ts.read_text(encoding="utf-8"), re.S
+    )
     assert block, "RESUME_TEMPLATE_IDS not found in src/lib/types.ts"
     assert re.findall(r'"([a-z-]+)"', block.group(1)) == list(get_args(ResumeTemplate))
 
@@ -292,7 +328,10 @@ async def test_every_template_saves(auth_client, portfolio):
 
 async def test_columns_and_background_save_and_unknown_ones_are_refused(auth_client, portfolio):
     url = f"/api/v1/portfolios/{portfolio['id']}/resume"
-    body = {**FULL_RESUME, "style": {**FULL_RESUME["style"], "columns": "half", "backdrop": "hexagons"}}
+    body = {
+        **FULL_RESUME,
+        "style": {**FULL_RESUME["style"], "columns": "half", "backdrop": "hexagons"},
+    }
     res = await auth_client.put(url, json=body)
     assert res.status_code == 200
     assert res.json()["resume"]["style"]["columns"] == "half"
@@ -300,12 +339,21 @@ async def test_columns_and_background_save_and_unknown_ones_are_refused(auth_cli
 
     # The pattern's own colour, and back to following the accent.
     for colour in ("#94a3b8", ""):
-        res = await auth_client.put(url, json={**body, "style": {**body["style"], "backdropColor": colour}})
+        res = await auth_client.put(
+            url, json={**body, "style": {**body["style"], "backdropColor": colour}}
+        )
         assert res.status_code == 200
         assert res.json()["resume"]["style"]["backdropColor"] == colour
 
-    for bad in ({"columns": "three"}, {"backdrop": "glitter"}, {"backdropColor": "grey"}, {"backdropColor": "#abc"}):
-        res = await auth_client.put(url, json={**FULL_RESUME, "style": {**FULL_RESUME["style"], **bad}})
+    for bad in (
+        {"columns": "three"},
+        {"backdrop": "glitter"},
+        {"backdropColor": "grey"},
+        {"backdropColor": "#abc"},
+    ):
+        res = await auth_client.put(
+            url, json={**FULL_RESUME, "style": {**FULL_RESUME["style"], **bad}}
+        )
         assert res.status_code == 422
 
 
@@ -317,6 +365,8 @@ def test_the_background_list_matches_the_frontend():
     from app.schemas.resume import ResumeBackdrop
 
     types_ts = Path(__file__).resolve().parents[2] / "src" / "lib" / "types.ts"
-    block = re.search(r"RESUME_BACKDROP_IDS = \[(.*?)\] as const", types_ts.read_text(encoding="utf-8"), re.S)
+    block = re.search(
+        r"RESUME_BACKDROP_IDS = \[(.*?)\] as const", types_ts.read_text(encoding="utf-8"), re.S
+    )
     assert block
     assert re.findall(r'"([a-z-]+)"', block.group(1)) == list(get_args(ResumeBackdrop))

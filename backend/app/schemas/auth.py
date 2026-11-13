@@ -41,7 +41,7 @@ class FirebaseSignInRequest(CamelModel):
 
 class TokenOut(CamelModel):
     access_token: str
-    token_type: Literal["bearer"] = "bearer"
+    token_type: Literal["bearer"] = "bearer"  # noqa: S105 - a scheme name, not a secret
     expires_in: int
 
 

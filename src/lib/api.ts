@@ -47,10 +47,6 @@ export function setAccessToken(token: string | null) {
   accessToken = token;
 }
 
-export function getAccessToken(): string | null {
-  return accessToken;
-}
-
 let onSignedOut: (() => void) | null = null;
 
 /** Called when a refresh fails, so the session store can clear itself. */
@@ -187,11 +183,3 @@ export function messageFor(error: unknown): string {
   return "Something went wrong.";
 }
 
-/**
- * Asset URLs come back relative, so they work behind whatever host serves
- * the API. The browser needs them absolute.
- */
-export function assetUrl(url: string | null | undefined): string | undefined {
-  if (!url) return undefined;
-  return url.startsWith("http") ? url : `${API_BASE}${url}`;
-}

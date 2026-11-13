@@ -1,7 +1,7 @@
 "use client";
 
 import { useSyncExternalStore } from "react";
-import { ApiError, api, onUnauthenticated, refreshSession, setAccessToken } from "./api";
+import { api, onUnauthenticated, refreshSession, setAccessToken } from "./api";
 
 /* ══════════════════════════════════════════════════════════════════════════
    Who is signed in.
@@ -13,7 +13,7 @@ import { ApiError, api, onUnauthenticated, refreshSession, setAccessToken } from
    and subscribe-time is the correct moment anyway.
    ══════════════════════════════════════════════════════════════════════ */
 
-export type SessionUser = {
+type SessionUser = {
   id: string;
   /** Null for an account made with a phone number. */
   email: string | null;
@@ -21,7 +21,7 @@ export type SessionUser = {
   handle: string | null;
 };
 
-export type SessionStatus = "loading" | "in" | "out";
+type SessionStatus = "loading" | "in" | "out";
 
 type AuthResponse = {
   user: SessionUser;
@@ -121,16 +121,6 @@ export async function signOut() {
   }
   setAccessToken(null);
   emit({ user: null, status: "out" });
-}
-
-/** After a profile edit, so the nav shows the new name without a reload. */
-export function updateSessionUser(patch: Partial<SessionUser>) {
-  if (!state.user) return;
-  emit({ ...state, user: { ...state.user, ...patch } });
-}
-
-export function isApiError(error: unknown): error is ApiError {
-  return error instanceof ApiError;
 }
 
 export function useSession() {

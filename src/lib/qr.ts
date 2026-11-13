@@ -40,7 +40,7 @@ function gfMul(a: number, b: number): number {
 }
 
 /** Coefficients of (x−α⁰)(x−α¹)… , highest power first, leading coeff 1. */
-export function rsGenerator(degree: number): number[] {
+function rsGenerator(degree: number): number[] {
   let result = [1];
   let root = 1;
   for (let i = 0; i < degree; i++) {
@@ -56,7 +56,7 @@ export function rsGenerator(degree: number): number[] {
 }
 
 /** The `degree` error-correction codewords for one block of data. */
-export function rsRemainder(data: Uint8Array | number[], degree: number): number[] {
+function rsRemainder(data: Uint8Array | number[], degree: number): number[] {
   const gen = rsGenerator(degree);
   const result = new Array<number>(degree).fill(0);
   for (const byte of data) {

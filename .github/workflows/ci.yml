@@ -1,0 +1,247 @@
+# Every check a pull request must pass before it merges into main.
+# Container builds and deploys are not here; they get their own workflow.
+#
+# Third-party actions are pinned to a commit, with the tag in a comment.
+# Dependabot (.github/dependabot.yml) proposes updates to the pins.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  NODE_VERSION: "22"
+  # The production image's Python (Dockerfile) and Postgres major version.
+  PYTHON_VERSION: "3.13"
+
+jobs:
+  frontend:
+    name: Frontend (lint, types, unused code, audit, build)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - name: Install from the lockfile
+        run: npm ci
+      - name: Generate route types (PageProps, LayoutProps)
+        # A fresh checkout has no .next; the type-aware lint and tsc need them.
+        run: npx next typegen
+      - name: ESLint (Next, React Compiler, type-aware promises, a11y)
+        run: npm run lint
+      - name: TypeScript
+        run: npm run typecheck
+      - name: Unused files and dependencies (knip)
+        run: npm run knip
+      - name: Dependency audit
+        run: npm audit --audit-level=high
+      - name: Build
+        run: npm run build
+        env:
+          # Build-time values. Placeholders are enough to compile; nothing
+          # is deployed from this job.
+          NEXT_PUBLIC_API_URL: ""
+          NEXT_PUBLIC_FIREBASE_API_KEY: ci-placeholder
+          NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: ci-placeholder.firebaseapp.com
+          NEXT_PUBLIC_FIREBASE_PROJECT_ID: ci-placeholder
+          NEXT_PUBLIC_FIREBASE_APP_ID: ci-placeholder
+          NEXT_TELEMETRY_DISABLED: "1"
+
+  backend-lint:
+    name: Backend (ruff, types, audit)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: backend/pyproject.toml
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+      - name: Ruff lint (incl. Bandit security rules)
+        run: ruff check --output-format=github .
+      - name: Ruff format
+        run: ruff format --check .
+      - name: Dependency audit (pip-audit)
+        run: pip-audit --skip-editable
+      - name: Types (mypy, advisory until clean)
+        continue-on-error: true
+        run: mypy
+
+  backend-test:
+    name: Backend tests (PostgreSQL 16)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: backend/pyproject.toml
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+      - name: pytest with coverage
+        # The harness creates and drops facet_test on this server itself.
+        env:
+          FACET_TEST_DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/facet_test
+        run: pytest -q --cov --cov-report=term --cov-report=xml
+      - name: Keep the coverage report
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: coverage
+          path: backend/coverage.xml
+          if-no-files-found: ignore
+
+  migrations:
+    name: Migrations (one head, no drift, reversible)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: facet_ci
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      FACET_DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/facet_ci
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          # squawk compares against the base branch to find new migrations.
+          fetch-depth: 0
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: backend/pyproject.toml
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+      - name: Exactly one head
+        # Two branches that each add a migration merge into a split history.
+        run: |
+          heads="$(alembic heads | wc -l)"
+          alembic heads
+          if [ "$heads" -ne 1 ]; then
+            echo "::error::Alembic has $heads heads. Add a merge migration."
+            exit 1
+          fi
+      - name: Upgrade an empty database to head
+        run: alembic upgrade head
+      - name: Models match the migrations
+        run: alembic check
+      - name: Downgrade to base and back up again
+        run: |
+          alembic downgrade base
+          alembic upgrade head
+      - name: Lint new migrations' SQL (squawk, advisory)
+        if: github.event_name == 'pull_request'
+        continue-on-error: true
+        env:
+          BASE_REF: origin/${{ github.base_ref }}
+        run: scripts/squawk_new_migrations.sh "$BASE_REF"
+
+  seed-sync:
+    name: Seed JSON matches src/lib/seed.ts
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci
+      - name: Regenerate and compare
+        run: |
+          node backend/scripts/dump_seed.mjs
+          if ! git diff --exit-code -- backend/app/seed_data.json; then
+            echo "::error file=backend/app/seed_data.json::Stale. Run: node backend/scripts/dump_seed.mjs"
+            exit 1
+          fi
+
+  workflows:
+    name: Workflows and shell scripts (actionlint, zizmor, shellcheck)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - name: Install
+        run: pip install actionlint-py==1.7.12.25 zizmor==1.32.0
+      - name: actionlint (also shellchecks every run block)
+        run: actionlint
+      - name: zizmor (Actions security)
+        run: zizmor --format=github .github/workflows
+      - name: shellcheck
+        run: shellcheck scripts/start.sh backend/scripts/*.sh
+
+  secrets:
+    name: Secret scan (gitleaks)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          # The whole history: a secret removed in a later commit is still leaked.
+          fetch-depth: 0
+      - uses: gitleaks/gitleaks-action@e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1e # v3.0.0
+        env:
+          # Reads the PR's commits. A personal account needs no licence.
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

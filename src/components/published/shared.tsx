@@ -21,7 +21,6 @@ import {
   assetSrc,
   coverOf,
   tabOf,
-  pageAddress,
   pagePath,
   previewPath,
 } from "@/lib/types";
@@ -45,7 +44,7 @@ export function UiIcon({ id, size = 17 }: { id: GlyphId; size?: number }) {
  * plate was not available, which is what this is: diagonal hairlines, not a
  * grey box and not an icon.
  */
-export const HATCH =
+const HATCH =
   "repeating-linear-gradient(45deg, color-mix(in srgb, var(--color-ink) 10%, transparent) 0 1px, transparent 1px 9px)";
 
 /**
@@ -137,7 +136,7 @@ const INK_LIGHT: Rgb = [0xf3, 0xf2, 0xf2];
  * #2d2b2a, one point off its hand-tuned #2d2b2b. The presets keep their own
  * maps regardless — this runs only for a picked colour.
  */
-export function derivedGround(hex: string): Record<string, string> {
+function derivedGround(hex: string): Record<string, string> {
   const bg = parseHex(hex);
   // Whichever ink reads better against this paper, rather than a luminance
   // threshold. A threshold has to be guessed and gets mid-tones wrong: at
@@ -181,7 +180,7 @@ const FOIL: Rgb = [0xd9, 0xc3, 0x7a];
  * Mixing toward pure white or pure black rather than toward the ink keeps the
  * hue: mixing an orange into a navy ink turns it brown halfway there.
  */
-export function readableOn(colour: Rgb | string, bg: Rgb | string, min: number): string {
+function readableOn(colour: Rgb | string, bg: Rgb | string, min: number): string {
   const c = typeof colour === "string" ? parseHex(colour) : colour;
   const ground = typeof bg === "string" ? parseHex(bg) : bg;
   const lb = luminance(ground);
@@ -355,86 +354,6 @@ export function allDates(p: Portfolio) {
     .sort((a, b) => a.year.localeCompare(b.year));
 }
 
-/**
- * The numbers row — the catalogue's table of measurements.
- *
- * `big` sets the figures at display size. `onAccent` paints the whole row on
- * the accent field, where every colour is drawn from `--color-accent-ink`
- * rather than a hardcoded white, so a pale accent gets dark figures on it
- * instead of white ones nobody can read.
- */
-export function StatRow({
-  p,
-  big,
-  onAccent,
-}: {
-  p: Portfolio;
-  big?: boolean;
-  onAccent?: boolean;
-}) {
-  const nums = allNumbers(p);
-  if (nums.length === 0) return null;
-  const shown = nums.slice(0, 8);
-  const background = onAccent ? "var(--color-accent)" : "var(--color-bg)";
-  // A hairline between columns, and nothing around the outside. The row used
-  // to close every cell on all four sides, which turned five figures into a
-  // spreadsheet and left the last row of a partly-filled grid ruled into
-  // empty boxes.
-  const rule = onAccent
-    ? "1px solid color-mix(in srgb, var(--color-accent-ink) 34%, transparent)"
-    : "1px solid var(--color-divider)";
-  return (
-    <div
-      className="grid grid-cols-2 px-6 md:grid-cols-4 md:px-10"
-      style={{
-        background,
-        borderTop: onAccent ? "none" : "1px solid var(--color-divider)",
-      }}
-    >
-      {shown.map((n, i) => (
-        <div
-          key={n.id}
-          className="flex flex-col gap-2 py-10"
-          style={{
-            background,
-            // No rule on the first cell of a row, so the row opens flush left
-            // against the page's own margin like every other block.
-            paddingLeft: i % 2 === 0 ? 0 : 20,
-            paddingRight: 20,
-            borderLeft: i % 2 === 0 ? "none" : rule,
-          }}
-        >
-          {/* A measurement in a catalogue is set in the display face at its
-              lining figures, on the ink rather than in colour: the number is
-              the fact, and colour here would make eight of them compete with
-              the one mark the page actually spends on the open plate. */}
-          <div
-            className="font-heading figure"
-            style={{
-              ...headline(big ? "64px" : "52px"),
-              lineHeight: 0.9,
-              letterSpacing: "-0.02em",
-              color: onAccent ? "var(--color-accent-ink)" : "var(--color-ink)",
-            }}
-          >
-            {n.value}
-          </div>
-          <div
-            className="mono-label"
-            style={{
-              color: onAccent
-                ? "color-mix(in srgb, var(--color-accent-ink) 78%, transparent)"
-                : undefined,
-            }}
-          >
-            {n.label}
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-}
-
 /* ── the plate ────────────────────────────────────────────────────────────
    The catalogue's one structural object: a reproduction mounted on board,
    trimmed with a keyline, with its caption set outside it on the board.
@@ -454,7 +373,7 @@ export function StatRow({
  * transform and exposes its angles only through its own glare element, which
  * paints a white diagonal bar rather than this world's soft band.
  */
-export function useTiltPlate() {
+function useTiltPlate() {
   const reduced = useReducedMotion();
 
   const onPointerMove = useCallback(
@@ -492,38 +411,6 @@ export function useTiltPlate() {
 }
 
 /**
- * A mounted reproduction. `tilt` is for a plate large enough to be worth
- * catching light — a thumbnail in a list is not.
- */
-export function Plate({
-  children,
-  className = "",
-  tilt,
-  style,
-}: {
-  children: React.ReactNode;
-  className?: string;
-  tilt?: boolean;
-  style?: CSSProperties;
-}) {
-  const t = useTiltPlate();
-  return (
-    <div
-      className={`plate plate-keyline ${tilt ? "plate-sheen" : ""} ${className}`}
-      onPointerMove={tilt ? t.onPointerMove : undefined}
-      onPointerLeave={tilt ? t.onPointerLeave : undefined}
-      style={{
-        transition: "transform 420ms var(--ease-out)",
-        willChange: tilt ? "transform" : undefined,
-        ...style,
-      }}
-    >
-      {children}
-    </div>
-  );
-}
-
-/**
  * The two fields under every plate: what it is, and who is credited for it.
  *
  * Both are read off the section the author actually filled in — the medium
@@ -542,122 +429,6 @@ export function captionCredit(section: Section): [string, string] {
   // There was a third, first: the tab the section filed under. A section is
   // filed under nothing but its own title now, which the plate already shows.
   return [medium, section.quote?.attribution?.trim() || "—"];
-}
-
-/** The caption block: plate number, title, credit line, then the description. */
-export function PlateCaption({
-  p,
-  section,
-  index,
-  titleOnPlate,
-  children,
-}: {
-  p: Portfolio;
-  section: Section;
-  /** 1-based plate number, as the plate list prints it. */
-  index: number;
-  /**
-   * The mount above already sets this work's title, because it had no
-   * reproduction to carry. The caption then prints the number and the credit
-   * and leaves the title alone — a catalogue does not set the same title
-   * twice, forty pixels apart.
-   */
-  titleOnPlate?: boolean;
-  children?: React.ReactNode;
-}) {
-  const [medium, credit] = captionCredit(section);
-  return (
-    <figcaption className="caption flex flex-col gap-2">
-      <div className="flex items-baseline gap-3">
-        <span className="plate-no text-[13px]" style={{ color: "var(--color-mark)" }}>
-          {String(index).padStart(2, "0")}
-        </span>
-        {titleOnPlate ? (
-          <SectionTitleLink
-            p={p}
-            section={section}
-            className="caption-credit"
-          />
-        ) : (
-          <SectionTitleLink
-            p={p}
-            section={section}
-            className="font-heading text-[21px] leading-[1.15]"
-          />
-        )}
-      </div>
-      <div className="caption-credit">
-        {medium} · {credit}
-      </div>
-      {section.description && (
-        <p className="whitespace-pre-line m-0 text-[14px] leading-[1.55] text-muted">{section.description}</p>
-      )}
-      {children}
-    </figcaption>
-  );
-}
-
-/**
- * The plate turn — the page's one authored moment.
- *
- * **Changing tab never swaps a page.** This container persists across every
- * tab change and only animates its own box as the run inside it changes
- * height; the turning happens on the plates themselves, in `PlateLeaf`, and
- * a plate that appears in both rooms travels between them on its shared
- * `layoutId` rather than leaving and arriving as two different objects.
- *
- * The first version keyed an `AnimatePresence` on the tab, which unmounted
- * the whole stack and mounted a new one. It looked like a turn and was a
- * swap — exactly what the contract's first sentence refuses.
- */
-export function PlateTurn({
-  children,
-  className,
-}: {
-  children: React.ReactNode;
-  className?: string;
-}) {
-  return (
-    <motion.div
-      layout
-      className={className}
-      transition={{ duration: 0.52, ease: [0.33, 0, 0.1, 1] }}
-    >
-      {children}
-    </motion.div>
-  );
-}
-
-/**
- * One plate turning in or out of the open room.
- *
- * Rendered inside an `AnimatePresence` so a plate that leaves turns away
- * while the one arriving turns in. `layout` keeps its box animating to its
- * new position rather than jumping there, and `mode="popLayout"` at the
- * caller takes a leaving plate out of flow so the arrivals do not wait for
- * the exit before they settle.
- */
-export function PlateLeaf({
-  children,
-  className,
-}: {
-  children: React.ReactNode;
-  className?: string;
-}) {
-  const reduced = useReducedMotion();
-  return (
-    <motion.figure
-      layout
-      className={className}
-      initial={reduced ? { opacity: 0 } : { opacity: 0, rotateX: -7, y: 24, filter: "blur(7px)" }}
-      animate={reduced ? { opacity: 1 } : { opacity: 1, rotateX: 0, y: 0, filter: "blur(0px)" }}
-      exit={reduced ? { opacity: 0 } : { opacity: 0, rotateX: 5, y: -16, filter: "blur(7px)" }}
-      transition={reduced ? { duration: 0.12 } : { duration: 0.52, ease: [0.33, 0, 0.1, 1] }}
-      style={{ transformPerspective: 1400, transformOrigin: "50% 0%" }}
-    >
-      {children}
-    </motion.figure>
-  );
 }
 
 /* ── layout ───────────────────────────────────────────────────────────── */
@@ -800,116 +571,6 @@ export function LensGate({
         })}
       </div>
     </div>
-  );
-}
-
-export function Tabs({
-  p,
-  tab,
-  setTab,
-  variant,
-}: {
-  p: Portfolio;
-  tab: string;
-  setTab: (t: string) => void;
-  /**
-   * "underline" rules a scrolling flex row; "block" is Poster's solid tab on
-   * the accent field; "segment" is the same underline in a segmented control,
-   * where the cells are grid tracks rather than flex items.
-   *
-   * All three clear 44px, which the underline row did not: it was a 14px
-   * label with 14px of padding, so the row a visitor navigates the whole page
-   * with was a 38px target on the theme most people open on a phone.
-   */
-  variant: "underline" | "block" | "segment";
-}) {
-  const counts = visibleSections(p);
-  return (
-    <>
-      {tabs(p).map((t, i) => {
-        const on = t === tab;
-        // The plate list is numbered because the sequence is information: it
-        // is the order the sections are in, and it is how a visitor says
-        // which room they are reading.
-        const no = String(i + 1).padStart(2, "0");
-        if (variant === "block") {
-          return (
-            <button
-              key={t}
-              type="button"
-              onClick={() => setTab(t)}
-              className="font-heading flex h-14 flex-none cursor-pointer items-baseline gap-2.5 px-6 text-base whitespace-nowrap"
-              style={{
-                background: on ? "var(--color-accent-ink)" : "transparent",
-                color: on ? "var(--color-accent)" : "var(--color-accent-ink)",
-                opacity: on ? 1 : 0.74,
-                transition:
-                  "opacity 180ms var(--ease-out), background-color 180ms var(--ease-out)",
-              }}
-            >
-              <span className="plate-no text-[12px] opacity-70">{no}</span>
-              {t}
-            </button>
-          );
-        }
-        if (variant === "segment") {
-          return (
-            <button
-              key={t}
-              type="button"
-              onClick={() => setTab(t)}
-              // A grid item's automatic minimum size is its content size, so
-              // five tab labels would overrun their 1fr tracks, overlap and
-              // push the page wider than the viewport. `min-w-0` plus
-              // `overflow-hidden` drops that minimum to zero (CSS Grid §6.6)
-              // and lets the label clip with an ellipsis inside its own
-              // column. Owned here rather than patched on from the parent, so
-              // the caller only picks a variant.
-              className="font-heading flex h-[52px] min-w-0 cursor-pointer items-center justify-center gap-2 overflow-hidden text-[15px] text-ellipsis whitespace-nowrap"
-              style={{
-                color: on ? "var(--color-mark)" : undefined,
-                opacity: on ? 1 : 0.68,
-                boxShadow: on ? "inset 0 -1px 0 var(--color-mark)" : "none",
-                transition: "color 180ms var(--ease-out), opacity 180ms var(--ease-out)",
-              }}
-            >
-              <span className="plate-no text-[11px] opacity-70">{no}</span>
-              {t}
-            </button>
-          );
-        }
-        // The count is the one number the row earns beyond the plate number:
-        // it says how much sits behind a tab before the visitor spends a tap
-        // finding out.
-        const count = counts.filter((x) => tabOf(x) === t).length;
-        return (
-          <button
-            key={t}
-            type="button"
-            onClick={() => setTab(t)}
-            // flex-none + nowrap: the row scrolls sideways inside its own
-            // overflow container rather than breaking a tab name in half.
-            className="font-heading flex h-[60px] flex-none cursor-pointer items-baseline gap-2.5 text-[19px] whitespace-nowrap"
-            style={{
-              color: on ? "var(--color-mark)" : undefined,
-              opacity: on ? 1 : 0.62,
-              boxShadow: on ? "inset 0 -1px 0 var(--color-mark)" : "none",
-              letterSpacing: "-0.01em",
-              transition: "color 180ms var(--ease-out), opacity 180ms var(--ease-out)",
-            }}
-          >
-            <span className="plate-no text-[12px] opacity-70">{no}</span>
-            {t}
-            {/* One section, one name: a count only when two share it. */}
-            {count > 1 && (
-              <span className="caption-credit" style={{ color: "inherit", opacity: 0.7 }}>
-                {count}
-              </span>
-            )}
-          </button>
-        );
-      })}
-    </>
   );
 }
 
@@ -1132,7 +793,7 @@ export function useRecordClick() {
   return useContext(PreviewContext) ? noRecord : recordClick;
 }
 
-export function useIsPreview() {
+function useIsPreview() {
   return useContext(PreviewContext);
 }
 
@@ -1212,37 +873,6 @@ export function HeaderLinks({
       ))}
     </div>
   );
-}
-
-/**
- * "Save contact" — a real vCard built from the header, so a phone that opens
- * it files the page's owner in the address book. No server, no library: the
- * card is assembled here and handed over as a blob.
- */
-export function saveContact(p: Portfolio, handle: string) {
-  const esc = (v: string) => v.replace(/[\\;,]/g, (c) => `\\${c}`).replace(/\n/g, "\\n");
-  const emails = p.header.links.filter((l) => l.url.includes("@") && !l.url.includes("/"));
-  const urls = p.header.links.filter((l) => !emails.includes(l));
-
-  const lines = [
-    "BEGIN:VCARD",
-    "VERSION:3.0",
-    `FN:${esc(p.header.name)}`,
-    p.header.current && `TITLE:${esc(p.header.current)}`,
-    p.header.description && `NOTE:${esc(p.header.description)}`,
-    ...emails.map((l) => `EMAIL;TYPE=INTERNET:${esc(l.url.trim())}`),
-    ...urls.map((l) => `URL:${esc(href(l.url))}`),
-    `URL:https://${esc(pageAddress(handle, p.slug))}`,
-    "END:VCARD",
-  ].filter(Boolean);
-
-  const blob = new Blob([lines.join("\r\n")], { type: "text/vcard;charset=utf-8" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = `${p.header.name.trim().replace(/\s+/g, "-").toLowerCase() || p.slug}.vcf`;
-  a.click();
-  URL.revokeObjectURL(url);
 }
 
 /** A section's title, linking through to its own page — artboard 1d. */

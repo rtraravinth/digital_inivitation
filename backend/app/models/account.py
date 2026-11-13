@@ -10,7 +10,7 @@ from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base, TimestampMixin, UUIDPrimaryKeyMixin
-from app.models.enums import NOTIFICATION_KEYS, PLANS, PRIVACY_KEYS, sql_in
+from app.models.enums import PLANS, sql_in
 
 if TYPE_CHECKING:
     from app.models.asset import Asset
@@ -71,12 +71,10 @@ class AccountSettings(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     #: How this account last signed in, as Firebase names it: ``password``,
     #: ``google.com``, ``github.com``, ``emailLink`` or ``phone``. Shown on
     #: /account; never a credential.
-    sign_in_provider: Mapped[str] = mapped_column(String(32), nullable=False, default="")
+    #: The server default is the one migration c4f1e8a2d6b9 created, so rows
+    #: that predate the column read as "".
+    sign_in_provider: Mapped[str] = mapped_column(
+        String(32), nullable=False, default="", server_default=""
+    )
 
     user: Mapped[User] = relationship(back_populates="settings")
-
-    def notification_keys_are_known(self) -> bool:
-        return set(self.notifications) <= set(NOTIFICATION_KEYS)
-
-    def privacy_keys_are_known(self) -> bool:
-        return set(self.privacy) <= set(PRIVACY_KEYS)

@@ -26,7 +26,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass, field
-from datetime import date
+from datetime import UTC, datetime
 
 
 def _words(text: str) -> frozenset[str]:
@@ -190,17 +190,6 @@ SYNONYMS: dict[str, str] = {
     "decision-making": "decision making",
     "a b testing": "a/b testing",
 }
-
-ACTION_VERBS = _words(
-    """
-    achieved built created cut delivered designed developed directed drove grew improved
-    increased launched led managed negotiated owned produced raised reduced ran scaled
-    shipped signed spun started streamlined trained won wrote advised analysed analyzed
-    automated coached established expanded founded implemented mentored migrated
-    optimised optimized organised organized planned rebuilt redesigned saved secured
-    simplified spearheaded
-    """
-)
 
 DEGREES: list[tuple[int, str, re.Pattern[str]]] = [
     (3, "a doctorate", re.compile(r"\b(ph\.?\s?d|doctorate|doctoral)\b", re.I)),
@@ -434,7 +423,7 @@ _YEAR = re.compile(r"(19|20)\d{2}")
 def years_of_experience(experience: list[dict]) -> float:
     """Years covered by dated roles, overlaps counted once."""
     spans: list[tuple[int, int]] = []
-    this_year = date.today().year
+    this_year = datetime.now(UTC).year
     for role in experience:
         start = _YEAR.search(role.get("start") or "")
         end = _YEAR.search(role.get("end") or "")

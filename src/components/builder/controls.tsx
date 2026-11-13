@@ -38,7 +38,7 @@ import {
   type ThemeId,
 } from "@/lib/types";
 
-export type Recipe = (recipe: (p: Portfolio) => Portfolio) => void;
+type Recipe = (recipe: (p: Portfolio) => Portfolio) => void;
 
 // In its own module so the portfolio list can draw one without loading every
 // control on this page; re-exported so existing imports keep working.
@@ -121,7 +121,7 @@ function StyleTiles({
  * "Match everything to its content" applies every suggestion. Nothing is
  * applied without that click, or a click on a tile.
  */
-export function SectionStyleControl({ p, onChange }: { p: Portfolio; onChange: Recipe }) {
+function SectionStyleControl({ p, onChange }: { p: Portfolio; onChange: Recipe }) {
   const group = useId();
   const { updateSection } = usePortfolios();
   const ignored = IGNORED[p.theme]?.styles;

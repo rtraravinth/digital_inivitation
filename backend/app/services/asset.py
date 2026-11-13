@@ -181,7 +181,10 @@ class AssetService:
         try:
             # Parsed, not merely sniffed: a file claiming to be SVG that is
             # not well-formed XML has no business being served back.
-            ElementTree.fromstring(raw.decode("utf-8", errors="strict"))
+            # S314: ElementTree resolves no external entities, and the bundled
+            # expat (2.4.1+) caps entity expansion, so this parse cannot be made
+            # to fetch files or blow up memory.
+            ElementTree.fromstring(raw.decode("utf-8", errors="strict"))  # noqa: S314
         except (ElementTree.ParseError, UnicodeDecodeError) as exc:
             raise UnsupportedMedia("That SVG could not be parsed.") from exc
 

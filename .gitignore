@@ -59,6 +59,10 @@ codeql-results/
 codeql-custom-queries-*/
 .vscode/
 
+# Coverage output from pytest --cov
+.coverage
+coverage.xml
+
 # Firebase service-account keys (the downloaded file is named like this).
 # A secret: keep it out of the repository.
 *firebase-adminsdk*.json

@@ -92,6 +92,19 @@ async def delete_asset(asset_id: uuid.UUID, session: SessionDep, user: CurrentUs
     await AssetService(session).delete(user, asset_id)
 
 
+#: Every upload is served from the app's own origin, and an SVG opened as a
+#: page is a document there: its <script> would run with the viewer's cookies
+#: and could refresh their session. `sandbox` gives the response an opaque
+#: origin with scripts off; `default-src 'none'` stops it fetching anything.
+#: Inline styles and data: images stay, so an SVG still draws when opened.
+#: An <img> never runs a script, so this changes nothing on the page.
+UPLOAD_CSP = "default-src 'none'; style-src 'unsafe-inline'; img-src data:; sandbox"
+
+#: Chrome's PDF viewer refuses to render a sandboxed document, and a PDF's
+#: own scripting is the viewer's to contain, not the page's.
+SANDBOX_EXEMPT = frozenset({"application/pdf"})
+
+
 def serve(asset: Asset, *, public: bool = False) -> Response:
     """Stream the bytes with a content hash as the ETag.
 
@@ -104,12 +117,20 @@ def serve(asset: Asset, *, public: bool = False) -> Response:
         raise NotFound("That upload is no longer stored.", code="asset_missing")
 
     cache = "public, max-age=31536000, immutable" if public else "private, max-age=300"
+    headers = {
+        "ETag": f'"{asset.sha256}"',
+        "Cache-Control": cache,
+        # Serve the sniffed type and nothing a browser guesses instead.
+        "X-Content-Type-Options": "nosniff",
+    }
+    if asset.mime not in SANDBOX_EXEMPT:
+        headers["Content-Security-Policy"] = UPLOAD_CSP
     return FileResponse(
         path,
         media_type=asset.mime,
-        headers={
-            "ETag": f'"{asset.sha256}"',
-            "Cache-Control": cache,
-            "Content-Disposition": f'inline; filename="{asset.original_name}"',
-        },
+        headers=headers,
+        # Starlette writes the name RFC 6266-encoded, so a quote or a line
+        # break in an uploaded file's name cannot reshape the header.
+        filename=asset.original_name,
+        content_disposition_type="inline",
     )

@@ -31,7 +31,7 @@ import { SectionAside, SectionLinks, SectionTitleLink, UiIcon, gridCols, headlin
 
 const EASE = [0.16, 1, 0.3, 1] as const;
 
-export type PickedStyle = Exclude<SectionStyle, "theme">;
+type PickedStyle = Exclude<SectionStyle, "theme">;
 
 /** The style the author picked for the page, or null to let the theme draw it. */
 export function pickedStyle(p: Portfolio): PickedStyle | null {
@@ -85,7 +85,7 @@ const BULLET_RE = /^\s*[•\-*–]\s+/;
  * Present", and where people type dates by hand. Only a short first line that
  * names a year (or "Present") counts; anything else stays the body.
  */
-export function entryMeta(s: Section): { date: string; sub: string; body: string } {
+function entryMeta(s: Section): { date: string; sub: string; body: string } {
   const lines = s.description.split("\n");
   const first = (lines[0] ?? "").trim();
   const rest = lines.slice(1).join("\n").trim();
@@ -109,7 +109,7 @@ function isCurrent(date: string) {
 }
 
 /** Items for a chip row: split on the separators people actually type. */
-export function chipsOf(text: string): string[] {
+function chipsOf(text: string): string[] {
   return text
     .split(/\s*(?:[·,;|\n•]|\s-\s)\s*/)
     .map((t) => t.replace(BULLET_RE, "").trim())

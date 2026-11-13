@@ -120,6 +120,54 @@ async def test_an_svg_passes_through(auth_client):
     assert response.json()["mime"] == "image/svg+xml"
 
 
+SCRIPTED_SVG = (
+    b'<svg xmlns="http://www.w3.org/2000/svg">'
+    b"<script>fetch('/api/v1/auth/refresh', {method: 'POST'})</script></svg>"
+)
+
+
+async def test_an_svg_is_served_in_a_sandbox_so_its_scripts_never_run(auth_client):
+    # Opened directly, an SVG is a document on this origin: without the
+    # sandbox its script could refresh the viewer's session and read the token.
+    asset = (
+        await upload(auth_client, SCRIPTED_SVG, name="mark.svg", content_type="image/svg+xml")
+    ).json()
+
+    response = await auth_client.get(f"/api/v1/assets/{asset['id']}")
+    assert response.status_code == 200
+    csp = response.headers["content-security-policy"]
+    assert "sandbox" in csp
+    assert "default-src 'none'" in csp
+    assert "script-src" not in csp
+    assert response.headers["x-content-type-options"] == "nosniff"
+
+
+async def test_a_pdf_is_not_sandboxed_because_browsers_would_refuse_to_show_it(auth_client):
+    asset = (
+        await upload(
+            auth_client,
+            b"%PDF-1.4\n" + b"0" * 2048,
+            name="one-pager.pdf",
+            kind="file",
+            content_type="application/pdf",
+        )
+    ).json()
+    response = await auth_client.get(f"/api/v1/assets/{asset['id']}")
+    assert response.status_code == 200
+    assert "content-security-policy" not in response.headers
+    assert response.headers["x-content-type-options"] == "nosniff"
+
+
+async def test_a_hostile_file_name_cannot_break_the_disposition_header(auth_client):
+    name = 'a"; filename="evil.html.png'
+    asset = (await upload(auth_client, png_bytes(40, 30), name=name)).json()
+
+    response = await auth_client.get(f"/api/v1/assets/{asset['id']}")
+    disposition = response.headers["content-disposition"]
+    assert disposition.startswith("inline; filename*=utf-8''")
+    assert '"' not in disposition
+
+
 async def test_a_broken_svg_is_refused(auth_client):
     response = await upload(
         auth_client, b"<svg><rect></svg", name="broken.svg", content_type="image/svg+xml"
@@ -133,7 +181,8 @@ async def test_uploading_the_same_bytes_twice_reuses_one_file(auth_client, db_se
     second = (await upload(auth_client, payload, name="b.png")).json()
 
     assert first["id"] != second["id"]
-    assert first["name"] == "a.png" and second["name"] == "b.png"
+    assert first["name"] == "a.png"
+    assert second["name"] == "b.png"
 
     keys = (await db_session.execute(select(Asset.storage_key).distinct())).scalars().all()
     assert len(keys) == 1

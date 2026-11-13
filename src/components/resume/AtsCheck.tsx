@@ -49,7 +49,7 @@ function writeDraft(id: string, text: string) {
   }
 }
 
-export function verdict(score: number): string {
+function verdict(score: number): string {
   return score >= 75 ? "Strong match" : score >= 50 ? "Fair match" : "Low match";
 }
 

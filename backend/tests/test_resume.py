@@ -169,7 +169,8 @@ async def test_the_public_page_gets_only_the_lists_placed_on_it(client, auth_cli
     assert resume["languages"] == []
     assert resume["certifications"] == []
     # Contact details and the template never leave the account.
-    assert "email" not in resume and "style" not in resume
+    assert "email" not in resume
+    assert "style" not in resume
     assert "rohan@example.com" not in response.text
     assert "+91 98000" not in response.text
 

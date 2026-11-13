@@ -24,7 +24,7 @@ export type PublishedPrivacy = {
   showContact: boolean;
 };
 
-export type Published = {
+type Published = {
   portfolio: Portfolio;
   privacy: PublishedPrivacy;
 };

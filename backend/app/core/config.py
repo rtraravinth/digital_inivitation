@@ -11,12 +11,20 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Literal
 
-from pydantic import Field, field_validator
+from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 BACKEND_DIR = Path(__file__).resolve().parents[2]
 
 Env = Literal["dev", "test", "prod"]
+
+#: Signs development tokens only. It is in a public repository, so a server
+#: that signed with it would accept tokens anyone can forge; production
+#: refuses to start with it (``_production_has_a_real_secret``).
+DEV_JWT_SECRET = "insecure-development-secret-do-not-ship"  # noqa: S105 - dev default
+
+#: HS256 is as strong as its key, and RFC 7518 asks for at least 256 bits.
+JWT_SECRET_MIN_LENGTH = 32
 
 
 class Settings(BaseSettings):
@@ -32,7 +40,7 @@ class Settings(BaseSettings):
     database_url: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/facet"
     test_database_url: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/facet_test"
 
-    jwt_secret: str = "insecure-development-secret-do-not-ship"
+    jwt_secret: str = DEV_JWT_SECRET
     jwt_algorithm: str = "HS256"
     # An hour, like a Firebase ID token. Each refresh asks Firebase whether
     # the user is still allowed in, so this is also the longest a disable,
@@ -112,18 +120,30 @@ class Settings(BaseSettings):
         """
         return value if value.is_absolute() else (BACKEND_DIR / value)
 
+    @model_validator(mode="after")
+    def _production_has_a_real_secret(self) -> Settings:
+        """Fail at start-up, not after the first forged token.
+
+        A deployment that forgets ``FACET_JWT_SECRET`` would otherwise come
+        up signing with the development default.
+        """
+        if not self.is_prod:
+            return self
+        if self.jwt_secret == DEV_JWT_SECRET:
+            raise ValueError(
+                "FACET_JWT_SECRET is the development default. Set a random secret "
+                "in production, e.g. `openssl rand -base64 32`."
+            )
+        if len(self.jwt_secret) < JWT_SECRET_MIN_LENGTH:
+            raise ValueError(
+                f"FACET_JWT_SECRET must be at least {JWT_SECRET_MIN_LENGTH} characters "
+                "in production."
+            )
+        return self
+
     @property
     def is_prod(self) -> bool:
         return self.env == "prod"
-
-    @property
-    def sync_database_url(self) -> str:
-        """The same database, for the one caller that cannot be async.
-
-        Alembic's ``run_sync`` path and the test harness's CREATE DATABASE
-        both need a driver that speaks blocking DBAPI.
-        """
-        return self.database_url.replace("+asyncpg", "")
 
 
 @lru_cache

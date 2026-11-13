@@ -76,14 +76,8 @@ PortfolioStatus = Literal["live", "draft", "empty"]
 STATUSES: Final[tuple[str, ...]] = ("live", "draft", "empty")
 
 RoleNav = Literal["tabs", "rail", "scroll", "lens"]
-ROLE_NAVS: Final[tuple[str, ...]] = ("tabs", "rail", "scroll", "lens")
-
 Density = Literal["airy", "standard", "dense"]
-DENSITIES: Final[tuple[str, ...]] = ("airy", "standard", "dense")
-
 TypeScale = Literal["compact", "default", "display"]
-TYPE_SCALES: Final[tuple[str, ...]] = ("compact", "default", "display")
-
 #: How photographs print on the published page. Mirrors ``PhotoTreatment`` in
 #: src/lib/types.ts; "colour" is the default for a layout that never set one.
 PhotoTreatment = Literal["colour", "bw"]
@@ -106,18 +100,6 @@ PLANS: Final[tuple[str, ...]] = ("free", "pro")
 
 AssetKind = Literal["image", "file"]
 ASSET_KINDS: Final[tuple[str, ...]] = ("image", "file")
-
-NotificationKey = Literal["booking", "weekly", "brokenLink", "mention", "product"]
-NOTIFICATION_KEYS: Final[tuple[str, ...]] = (
-    "booking",
-    "weekly",
-    "brokenLink",
-    "mention",
-    "product",
-)
-
-PrivacyKey = Literal["indexable", "showContact", "countVisits", "badge"]
-PRIVACY_KEYS: Final[tuple[str, ...]] = ("indexable", "showContact", "countVisits", "badge")
 
 #: The one accent that ships as the default, from SWATCHES[0] — book cloth.
 DEFAULT_ACCENT: Final[str] = "#b5261e"
@@ -142,31 +124,6 @@ def sql_in(values: tuple[str, ...]) -> str:
     """Render a tuple as a SQL IN list for a CheckConstraint."""
     return ", ".join(f"'{value}'" for value in values)
 
-
-#: The components a section can carry under its own four fields. Each one is a
-#: shape a visitor recognises from public portfolio pages — a timeline, a wall
-#: of client names, quotes from people the author worked with. Mirrors
-#: BLOCK_TYPES in src/lib/types.ts.
-BlockType = Literal[
-    "timeline",
-    "testimonials",
-    "clients",
-    "tabs",
-    "stats",
-    "services",
-    "faq",
-    "contact",
-]
-BLOCK_TYPES: Final[tuple[str, ...]] = (
-    "timeline",
-    "testimonials",
-    "clients",
-    "tabs",
-    "stats",
-    "services",
-    "faq",
-    "contact",
-)
 
 #: How many images one section may carry, and how many components. Generous
 #: for a portfolio entry; there to stop a runaway client, not to ration anyone.

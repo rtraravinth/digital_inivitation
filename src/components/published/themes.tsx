@@ -11,7 +11,6 @@ import { Stage } from "./themes/stage";
 
 export * from "./shared";
 export { SectionDetail } from "./section-detail";
-export { Arcade, Aurora, Bio, Journey, Meridian, Stage };
 
 /**
  * Every theme, the builder canvas, and the card previews come through

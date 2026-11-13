@@ -22,7 +22,7 @@ export type Day = { day: string; views: number; clicks: number };
 const EASE = [0.16, 1, 0.3, 1] as const;
 
 /** "28 Oct" — a UTC day, since that is how the server buckets them. */
-export function shortDay(day: string): string {
+function shortDay(day: string): string {
   return new Date(`${day}T00:00:00Z`).toLocaleDateString(undefined, {
     day: "numeric",
     month: "short",

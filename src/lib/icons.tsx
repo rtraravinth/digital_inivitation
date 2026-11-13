@@ -128,7 +128,7 @@ export const ICONS = {
   },
 } satisfies Record<string, IconDef>;
 
-export type IconId = keyof typeof ICONS;
+type IconId = keyof typeof ICONS;
 
 /** Picker order: brands first in the order above, then the generic glyphs. */
 export const ICON_LIST = Object.keys(ICONS) as IconId[];

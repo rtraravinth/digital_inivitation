@@ -97,7 +97,7 @@ export function ThemeRoot({
 }
 
 /** Writes the pointer's position on the element into `--mx` / `--my`. */
-export function trackPointer(e: React.PointerEvent<HTMLElement>) {
+function trackPointer(e: React.PointerEvent<HTMLElement>) {
   if (!isMouse(e)) return;
   const el = e.currentTarget;
   const box = el.getBoundingClientRect();
@@ -117,7 +117,7 @@ export function trackPointer(e: React.PointerEvent<HTMLElement>) {
  * state would re-render the page for every block that scrolls past. React
  * leaves it alone afterwards because the `className` prop does not change.
  */
-export function revealRef(node: HTMLElement | null) {
+function revealRef(node: HTMLElement | null) {
   if (!node) return;
   const view = node.ownerDocument.defaultView;
   if (!view || typeof view.IntersectionObserver === "undefined") {
@@ -150,7 +150,7 @@ export function revealRef(node: HTMLElement | null) {
   return () => io.disconnect();
 }
 
-export type RevealKind = "up" | "tilt" | "flip" | "scale" | "left" | "right";
+type RevealKind = "up" | "tilt" | "flip" | "scale" | "left" | "right";
 
 /**
  * A block that arrives as it scrolls into view. `kind` picks the entrance;

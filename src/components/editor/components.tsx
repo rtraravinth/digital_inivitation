@@ -554,7 +554,7 @@ const FIELDS: Record<Exclude<BlockType, "contact" | "gallery" | PageBlock>, { fi
  * holds, the tools that act on it, then its rows. The components a section
  * adds and the built-in ones the resume prints both sit in this.
  */
-export function PanelShell({
+function PanelShell({
   icon,
   name,
   summary,

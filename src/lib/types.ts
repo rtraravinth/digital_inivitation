@@ -215,17 +215,17 @@ export type Footer = {
   showHeaderLinks: boolean;
 };
 
-export function emptyFooter(): Footer {
+function emptyFooter(): Footer {
   return { headline: "", text: "", ctaLabel: "", ctaUrl: "", links: [], note: "", showHeaderLinks: true };
 }
 
 /**
  * What an untitled section is called on the page's menu.
  */
-export const DEFAULT_TAB = "Untitled";
+const DEFAULT_TAB = "Untitled";
 
 /** As long as a stored tab may be. Mirrors TAB_MAX_LENGTH on the API. */
-export const TAB_MAX_LENGTH = 60;
+const TAB_MAX_LENGTH = 60;
 
 /**
  * A section's place on the page's menu: its own title. A section is one
@@ -650,7 +650,7 @@ export const FONTS: Array<{ id: FontId; name: string; sample: string; cssVar: st
  * `published/shared.tsx` takes whatever is chosen to an instance of itself
  * the author's ground can actually hold.
  */
-export const SWATCHES = ["#b5261e", "#1f3a32", "#1d3f8a", "#8a6f1f", "#5b2545"];
+const SWATCHES = ["#b5261e", "#1f3a32", "#1d3f8a", "#8a6f1f", "#5b2545"];
 
 /**
  * Both pickers write straight into a style attribute on the published page,
@@ -678,7 +678,7 @@ export function readHexColour(value: string): string | null {
  * wire format and a stored value, and renaming it would buy nothing a label
  * change does not.
  */
-export type RoleNav = "tabs" | "rail" | "scroll" | "lens";
+type RoleNav = "tabs" | "rail" | "scroll" | "lens";
 export type GridCols = 1 | 2 | 3;
 export type Density = "airy" | "standard" | "dense";
 
@@ -706,7 +706,7 @@ export const DENSITIES: Array<{ id: Density; name: string }> = [
  * chose one get "colour" — this is a deliberate change of look for existing
  * pages, not a backfill of what they had.
  */
-export type PhotoTreatment = "colour" | "bw";
+type PhotoTreatment = "colour" | "bw";
 
 export const PHOTO_TREATMENTS: Array<{ id: PhotoTreatment; name: string }> = [
   { id: "colour", name: "Colour" },
@@ -728,7 +728,7 @@ export const MOTION_LEVELS: Array<{ id: MotionLevel; name: string; desc: string 
 ];
 
 /** The headline scale multiplies each theme's own display size. */
-export type TypeScale = "compact" | "default" | "display";
+type TypeScale = "compact" | "default" | "display";
 
 export const TYPE_SCALES: Array<{ id: TypeScale; name: string; factor: number }> = [
   { id: "compact", name: "Compact", factor: 0.82 },
@@ -776,11 +776,11 @@ export const SECTION_STYLES: Array<{ id: SectionStyle; name: string; desc: strin
 
 const SECTION_STYLE_IDS = new Set<string>(SECTION_STYLES.map((s) => s.id));
 
-export function isSectionStyle(v: unknown): v is SectionStyle {
+function isSectionStyle(v: unknown): v is SectionStyle {
   return typeof v === "string" && SECTION_STYLE_IDS.has(v);
 }
 
-export function defaultLayout(): Layout {
+function defaultLayout(): Layout {
   return {
     roleNav: "tabs",
     grid: 2,
@@ -827,7 +827,7 @@ export type Portfolio = {
 const THEME_IDS = new Set<string>(THEMES.map((t) => t.id));
 
 /** The theme a new or unrecognised portfolio renders in. */
-export const DEFAULT_THEME: ThemeId = "aurora";
+const DEFAULT_THEME: ThemeId = "aurora";
 
 /**
  * The catalogue themes and the motion theme that took each one's place.
@@ -908,15 +908,7 @@ function sectionOf(raw: Section & { image?: Asset | null }): Section {
   };
 }
 
-export const STATUS_LABEL: Record<PortfolioStatus, string> = {
-  live: "Published",
-  draft: "Not published",
-  // Still its own word: an empty portfolio is not published either, but it
-  // has nothing on it yet, which is what the card is telling you.
-  empty: "Empty",
-};
-
-export function emptyHeader(): PortfolioHeader {
+function emptyHeader(): PortfolioHeader {
   return {
     name: "",
     current: "",
@@ -929,7 +921,7 @@ export function emptyHeader(): PortfolioHeader {
   };
 }
 
-export function emptySection(id: string): Section {
+function emptySection(id: string): Section {
   return {
     id,
     title: "",
@@ -956,19 +948,6 @@ export function emptySection(id: string): Section {
  * Settings → Password policy), which is what enforces it; this is so the UI
  * can say so before the round trip. Change both together. */
 export const PASSWORD_MIN = 8;
-
-/** The public domain these pages are published under. */
-export const PAGE_DOMAIN = "facet.page";
-
-/**
- * A page's address, which is `<handle>/<slug>` — the handle is the namespace,
- * so a slug alone no longer identifies a page. One place for it, because it
- * is printed on the dashboard, the builder, the block manager, /stats, and
- * inside a QR code that has to match all of them.
- */
-export function pageAddress(handle: string, slug: string): string {
-  return `${PAGE_DOMAIN}/${handle}/${slug}`;
-}
 
 /** The same page on this app: the route that actually serves it. */
 export function pagePath(handle: string, slug: string): string {
@@ -1262,7 +1241,7 @@ export type ResumeBlock =
 
 /** The structured lists — the ones a component can place on the page. */
 export type PageBlock = "experience" | "education" | "skills" | "certifications" | "languages" | "awards";
-export const PAGE_BLOCKS: PageBlock[] = ["experience", "education", "skills", "certifications", "languages", "awards"];
+const PAGE_BLOCKS: PageBlock[] = ["experience", "education", "skills", "certifications", "languages", "awards"];
 
 /** The style each kind of list reads best in: what it gets until its
  *  author picks another, and what the builder marks as suggested. */
@@ -1289,7 +1268,7 @@ export function lookOf(b: ResumeListBlock): Exclude<SectionStyle, "theme"> {
   return isSectionStyle(look) && look !== "theme" ? look : LIST_DEFAULT_STYLE[b.type];
 }
 
-export const RESUME_BLOCKS: ResumeBlock[] = [
+const RESUME_BLOCKS: ResumeBlock[] = [
   "summary",
   "experience",
   "education",
@@ -1358,7 +1337,7 @@ export type Resume = {
   style: ResumeStyle;
 };
 
-export function defaultResumeStyle(): ResumeStyle {
+function defaultResumeStyle(): ResumeStyle {
   return {
     template: "classic",
     paper: "a4",
@@ -1374,7 +1353,7 @@ export function defaultResumeStyle(): ResumeStyle {
   };
 }
 
-export function defaultResume(): Resume {
+function defaultResume(): Resume {
   return {
     email: "",
     phone: "",
@@ -1393,7 +1372,7 @@ export function defaultResume(): Resume {
 }
 
 /** Backfills a resume from any build, and keeps every block in the order once. */
-export function normalizeResume(raw: Partial<Resume> | null | undefined): Resume {
+function normalizeResume(raw: Partial<Resume> | null | undefined): Resume {
   const base = defaultResume();
   // `headline` and `summary` moved to the header, and `pageBlocks` gave way
   // to components placed in sections; a stale copy of any is dropped — the

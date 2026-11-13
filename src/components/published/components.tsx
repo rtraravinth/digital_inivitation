@@ -107,7 +107,7 @@ export function runsOf(p: Portfolio, prefix: string): Run[] {
 }
 
 /** Where a band sits on the page, for the menu to scroll to. */
-export function bandAnchor(section: Section): string {
+function bandAnchor(section: Section): string {
   return `section-${section.id}`;
 }
 

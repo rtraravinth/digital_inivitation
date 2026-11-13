@@ -1,0 +1,4 @@
+# squawk lints the SQL of new Alembic migrations in CI (advisory).
+pg_version = "16"
+# Alembic wraps each migration in a transaction.
+assume_in_transaction = true

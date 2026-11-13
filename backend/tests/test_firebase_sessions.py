@@ -186,7 +186,7 @@ async def test_lookup_failure_is_none_not_an_error(monkeypatch):
 
 
 def test_a_key_that_is_not_a_service_account_is_refused():
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="not a service-account key"):
         fa._load_service_account('{"type": "something-else"}')
     assert fa._load_service_account("") is None
 

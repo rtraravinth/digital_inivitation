@@ -9,7 +9,6 @@ from typing import Annotated, Literal
 from pydantic import Field
 
 from app.models.enums import (
-    DEFAULT_ACCENT,
     DEFAULT_TRACKING,
     Density,
     FontId,
@@ -202,6 +201,3 @@ class PortfolioPatch(StrictCamelModel):
 class SlugAvailableOut(CamelModel):
     slug: str
     available: bool
-
-
-DEFAULT_ACCENT_VALUE = DEFAULT_ACCENT

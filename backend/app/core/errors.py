@@ -104,11 +104,6 @@ class ServiceUnavailable(AppError):
     default_code = "service_unavailable"
 
 
-class RateLimited(AppError):
-    status_code = 429
-    default_code = "rate_limited"
-
-
 _HTTP_CODES = {
     400: "bad_request",
     401: "unauthenticated",

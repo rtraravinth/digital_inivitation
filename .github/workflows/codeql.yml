@@ -1,0 +1,61 @@
+# CodeQL security-extended, as AGENTS.md requires before sensitive work
+# ships: any finding at security-severity 7.0 or more fails the run.
+# Results also land in the repository's Security → Code scanning tab.
+name: CodeQL
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  schedule:
+    # Weekly, so new queries catch old code.
+    - cron: "27 3 * * 1"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: codeql-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  analyze:
+    name: CodeQL (${{ matrix.language }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      security-events: write
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [python, javascript-typescript]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: github/codeql-action/init@33d7b85da1a04171e211befe2c739303b9a4c066 # v4.39.3
+        with:
+          languages: ${{ matrix.language }}
+          build-mode: none
+          queries: security-extended
+          config-file: .github/codeql/codeql-config.yml
+      - uses: github/codeql-action/analyze@33d7b85da1a04171e211befe2c739303b9a4c066 # v4.39.3
+        with:
+          category: /language:${{ matrix.language }}
+          output: sarif
+      - name: Fail on high or critical findings
+        run: |
+          found="$(jq -r '
+            .runs[0] as $r
+            | ($r.tool.driver.rules
+                | map({key: .id, value: (.properties["security-severity"] // "0" | tonumber)})
+                | from_entries) as $sev
+            | $r.results[] | select($sev[.ruleId] >= 7.0)
+            | "\($sev[.ruleId]) \(.ruleId) \(.locations[0].physicalLocation.artifactLocation.uri):\(.locations[0].physicalLocation.region.startLine)"
+          ' sarif/*.sarif)"
+          if [ -n "$found" ]; then
+            echo "$found"
+            echo "::error::CodeQL found high or critical issues (security-severity >= 7.0)."
+            exit 1
+          fi

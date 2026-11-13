@@ -13,7 +13,7 @@ from tests.factories import OTHER_HANDLE, TEST_HANDLE
 
 
 @pytest.mark.parametrize(
-    "referrer,expected",
+    ("referrer", "expected"),
     [
         ("", "Direct"),
         ("https://www.linkedin.com/feed", "LinkedIn"),

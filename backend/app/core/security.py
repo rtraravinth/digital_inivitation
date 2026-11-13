@@ -15,7 +15,7 @@ from __future__ import annotations
 import hashlib
 import secrets
 from datetime import UTC, datetime, timedelta
-from typing import Any, Literal
+from typing import Any
 
 import jwt
 from pydantic import BaseModel
@@ -108,6 +108,3 @@ def hash_token(plaintext: str) -> str:
 def new_refresh_token() -> tuple[str, str]:
     plaintext = secrets.token_urlsafe(48)
     return plaintext, hash_token(plaintext)
-
-
-TokenType = Literal["bearer"]

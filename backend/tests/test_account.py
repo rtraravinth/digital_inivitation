@@ -46,8 +46,6 @@ async def test_the_defaults_match_the_frontends(auth_client):
 
 
 async def test_account_never_leaks_a_secret_or_a_hash(auth_client):
-    await auth_client.post("/api/v1/auth/two-step/enable")
-
     blob = (await auth_client.get("/api/v1/account")).text.lower()
     assert "secret" not in blob
     assert "hash" not in blob
@@ -171,17 +169,6 @@ async def test_security_patch_updates_phone_but_not_email(auth_client):
     # Email is identity, not a preference: it is not patchable here.
     refused = await auth_client.patch("/api/v1/account/security", json={"email": "new@example.com"})
     assert refused.status_code == 422
-
-
-async def test_recovery_codes_remaining_is_reported(auth_client):
-    assert (await auth_client.get("/api/v1/account")).json()["security"][
-        "recoveryCodesRemaining"
-    ] == 0
-
-    await auth_client.post("/api/v1/auth/recovery-codes")
-    assert (await auth_client.get("/api/v1/account")).json()["security"][
-        "recoveryCodesRemaining"
-    ] == 10
 
 
 async def test_account_requires_a_token(client):

@@ -41,8 +41,6 @@ export function Account() {
   const checklist: Array<{ id: GroupId; label: string; done: boolean }> = [
     { id: "profile", label: "Choose a handle", done: !!handle },
     { id: "profile", label: "Add a photo", done: !!account.profile.portrait },
-    { id: "security", label: "Turn on two-step", done: account.security.twoStep },
-    { id: "security", label: "Keep recovery codes", done: account.security.recoveryCodesRemaining > 0 },
   ];
   const done = checklist.filter((c) => c.done).length;
 
@@ -153,12 +151,11 @@ export function Account() {
                       No handle yet — choose one
                     </button>
                   )}
-                  <span className="text-[12.5px] text-muted">{account.security.email}</span>
+                  <span className="text-[12.5px] text-muted">{account.security.email ?? account.security.phone}</span>
                 </div>
                 <div className="flex flex-wrap gap-2">
                   <Fact label="Plan" value={planName} />
                   <Fact label="Live pages" value={String(live)} />
-                  <Fact label="Two-step" value={account.security.twoStep ? "On" : "Off"} />
                 </div>
               </TiltPanel>
             </motion.div>

@@ -952,9 +952,10 @@ export function emptySection(id: string): Section {
  * server this build doesn't have — see NEEDS_SERVER below and the notice the
  * Account page renders. It is stored, and honest about what it can't do.
  */
-/** Mirrors PASSWORD_MIN in backend/app/schemas/auth.py. The server is what
- * enforces it; this is so the UI can say so before the round trip. */
-export const PASSWORD_MIN = 12;
+/** Mirrors the Firebase project's password policy (Authentication →
+ * Settings → Password policy), which is what enforces it; this is so the UI
+ * can say so before the round trip. Change both together. */
+export const PASSWORD_MIN = 8;
 
 /** The public domain these pages are published under. */
 export const PAGE_DOMAIN = "facet.page";
@@ -996,18 +997,17 @@ export type AccountProfile = {
 };
 
 /**
- * What /account can safely know about your security settings. The TOTP seed
- * and the recovery-code hashes never leave the server, so this carries a
- * count rather than the codes themselves.
+ * What /account knows about how you sign in. Firebase Authentication holds
+ * every credential — password, second factor, provider grants — so there is
+ * no secret here to leak, only how the account last signed in.
  */
 export type AccountSecurity = {
-  email: string;
+  /** Null for an account made with a phone number. */
+  email: string | null;
   phone: string;
-  /** ISO timestamp, or null if it has never been changed. */
-  passwordChanged: string | null;
-  twoStep: boolean;
   google: boolean;
-  recoveryCodesRemaining: number;
+  /** As Firebase names it: "password", "google.com", "github.com", "emailLink", "phone". */
+  signInProvider: string;
 };
 
 export type PlanId = "free" | "pro";
@@ -1142,10 +1142,8 @@ export function defaultAccount(): AccountSettings {
     security: {
       email: "",
       phone: "",
-      passwordChanged: null,
-      twoStep: false,
       google: false,
-      recoveryCodesRemaining: 0,
+      signInProvider: "",
     },
     plan: "free",
     customDomain: "",

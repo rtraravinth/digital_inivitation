@@ -1,12 +1,10 @@
-"""Devices signed in, and changing a password.
+"""Devices signed in.
 
 These are the /account controls that used to render a notice saying they
 needed a server. They now do what they say.
 """
 
 from __future__ import annotations
-
-from tests.factories import TEST_PASSWORD
 
 
 async def test_sessions_lists_the_current_one_marked_current(auth_client):
@@ -68,54 +66,4 @@ async def test_revoke_all_others_keeps_the_caller_signed_in(auth_client, second_
     assert response.json() == {"revoked": 1}
 
     assert (await auth_client.get("/api/v1/auth/sessions")).status_code == 200
-    assert (await second_login.get("/api/v1/auth/sessions")).status_code == 401
-
-
-async def test_changing_the_password_requires_the_current_one(auth_client):
-    response = await auth_client.post(
-        "/api/v1/auth/password",
-        json={"currentPassword": "not-my-password", "newPassword": "a brand new passphrase"},
-    )
-    assert response.status_code == 401
-    assert response.json()["error"]["code"] == "invalid_credentials"
-
-
-async def test_changing_the_password_rejects_a_short_one(auth_client):
-    response = await auth_client.post(
-        "/api/v1/auth/password",
-        json={"currentPassword": TEST_PASSWORD, "newPassword": "short"},
-    )
-    assert response.status_code == 422
-
-
-async def test_changing_the_password_works_and_the_old_one_stops(auth_client, client, registered):
-    response = await auth_client.post(
-        "/api/v1/auth/password",
-        json={"currentPassword": TEST_PASSWORD, "newPassword": "a brand new passphrase"},
-    )
-    assert response.status_code == 204
-
-    email = registered["user"]["email"]
-    stale = await client.post(
-        "/api/v1/auth/login", json={"email": email, "password": TEST_PASSWORD}
-    )
-    assert stale.status_code == 401
-
-    fresh = await client.post(
-        "/api/v1/auth/login", json={"email": email, "password": "a brand new passphrase"}
-    )
-    assert fresh.status_code == 200
-
-
-async def test_changing_the_password_revokes_other_sessions_but_not_this_one(
-    auth_client, second_login
-):
-    response = await auth_client.post(
-        "/api/v1/auth/password",
-        json={"currentPassword": TEST_PASSWORD, "newPassword": "a brand new passphrase"},
-    )
-    assert response.status_code == 204
-
-    assert (await auth_client.get("/api/v1/auth/sessions")).status_code == 200
-    # A password change that leaves other devices signed in is not one.
     assert (await second_login.get("/api/v1/auth/sessions")).status_code == 401

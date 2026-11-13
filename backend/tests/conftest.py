@@ -27,8 +27,6 @@ from sqlalchemy.pool import NullPool
 
 from tests.factories import *  # noqa: F403 - fixture registration
 
-TEST_PASSWORD = "correct horse battery"
-
 
 def _split_database_url(url: str) -> tuple[str, str]:
     """Return (server_url, database_name) from a SQLAlchemy URL."""
@@ -125,15 +123,26 @@ async def db_session(engine) -> AsyncIterator[AsyncSession]:
 
 
 @pytest.fixture
-async def app(db_session: AsyncSession, media_root: Path):
+def firebase_accounts():
+    """What Firebase says about each uid. Empty: nobody is checked."""
+    from tests.factories import FakeAccounts
+
+    return FakeAccounts()
+
+
+@pytest.fixture
+async def app(db_session: AsyncSession, media_root: Path, firebase_accounts):
     """The real application, with the request session swapped for the test one.
 
     ``get_session`` normally commits per request. Here every request joins the
     test's open transaction instead, so the rollback at the end really does
     undo everything a test did.
     """
+    from app.core.firebase import get_firebase_verifier
+    from app.core.firebase_accounts import get_account_checker
     from app.db.session import get_session
     from app.main import create_app
+    from tests.factories import fake_verify
 
     application = create_app()
 
@@ -143,6 +152,10 @@ async def app(db_session: AsyncSession, media_root: Path):
         await db_session.flush()
 
     application.dependency_overrides[get_session] = override
+    # Google's keys cannot sign a test's tokens, so the verifier is a fake
+    # that reads them back. test_firebase.py covers the real one.
+    application.dependency_overrides[get_firebase_verifier] = lambda: fake_verify
+    application.dependency_overrides[get_account_checker] = lambda: firebase_accounts
     return application
 
 

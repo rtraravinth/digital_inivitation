@@ -34,10 +34,29 @@ class Settings(BaseSettings):
 
     jwt_secret: str = "insecure-development-secret-do-not-ship"
     jwt_algorithm: str = "HS256"
-    access_token_ttl_minutes: int = Field(default=15, ge=1, le=60 * 24)
+    # An hour, like a Firebase ID token. Each refresh asks Firebase whether
+    # the user is still allowed in, so this is also the longest a disable,
+    # delete or password reset in Firebase takes to reach FACET — the same
+    # as Firebase's own tokens. FACET's own sign-outs are immediate anyway:
+    # every request checks the session row.
+    access_token_ttl_minutes: int = Field(default=60, ge=1, le=60 * 24)
     refresh_token_ttl_days: int = Field(default=30, ge=1, le=365)
-    # How long a two-step login challenge stays usable.
-    challenge_ttl_seconds: int = Field(default=300, ge=30, le=3600)
+
+    # Firebase Authentication proves who someone is; FACET then opens its own
+    # session. The project id is the only thing needed to verify a Firebase
+    # ID token — Google publishes the signing keys — so no service-account
+    # secret is held here. Empty refuses every Firebase sign-in.
+    firebase_project_id: str = ""
+    # How recently the person must have signed in to Firebase for their ID
+    # token to open a FACET session. An ID token lives an hour; this keeps a
+    # leaked one from being traded in for a 30-day session long after the
+    # sign-in that minted it.
+    firebase_max_auth_age_seconds: int = Field(default=15 * 60, ge=60, le=60 * 60)
+    # The project's service-account key — the JSON itself, or a path to it.
+    # Used only to ask Firebase whether a user was deleted, disabled or had
+    # their sessions revoked (a password reset does that), so FACET's own
+    # sessions end when Firebase's do. Empty skips the check, with a warning.
+    firebase_service_account: str = ""
     # How long a signed upload URL keeps opening. Longer than an access
     # token on purpose: the URL is baked into a response the editor may
     # hold on screen for hours, and it names one asset and nothing else.

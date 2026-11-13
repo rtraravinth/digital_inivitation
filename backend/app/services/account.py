@@ -8,7 +8,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.errors import Conflict, NotFound
-from app.models import AccountProfile, Asset, RecoveryCode, User
+from app.models import AccountProfile, Asset, User
 from app.schemas.account import (
     RESERVED_HANDLES,
     AccountOut,
@@ -52,7 +52,6 @@ class AccountService:
         self.session = session
 
     async def get(self, user: User) -> AccountOut:
-        remaining = await self._unused_recovery_codes(user)
         profile = user.profile
         settings = user.settings
 
@@ -69,24 +68,14 @@ class AccountService:
             security=SecurityOut(
                 email=user.email,
                 phone=settings.phone,
-                password_changed=settings.password_changed_at,
-                two_step=settings.two_step_enabled,
                 google=settings.google_linked,
-                recovery_codes_remaining=remaining,
+                sign_in_provider=settings.sign_in_provider,
             ),
             plan=settings.plan,
             custom_domain=settings.custom_domain,
             notifications=dict(settings.notifications or {}),
             privacy=dict(settings.privacy or {}),
         )
-
-    async def _unused_recovery_codes(self, user: User) -> int:
-        rows = await self.session.scalars(
-            select(RecoveryCode).where(
-                RecoveryCode.user_id == user.id, RecoveryCode.used_at.is_(None)
-            )
-        )
-        return len(list(rows))
 
     # ── profile ─────────────────────────────────────────────────────────
 

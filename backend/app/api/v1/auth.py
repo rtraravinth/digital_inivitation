@@ -1,4 +1,10 @@
-"""Sign in, sign out, and everything that guards an account."""
+"""Sign in, sign out, and the devices an account is signed in on.
+
+Firebase Authentication does the proving — passwords, Google, GitHub, email
+links, phone codes, and any second factor. ``POST /auth/firebase`` trades the
+ID token it issues for a FACET session: the same short-lived access token and
+httpOnly refresh cookie as before, so everything after sign-in is unchanged.
+"""
 
 from __future__ import annotations
 
@@ -16,21 +22,10 @@ from app.api.deps import (
 from app.api.route import TransactionRoute
 from app.core.config import get_settings
 from app.core.errors import Unauthenticated
+from app.core.firebase import FirebaseVerifierDep
+from app.core.firebase_accounts import AccountCheckerDep
 from app.models import User
-from app.schemas.auth import (
-    AuthOut,
-    ChangePasswordRequest,
-    LoginRequest,
-    RecoveryCodesOut,
-    RegisterRequest,
-    SessionOut,
-    TokenOut,
-    TwoStepCodeRequest,
-    TwoStepLoginRequest,
-    TwoStepRequiredOut,
-    TwoStepSetupOut,
-    UserOut,
-)
+from app.schemas.auth import AuthOut, FirebaseSignInRequest, SessionOut, TokenOut, UserOut
 from app.schemas.common import ERROR_RESPONSES
 from app.services.auth import AuthService, IssuedTokens
 
@@ -67,7 +62,6 @@ def _user_out(user: User) -> UserOut:
         email=user.email,
         name=user.profile.name if user.profile else "",
         handle=user.profile.handle if user.profile else None,
-        two_step=user.settings.two_step_enabled if user.settings else False,
     )
 
 
@@ -78,48 +72,19 @@ def _auth_out(user: User, tokens: IssuedTokens) -> AuthOut:
     )
 
 
-@router.post(
-    "/register",
-    status_code=status.HTTP_201_CREATED,
-    response_model=AuthOut,
-    summary="Create an account",
-)
-async def register(
-    payload: RegisterRequest, response: Response, session: SessionDep, device: DeviceDep
+@router.post("/firebase", response_model=AuthOut, summary="Sign in with a Firebase ID token")
+async def firebase_sign_in(
+    payload: FirebaseSignInRequest,
+    response: Response,
+    session: SessionDep,
+    device: DeviceDep,
+    verify: FirebaseVerifierDep,
+    accounts: AccountCheckerDep,
 ) -> AuthOut:
-    service = AuthService(session)
-    user, tokens = await service.register(
-        payload.email, payload.password, payload.name, payload.handle, device
+    identity = await verify(payload.id_token)
+    user, tokens = await AuthService(session).sign_in(
+        identity, device, accounts, name=payload.name, handle=payload.handle
     )
-    _set_refresh_cookie(response, tokens.refresh_token)
-    return _auth_out(user, tokens)
-
-
-@router.post(
-    "/login",
-    response_model=AuthOut | TwoStepRequiredOut,
-    summary="Sign in",
-    responses={202: {"model": TwoStepRequiredOut, "description": "A second factor is required"}},
-)
-async def login(payload: LoginRequest, response: Response, session: SessionDep, device: DeviceDep):
-    service = AuthService(session)
-    user, result = await service.login(payload.email, payload.password, device)
-
-    if isinstance(result, str):
-        # Password accepted, but no session exists until the code is right.
-        response.status_code = status.HTTP_202_ACCEPTED
-        return TwoStepRequiredOut(challenge=result)
-
-    _set_refresh_cookie(response, result.refresh_token)
-    return _auth_out(user, result)
-
-
-@router.post("/login/two-step", response_model=AuthOut, summary="Finish signing in")
-async def login_two_step(
-    payload: TwoStepLoginRequest, response: Response, session: SessionDep, device: DeviceDep
-) -> AuthOut:
-    service = AuthService(session)
-    user, tokens = await service.complete_two_step(payload.challenge, payload.code, device)
     _set_refresh_cookie(response, tokens.refresh_token)
     return _auth_out(user, tokens)
 
@@ -129,13 +94,14 @@ async def refresh(
     response: Response,
     session: SessionDep,
     device: DeviceDep,
+    accounts: AccountCheckerDep,
     facet_refresh: str | None = Cookie(default=None, alias=REFRESH_COOKIE),
 ) -> AuthOut:
     if not facet_refresh:
         raise Unauthenticated("Please sign in again.", code="invalid_refresh_token")
 
     service = AuthService(session)
-    user, tokens = await service.refresh(facet_refresh, device)
+    user, tokens = await service.refresh(facet_refresh, device, accounts)
     _set_refresh_cookie(response, tokens.refresh_token)
     return _auth_out(user, tokens)
 
@@ -179,49 +145,3 @@ async def revoke_session(session_id: uuid.UUID, session: SessionDep, caller: Cal
 async def revoke_other_sessions(session: SessionDep, caller: CallerDep) -> dict[str, int]:
     revoked = await AuthService(session).revoke_other_sessions(caller.user, caller.session_id)
     return {"revoked": revoked}
-
-
-@router.post("/password", status_code=status.HTTP_204_NO_CONTENT, summary="Change your password")
-async def change_password(
-    payload: ChangePasswordRequest, session: SessionDep, caller: CallerDep
-) -> None:
-    await AuthService(session).change_password(
-        caller.user, payload.current_password, payload.new_password, caller.session_id
-    )
-
-
-@router.post("/two-step/enable", response_model=TwoStepSetupOut, summary="Start two-step setup")
-async def begin_two_step(session: SessionDep, caller: CallerDep) -> TwoStepSetupOut:
-    secret, uri = await AuthService(session).begin_two_step(caller.user)
-    return TwoStepSetupOut(secret=secret, otpauth_uri=uri)
-
-
-@router.post(
-    "/two-step/verify",
-    status_code=status.HTTP_204_NO_CONTENT,
-    summary="Confirm two-step with a code",
-)
-async def confirm_two_step(
-    payload: TwoStepCodeRequest, session: SessionDep, caller: CallerDep
-) -> None:
-    await AuthService(session).confirm_two_step(caller.user, payload.code)
-
-
-@router.post(
-    "/two-step/disable", status_code=status.HTTP_204_NO_CONTENT, summary="Turn two-step off"
-)
-async def disable_two_step(
-    payload: TwoStepCodeRequest, session: SessionDep, caller: CallerDep
-) -> None:
-    await AuthService(session).disable_two_step(caller.user, payload.code)
-
-
-@router.post(
-    "/recovery-codes",
-    response_model=RecoveryCodesOut,
-    summary="Issue ten single-use recovery codes",
-)
-async def issue_recovery_codes(session: SessionDep, caller: CallerDep) -> RecoveryCodesOut:
-    codes = await AuthService(session).issue_recovery_codes(caller.user)
-    # The only time these are readable. Only hashes are stored.
-    return RecoveryCodesOut(codes=codes)

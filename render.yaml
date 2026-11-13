@@ -38,10 +38,29 @@ services:
       # With the disk above, change this to /var/data/media.
       - key: FACET_MEDIA_ROOT
         value: /app/backend/media
+      # Firebase Authentication. The project id is all the API needs to
+      # verify a sign-in; the four NEXT_PUBLIC_ values are the web app's
+      # config from Firebase → Project settings → Your apps. They are public
+      # (they ship to every browser) but read at build time, so set them
+      # before the first deploy. Entered in the dashboard, not committed.
+      - key: FACET_FIREBASE_PROJECT_ID
+        sync: false
+      # The service-account key JSON (Project settings → Service accounts).
+      # A secret: it lets the API ask Firebase whether a user was disabled,
+      # deleted or had their sessions revoked, so FACET signs them out too.
+      - key: FACET_FIREBASE_SERVICE_ACCOUNT
+        sync: false
+      - key: NEXT_PUBLIC_FIREBASE_API_KEY
+        sync: false
+      - key: NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN
+        sync: false
+      - key: NEXT_PUBLIC_FIREBASE_PROJECT_ID
+        sync: false
+      - key: NEXT_PUBLIC_FIREBASE_APP_ID
+        sync: false
       # A demo account with the five seeded portfolios, created on first
-      # start. The password is generated: read it under the service's
-      # Environment tab. Delete both to have no demo account.
+      # start. It has no password: sign in through Firebase with this
+      # address — it must be one whose inbox you can open, because Firebase
+      # has to verify it before the two are linked. Delete it to have none.
       - key: FACET_DEMO_EMAIL
-        value: demo@example.com
-      - key: FACET_DEMO_PASSWORD
-        generateValue: true
+        sync: false

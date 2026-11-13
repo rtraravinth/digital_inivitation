@@ -8,7 +8,6 @@ from app.db.base import Base
 from app.models.account import (
     AccountProfile,
     AccountSettings,
-    RecoveryCode,
     default_notifications,
     default_privacy,
 )
@@ -28,7 +27,6 @@ __all__ = [
     "PageView",
     "Portfolio",
     "PortfolioHeader",
-    "RecoveryCode",
     "Section",
     "SectionImage",
     "User",

@@ -1,6 +1,6 @@
 """Development commands.
 
-    python -m app.cli create-user --email you@example.com --password "..."
+    python -m app.cli create-user --email you@example.com --handle you
     python -m app.cli seed --email you@example.com
     python -m app.cli routes
 
@@ -17,20 +17,27 @@ import json
 from pathlib import Path
 
 import typer
-from pydantic import ValidationError
+from pydantic import EmailStr, Field, ValidationError
 from sqlalchemy import select
 
 from app.core.errors import AppError
-from app.core.security import hash_password
 from app.db.session import dispose_engine, get_sessionmaker
 from app.models import AccountProfile, AccountSettings, User
-from app.schemas.auth import RegisterRequest
+from app.schemas.account import HANDLE_PATTERN
+from app.schemas.common import CamelModel
 from app.services.account import assert_handle_available
 from app.services.transfer import TransferService
 
 app = typer.Typer(help="FACET backend development commands.", no_args_is_help=True)
 
 SEED_FILE = Path(__file__).resolve().parent / "seed_data.json"
+
+
+class _NewAccount(CamelModel):
+    """The API's own validation for an address and a handle."""
+
+    email: EmailStr
+    handle: str = Field(pattern=HANDLE_PATTERN)
 
 
 def _run(coro):
@@ -43,7 +50,7 @@ def _run(coro):
     return asyncio.run(wrapper())
 
 
-async def _create_user(email: str, password: str, name: str, handle: str) -> str:
+async def _create_user(email: str, name: str, handle: str) -> str:
     async with get_sessionmaker()() as session:
         email = email.strip().lower()
         if await session.scalar(select(User).where(User.email == email)):
@@ -57,7 +64,9 @@ async def _create_user(email: str, password: str, name: str, handle: str) -> str
         except AppError as exc:
             raise typer.BadParameter(exc.message) from exc
 
-        user = User(email=email, password_hash=hash_password(password))
+        # No credential: Firebase holds those. The first Firebase sign-in
+        # with this address, once Firebase has verified it, links the account.
+        user = User(email=email)
         user.profile = AccountProfile(name=name, handle=handle, tags=[], links=[])
         user.settings = AccountSettings()
         session.add(user)
@@ -67,28 +76,26 @@ async def _create_user(email: str, password: str, name: str, handle: str) -> str
 
 @app.command("create-user")
 def create_user(
-    email: str = typer.Option(..., help="Sign-in address"),
-    password: str = typer.Option(..., help="At least 12 characters"),
+    email: str = typer.Option(..., help="Sign-in address, as it is in Firebase"),
     handle: str = typer.Option(..., help="The account's address: facet.page/<handle>/<slug>"),
     name: str = typer.Option("", help="Display name"),
 ) -> None:
-    """Create an account without going through the API."""
-    if len(password) < 12:
-        raise typer.BadParameter("Use at least 12 characters.")
+    """Create an account without going through the API.
 
+    It has no password — sign in to it through Firebase with the same,
+    verified, address and the two are linked on that first sign-in.
+    """
     # Validate exactly as the API does, or this can mint an account that
-    # cannot sign in — a reserved TLD like .test gets past a naive check and
-    # is then refused at login. Registration requires a handle, so this must
-    # send one: without it every invocation failed validation, and an account
-    # with no handle has no address to publish under.
+    # cannot sign in — a reserved TLD like .test gets past a naive check.
+    # An account with no handle has no address to publish under.
     try:
-        request = RegisterRequest(email=email, password=password, name=name, handle=handle)
+        request = _NewAccount(email=email.strip().lower(), handle=handle.strip().lower())
     except ValidationError as exc:
         error = exc.errors()[0]
         field = ".".join(str(part) for part in error["loc"]) or "input"
         raise typer.BadParameter(f"{field}: {error['msg']}") from exc
 
-    user_id = _run(_create_user(str(request.email), password, name, request.handle))
+    user_id = _run(_create_user(str(request.email), name, request.handle))
     typer.echo(f"created {request.email} ({user_id}) at {request.handle}/")
 
 

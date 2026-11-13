@@ -1,12 +1,11 @@
-"""Account profile, settings and recovery codes."""
+"""Account profile and settings."""
 
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
-from sqlalchemy import Boolean, CheckConstraint, DateTime, ForeignKey, String, Text
+from sqlalchemy import Boolean, CheckConstraint, ForeignKey, String, Text
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -69,16 +68,10 @@ class AccountSettings(UUIDPrimaryKeyMixin, TimestampMixin, Base):
 
     phone: Mapped[str] = mapped_column(String(32), nullable=False, default="")
     google_linked: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
-    password_changed_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
-
-    # Written only once a TOTP code has confirmed it. An unconfirmed secret
-    # must never be able to lock someone out of their own account.
-    two_step_secret: Mapped[str | None] = mapped_column(String(64), nullable=True)
-    two_step_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
-    # The secret being set up, not yet confirmed.
-    two_step_pending_secret: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    #: How this account last signed in, as Firebase names it: ``password``,
+    #: ``google.com``, ``github.com``, ``emailLink`` or ``phone``. Shown on
+    #: /account; never a credential.
+    sign_in_provider: Mapped[str] = mapped_column(String(32), nullable=False, default="")
 
     user: Mapped[User] = relationship(back_populates="settings")
 
@@ -87,17 +80,3 @@ class AccountSettings(UUIDPrimaryKeyMixin, TimestampMixin, Base):
 
     def privacy_keys_are_known(self) -> bool:
         return set(self.privacy) <= set(PRIVACY_KEYS)
-
-
-class RecoveryCode(UUIDPrimaryKeyMixin, TimestampMixin, Base):
-    """One row per issued code. Stored as an argon2 hash, single use."""
-
-    __tablename__ = "recovery_codes"
-
-    user_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
-    )
-    code_hash: Mapped[str] = mapped_column(String(255), nullable=False)
-    used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-
-    user: Mapped[User] = relationship(back_populates="recovery_codes")

@@ -29,7 +29,7 @@ because the connection never arrives. Pass flags through when you need them:
 ```
 npm run build
 npm run lint
-cd backend && .venv/bin/python -m pytest    # 358 tests (.venv/Scripts on Windows)
+cd backend && .venv/bin/python -m pytest    # 379 tests (.venv/Scripts on Windows)
 ```
 
 `NEXT_PUBLIC_API_URL` points the frontend at the API; see
@@ -56,7 +56,8 @@ One container, one address: the `Dockerfile` builds the frontend and runs it
 beside the API, and `render.yaml` is a Render blueprint for that container
 plus its PostgreSQL (New → Blueprint → this repository; every push
 redeploys). `scripts/start.sh` migrates, optionally creates a demo account
-(`FACET_DEMO_EMAIL` / `FACET_DEMO_PASSWORD`, seeded once), then starts both.
+(`FACET_DEMO_EMAIL`, seeded once — no password; a Firebase sign-in with that
+verified address claims it), then starts both.
 
 - **One address is the point, not a convenience.** The refresh cookie is
   `SameSite=Lax`, so a frontend and an API on two hosts sign you out on every
@@ -666,6 +667,87 @@ rejects those, and the first characters of any hand-typed colour raised a
 save-failed banner. `ColourField` keeps a local draft and commits only a
 complete `#rrggbb`, dropping the draft on blur.
 
+## Signing in: Firebase proves, FACET keeps the session
+
+**Firebase Authentication holds every credential; this database holds
+none.** Google, GitHub, email + password, email link and phone code all
+happen in the browser against Firebase (`src/lib/firebase.ts`,
+`components/SignIn.tsx`). The ID token Firebase issues is posted once to
+`POST /auth/firebase`, which verifies it (`app/core/firebase.py`) and opens
+FACET's own session — the same in-memory access token and httpOnly refresh
+cookie as before, so nothing after sign-in changed, `auth_sessions` and the
+device list included. Migration `c4f1e8a2d6b9` dropped the password hashes,
+TOTP columns and recovery codes; there is no password route.
+
+- **Verification needs only the project id** (`FACET_FIREBASE_PROJECT_ID`):
+  PyJWT checks the RS256 signature against Google's published JWKS, plus
+  `aud`, `iss`, `exp` and `sub`. No `firebase-admin`, no service-account
+  key. It also refuses a sign-in older than
+  `FACET_FIREBASE_MAX_AUTH_AGE_SECONDS` (15 min), because an hour-old ID token
+  is about to become a 30-day session.
+- **Firebase is in-memory in the browser, on purpose.** Its default keeps a
+  refresh token in IndexedDB, readable by any injected script — what the
+  httpOnly cookie exists to avoid. So `initializeAuth` uses
+  `inMemoryPersistence`, the Firebase sign-in is dropped after the exchange,
+  and Google/GitHub use a popup (a redirect would reload the page and lose
+  it). Only the sign-in page and "Email me a reset link" import the SDK.
+- **An account is found by uid, then by verified email, then made.** The
+  email step is how accounts from before Firebase (and CLI-made ones) are
+  claimed. **It requires `email_verified`** — otherwise anyone could register
+  someone else's address with a password in Firebase and walk into their
+  portfolios. An unverified email also cannot make an account (403
+  `email_unverified`). A token nobody owns yet answers 422 `handle_required`
+  and the page asks for a name and handle, then posts again.
+- **FACET's sessions end when Firebase's do.** Firebase never expires a
+  session on a clock; it ends one when the user is deleted or disabled, or
+  when `validSince` moves past the sign-in (password change or reset, email
+  change, admin revocation). `AuthService.refresh` asks Firebase on every
+  rotation (`app/core/firebase_accounts.py`, the Identity Toolkit
+  `accounts:lookup` admin call) and follows: deleted or disabled revokes every
+  session (`account_disabled`), a later `validSince` revokes every session
+  signed in before it (`firebase_session_revoked`). So a change in Firebase
+  reaches FACET within one access token — an hour, matching Firebase's own
+  ID tokens; FACET's own sign-outs stay immediate. `auth_sessions.signed_in_at`
+  is the Firebase sign-in moment, carried across rotations — `created_at` is
+  only the latest rotation. The 30-day refresh window slides, so an account in
+  use is never signed out by FACET's own clock, and FACET sets no password
+  rules of its own. The admin call needs `FACET_FIREBASE_SERVICE_ACCOUNT` (the
+  key JSON or a path; never committed). Without it the check is skipped with a
+  warning. If Google is unreachable it **fails open** and logs: an outage must
+  not sign everyone out.
+- **Deleting an account deletes its Firebase login, both or neither.**
+  `DELETE /account` removes the rows, then deletes the Firebase user before
+  the commit; if Firebase cannot be reached it answers 503
+  `firebase_unreachable` and the rollback keeps everything. A Firebase login
+  left behind would sign straight back in to a fresh, empty account.
+- **An email changed in Firebase is copied to `users.email`** on sign-in and
+  on refresh — only once Firebase has verified it, and only if no other
+  account holds it, because the email is how a pre-Firebase account is
+  claimed. (Firebase also revokes sessions on an email change, so in practice
+  it arrives with the next sign-in.)
+- **Never name an email-link return parameter `link`.** Firebase reads `link`
+  (and `deep_link_id`) as a nested action URL, so `/signin?link=1` made every
+  real sign-in link look like no link at all. It is `?via=email-link`.
+- **An error that reports a revocation must not roll it back.** Errors roll
+  the request's transaction back, which used to undo "every session is
+  revoked" (refresh-token reuse) along with the 401 that announced it. An
+  `AppError` raised with `keep_writes=True` is committed by `TransactionRoute`
+  before it propagates. The app's test harness shares one transaction and
+  cannot see this, so `test_keep_writes_commits_before_the_error_and_others_do_not`
+  drives `TransactionRoute` on its own app.
+- **`users.email` is nullable**: a phone-only account has none.
+- **Tests fake the verifier**, overriding `get_firebase_verifier` with
+  `fake_verify` (`tests/factories.py`); `firebase_token(email, …)` builds a
+  token it reads. The real checks are in `tests/test_firebase.py` against a
+  key pair made in the test.
+- **Configuration.** The four `NEXT_PUBLIC_FIREBASE_*` values are public but
+  build-time: `.env.local` locally, Dockerfile build args (Render passes the
+  service's env vars) in the image. In the Firebase console, every method
+  used must be enabled and the deployed host added to Authorised domains.
+  Phone sign-in needs the Blaze plan.
+- `PASSWORD_MIN` in `types.ts` mirrors the Firebase project's password
+  policy, which is what enforces it.
+
 ## The backend
 
 `backend/` is a FastAPI service on PostgreSQL, and it is where everything now
@@ -785,9 +867,10 @@ deleted.
   host, email notifications need a mail service. Each renders a
   `<ServerNotice>` saying so in as many words. Do not quietly make them look
   functional — if you add one, delete its notice in the same change.
-  Everything else on that page is real: sign-in, passwords, two-step (TOTP),
-  single-use recovery codes, the device list and its revoke buttons, and all
-  four Privacy switches.
+  Everything else on that page is real: sign-in (through Firebase), the
+  password-reset email, the device list and its revoke buttons, and all four
+  Privacy switches. Two-step says "not offered yet" — it is Firebase's to
+  provide and needs its Blaze plan.
 - **The published page has no signed-out vs. owner distinction**, so
   "Claim your page" is decorative. The `badge` privacy switch hides it.
 - **Reordering is buttons, not drag.** The canvas draws a drag handle and says
@@ -798,7 +881,7 @@ deleted.
 - **Slugs are global.** Two accounts cannot both hold `rohan`, because the
   address is `facet.page/<slug>` with nothing in front of it. The create
   dialog surfaces the 409 as a message.
-- **The frontend has no test runner.** The backend has 358 pytest tests;
+- **The frontend has no test runner.** The backend has 379 pytest tests;
   changes here are checked with `npm run lint`, `npm run build` and by
   actually opening the app.
 

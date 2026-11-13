@@ -58,3 +58,7 @@ codeql-dbs/
 codeql-results/
 codeql-custom-queries-*/
 .vscode/
+
+# Firebase service-account keys (the downloaded file is named like this).
+# A secret: keep it out of the repository.
+*firebase-adminsdk*.json

@@ -26,14 +26,14 @@ async def test_a_supplied_request_id_is_echoed_back(client):
 
 
 async def test_validation_failure_names_the_field(client):
-    response = await client.post("/api/v1/auth/register", json={"email": "not-an-email"})
+    response = await client.post("/api/v1/auth/firebase", json={"handle": "x"})
     assert response.status_code == 422
 
     error = response.json()["error"]
     assert error["code"] == "validation_failed"
     fields = {item["field"] for item in error["details"]["fields"]}
-    assert "email" in fields
-    assert "password" in fields
+    assert "idToken" in fields
+    assert "handle" in fields
 
 
 async def test_field_messages_are_written_for_a_person(client):
@@ -42,13 +42,12 @@ async def test_field_messages_are_written_for_a_person(client):
     "value is not a valid email address: An email address must have an
     @-sign." is a developer's sentence; the envelope promises a person's.
     """
-    response = await client.post("/api/v1/auth/register", json={"email": "not-an-email"})
+    response = await client.post("/api/v1/auth/firebase", json={})
     messages = {
         item["field"]: item["message"] for item in response.json()["error"]["details"]["fields"]
     }
 
-    assert messages["email"] == "Enter an email address in the form name@example.com."
-    assert messages["password"] == "This is required."
+    assert messages["idToken"] == "This is required."
     for message in messages.values():
         assert not message.startswith("value is not")
         assert not message.startswith("Value error,")

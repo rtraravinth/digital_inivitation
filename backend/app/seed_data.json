@@ -242,7 +242,8 @@
         "spacing": "standard",
         "photo": false,
         "columns": "auto",
-        "backdrop": "none"
+        "backdrop": "none",
+        "backdropColor": ""
       }
     },
     "sections": [
@@ -764,7 +765,8 @@
         "spacing": "standard",
         "photo": false,
         "columns": "auto",
-        "backdrop": "none"
+        "backdrop": "none",
+        "backdropColor": ""
       }
     },
     "footer": {
@@ -920,7 +922,8 @@
         "spacing": "standard",
         "photo": false,
         "columns": "auto",
-        "backdrop": "none"
+        "backdrop": "none",
+        "backdropColor": ""
       }
     },
     "footer": {
@@ -1049,7 +1052,8 @@
         "spacing": "standard",
         "photo": false,
         "columns": "auto",
-        "backdrop": "none"
+        "backdrop": "none",
+        "backdropColor": ""
       }
     },
     "footer": {
@@ -1213,7 +1217,8 @@
         "spacing": "standard",
         "photo": false,
         "columns": "auto",
-        "backdrop": "none"
+        "backdrop": "none",
+        "backdropColor": ""
       }
     },
     "footer": {

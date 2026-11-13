@@ -227,7 +227,7 @@ export function clearAccountError() {
   notify();
 }
 
-export async function refreshAccount() {
+async function refreshAccount() {
   await load();
 }
 

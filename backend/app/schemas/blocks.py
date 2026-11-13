@@ -105,18 +105,6 @@ class GalleryBlock(_Block):
     )
 
 
-#: The resume lists that can be placed on the page. Mirrors ``PAGE_BLOCKS``
-#: in src/lib/types.ts.
-RESUME_LIST_TYPES: tuple[str, ...] = (
-    "experience",
-    "education",
-    "skills",
-    "certifications",
-    "languages",
-    "awards",
-)
-
-
 class ResumeListBlock(_Block):
     """One of the resume's lists, shown in this section.
 

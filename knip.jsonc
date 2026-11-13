@@ -1,0 +1,12 @@
+{
+  "$schema": "https://unpkg.com/knip@5/schema-jsonc.json",
+  // backend/scripts/dump_seed.mjs reads src/lib/seed.ts from disk rather than
+  // importing it, so knip cannot follow the link on its own.
+  "entry": ["scripts/*.mjs", "src/lib/seed.ts"],
+  "project": ["src/**/*.{ts,tsx}", "scripts/*.mjs", "backend/scripts/*.mjs"],
+  // postcss arrives with @tailwindcss/postcss; tailwindcss is imported from
+  // globals.css, which knip does not read.
+  "ignoreDependencies": ["postcss", "tailwindcss"]
+  // Every rule is an error, unused exports included: export only what
+  // another module imports.
+}

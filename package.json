@@ -7,7 +7,9 @@
     "api": "node scripts/api.mjs",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "typecheck": "tsc --noEmit",
+    "knip": "knip"
   },
   "dependencies": {
     "firebase": "^13.3.0",
@@ -23,12 +25,16 @@
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.4.5",
+    "eslint-plugin-jsx-a11y": "6.10.2",
+    "knip": "5.88.1",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "typescript": "^5",
+    "typescript-eslint": "8.72.1"
   },
   "overrides": {
     "@typescript-eslint/typescript-estree": {
       "minimatch": "^11.0.1"
-    }
+    },
+    "@grpc/grpc-js": "1.14.7"
   }
 }

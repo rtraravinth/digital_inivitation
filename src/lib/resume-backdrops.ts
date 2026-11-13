@@ -15,7 +15,7 @@ import type { Resume, ResumeBackdrop } from "./types";
    a corner sits flush with the paper's top rather than below its margin.
    ──────────────────────────────────────────────────────────────────────── */
 
-export type BgLayer = {
+type BgLayer = {
   image: string;
   size: string;
   position: string;
@@ -247,7 +247,7 @@ export function backdropLayers(id: ResumeBackdrop, colour: string, soft = true):
 }
 
 /** The paper ground (`paperGround()`) as a bottom layer, so decoration can sit over it. */
-export function groundLayer(ground: string): BgLayer[] {
+function groundLayer(ground: string): BgLayer[] {
   return ground.startsWith("linear-gradient")
     ? // Repeats: on the printed page "100%" is one page tall, not the document.
       [{ image: ground, size: "100% 100%", position: "0 0", repeat: "repeat-y" }]

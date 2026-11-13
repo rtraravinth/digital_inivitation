@@ -82,7 +82,7 @@ export function ShareDialog({
     },
     {
       label: "Email signature",
-      onClick: () => copyText(signature, "Signature copied — paste it into your email settings."),
+      onClick: () => void copyText(signature, "Signature copied — paste it into your email settings."),
       icon: <Icon d={<path d="M4 18c3-6 5-6 6-3s3 3 5-1 3-4 5 1" />} size={17} />,
     },
     ...(nativeShare

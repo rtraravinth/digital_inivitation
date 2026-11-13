@@ -29,8 +29,26 @@ because the connection never arrives. Pass flags through when you need them:
 ```
 npm run build
 npm run lint
-cd backend && .venv/bin/python -m pytest    # 379 tests (.venv/Scripts on Windows)
+npm run typecheck
+npm run knip
+cd backend && .venv/bin/python -m pytest    # 387 tests (.venv/Scripts on Windows)
 ```
+
+**CI runs all of these on every pull request** (`.github/workflows/ci.yml`),
+plus `ruff format --check`, `pip-audit`, `npm audit`, the migration checks
+(one head, `alembic check`, down to base and back), the seed check (re-run
+`dump_seed.mjs`, no diff), actionlint/zizmor/shellcheck and gitleaks.
+`codeql.yml` fails on a security-severity of 7.0 or more. Advisory, not
+blocking: mypy (33 errors when added; make it blocking once clean), squawk on
+new migrations, and six strict `jsx-a11y` rules listed in `eslint.config.mjs`.
+Ruff includes Bandit's rules (`S`); a `noqa` on one carries its reason.
+Coverage must stay at or above 80% (`pyproject.toml`).
+
+**knip fails on any unused file, dependency or export.** Export only what
+another module imports; a helper its own file uses stays unexported. Python
+has no such gate — `vulture` reports FastAPI routes, validators and pydantic
+fields as unused — so check by hand (`vulture app --min-confidence 60`)
+before calling backend code dead.
 
 `NEXT_PUBLIC_API_URL` points the frontend at the API; see
 `.env.local.example`. `backend/README.md` covers the database and migrations.
@@ -766,6 +784,17 @@ it, but two rules matter from this side:
   broken. The token names one asset and expires
   (`FACET_ASSET_URL_TTL_MINUTES`, 24h). Published pages are unaffected: they
   use `/api/v1/public/assets/{id}`, which needs nothing.
+- **Every upload is served sandboxed.** Uploads come from the app's own
+  origin, so an SVG opened as a page would run its `<script>` there and could
+  refresh the viewer's session. `serve()` in `api/v1/assets.py` sends
+  `UPLOAD_CSP` (`default-src 'none'` … `sandbox`) and `nosniff` on both asset
+  routes, and lets Starlette RFC 6266-encode the file name. PDFs alone skip
+  the sandbox, because Chrome will not render a sandboxed PDF. Keep the
+  header on any new route that serves stored bytes.
+- **Production will not start on the development JWT secret.** `Settings`
+  refuses `env == "prod"` with `DEV_JWT_SECRET` or a secret under 32
+  characters, so a host that forgets `FACET_JWT_SECRET` fails at boot
+  instead of accepting forged tokens.
 - **`src/lib/api.ts` is the only module that knows the API exists.** It owns
   the access token, one silent refresh-and-retry on a 401, and turning an
   error envelope into an `ApiError` with a `code` a caller can branch on.
@@ -881,7 +910,7 @@ deleted.
 - **Slugs are global.** Two accounts cannot both hold `rohan`, because the
   address is `facet.page/<slug>` with nothing in front of it. The create
   dialog surfaces the 409 as a message.
-- **The frontend has no test runner.** The backend has 379 pytest tests;
+- **The frontend has no test runner.** The backend has 387 pytest tests;
   changes here are checked with `npm run lint`, `npm run build` and by
   actually opening the app.
 

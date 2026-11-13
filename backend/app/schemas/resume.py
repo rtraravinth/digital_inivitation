@@ -96,11 +96,6 @@ ResumeBlock = Literal[
     "languages",
     "awards",
 ]
-#: The structured blocks — the ones that can also go on the page. Summary is
-#: the header's About and projects are the page's own sections, so neither
-#: has a page switch of its own.
-PageBlock = Literal["experience", "education", "skills", "certifications", "languages", "awards"]
-
 #: The order a new resume prints its blocks in: what a recruiter reads first.
 DEFAULT_ORDER: list[str] = [
     "summary",

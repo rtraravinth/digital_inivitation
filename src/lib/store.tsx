@@ -95,7 +95,7 @@ const getReady = () => ready;
 const notReady = () => false;
 
 /** Re-read everything from the server, discarding local state. */
-export async function refreshPortfolios() {
+async function refreshPortfolios() {
   await load();
 }
 
@@ -171,7 +171,7 @@ if (typeof window !== "undefined") {
 
 export type StartFrom = { kind: "blank" } | { kind: "copy"; id: string } | { kind: "founder" };
 
-export async function createPortfolioAsync(
+async function createPortfolioAsync(
   name: string,
   slug: string,
   startFrom: StartFrom,
@@ -351,7 +351,7 @@ function updateSection(
  * appends locally only after the request resolves. Callers that navigate to
  * a new section await `addSectionAsync`.
  */
-export async function addSectionAsync(portfolioId: string): Promise<string | null> {
+async function addSectionAsync(portfolioId: string): Promise<string | null> {
   clearError();
   try {
     const created = await api.post<Section>(`/portfolios/${portfolioId}/sections`, {});

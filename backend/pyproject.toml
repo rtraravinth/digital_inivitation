@@ -24,6 +24,11 @@ dev = [
   "httpx>=0.28",
   "ruff>=0.8",
   "psycopg[binary]>=3.2",
+  # CI's checks, so a developer can run the same ones locally.
+  "pytest-cov>=7.1",
+  "mypy>=2.4",
+  "pip-audit>=2.10",
+  "squawk-cli>=2.71",
 ]
 
 [build-system]
@@ -39,12 +44,32 @@ asyncio_default_fixture_loop_scope = "function"
 testpaths = ["tests"]
 filterwarnings = ["error::DeprecationWarning:app.*"]
 
+[tool.coverage.run]
+source = ["app"]
+
+[tool.coverage.report]
+# 85% when this floor was set. Raise it as coverage grows; never lower it.
+fail_under = 80
+show_missing = true
+skip_covered = true
+
+[tool.mypy]
+# Advisory in CI for now: 33 errors when it was added, mostly ORM columns
+# typed str where the schema wants a Literal. Make the CI step blocking once
+# `mypy` is clean.
+python_version = "3.12"
+files = ["app"]
+ignore_missing_imports = true
+warn_unused_ignores = true
+
 [tool.ruff]
 line-length = 100
 target-version = "py312"
 
 [tool.ruff.lint]
-select = ["E", "F", "I", "UP", "B", "C4", "SIM", "RUF"]
+# S is Bandit's security rules; ASYNC catches blocking calls in async code;
+# DTZ catches datetimes without a timezone.
+select = ["E", "F", "I", "UP", "B", "C4", "SIM", "RUF", "S", "ASYNC", "DTZ", "PT"]
 ignore = ["B008"]
 
 [tool.ruff.lint.isort]
@@ -53,7 +78,10 @@ ignore = ["B008"]
 known-third-party = ["alembic"]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/*" = ["E501"]
+# Tests assert, and their tokens and passwords are fixtures, not secrets.
+"tests/*" = ["E501", "S101", "S105", "S106"]
+# Migrations format their own constants into DDL; no input reaches them.
+"alembic/versions/*" = ["S608"]
 "app/seed_data.py" = ["E501"]
 # The ATS check's suggestions are sentences a person reads, and its patterns
 # match the dashes and apostrophes job ads are written with.

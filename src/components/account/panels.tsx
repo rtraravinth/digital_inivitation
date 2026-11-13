@@ -44,7 +44,7 @@ import {
    that need a service this build does not have say so on screen.
    ──────────────────────────────────────────────────────────────────────── */
 
-export type PanelProps = {
+type PanelProps = {
   account: AccountSettings;
   portfolios: Portfolio[];
   analytics: Analytics;
@@ -55,7 +55,7 @@ const EASE = [0.16, 1, 0.3, 1] as const;
 /** Mirrors HANDLE_PATTERN in backend/app/schemas/account.py. */
 const HANDLE = /^[a-z0-9][a-z0-9-]{1,30}[a-z0-9]$/;
 
-export function handleProblem(value: string): string | null {
+function handleProblem(value: string): string | null {
   if (!value) return "Choose a handle — it is the start of every page address.";
   if (value.length < 3) return "At least three characters.";
   if (value.length > 32) return "At most 32 characters.";
@@ -125,7 +125,7 @@ function SettingRow({
 }
 
 /** A status label: filled when the thing is on, outlined when it is not. */
-export function Pill({ on, children }: { on: boolean; children: React.ReactNode }) {
+function Pill({ on, children }: { on: boolean; children: React.ReactNode }) {
   return (
     <span
       className="inline-flex h-6 flex-none items-center rounded-full px-2.5 text-[12px] font-medium whitespace-nowrap"
@@ -177,7 +177,7 @@ function Switch({ on, onToggle, label }: { on: boolean; onToggle: () => void; la
  * not chosen. The settings are stored and shown; nothing enforces them, and
  * pretending otherwise would be worse than not drawing the screen.
  */
-export function ServerNotice({ what }: { what: string }) {
+function ServerNotice({ what }: { what: string }) {
   return (
     <div
       role="note"
@@ -225,7 +225,7 @@ function Message({ kind, children }: { kind: "error" | "ok"; children: React.Rea
 }
 
 /** Up to two initials, for an account with no photo. */
-export function initialsOf(name: string): string {
+function initialsOf(name: string): string {
   const parts = name.trim().split(/\s+/).filter(Boolean);
   if (parts.length === 0) return "?";
   return (parts[0][0] + (parts.length > 1 ? parts[parts.length - 1][0] : "")).toUpperCase();
@@ -257,7 +257,7 @@ export function Avatar({ profile, size }: { profile: AccountProfile; size: numbe
 
 /* ── 1. profile ───────────────────────────────────────────────────────── */
 
-export function ProfilePanel({ account }: PanelProps) {
+function ProfilePanel({ account }: PanelProps) {
   const [error, setError] = useState("");
   const [saved, setSaved] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -413,7 +413,7 @@ export function ProfilePanel({ account }: PanelProps) {
 /* ── 2. sign-in & security ────────────────────────────────────────────── */
 
 /** Everything here is enforced by the server. */
-export function SecurityPanel({ account }: PanelProps) {
+function SecurityPanel({ account }: PanelProps) {
   const s = account.security;
 
   const [sessions, setSessions] = useState<DeviceSession[] | null>(null);
@@ -593,7 +593,7 @@ export function SecurityPanel({ account }: PanelProps) {
 
 /* ── 3. page addresses ────────────────────────────────────────────────── */
 
-export function AddressesPanel({ account, portfolios, analytics }: PanelProps) {
+function AddressesPanel({ account, portfolios, analytics }: PanelProps) {
   const [copied, setCopied] = useState<string | null>(null);
   const [draftHandle, setDraftHandle] = useState<string | null>(null);
   const [error, setError] = useState("");
@@ -758,7 +758,7 @@ export function AddressesPanel({ account, portfolios, analytics }: PanelProps) {
 
 /* ── 4. plan & billing ────────────────────────────────────────────────── */
 
-export function PlanPanel({ account }: PanelProps) {
+function PlanPanel({ account }: PanelProps) {
   return (
     <div>
       <PanelHeader title="Plan & billing" desc="What you’re on, and what each plan includes." />
@@ -816,7 +816,7 @@ export function PlanPanel({ account }: PanelProps) {
 
 /* ── 5. notifications ─────────────────────────────────────────────────── */
 
-export function NotificationsPanel({ account }: PanelProps) {
+function NotificationsPanel({ account }: PanelProps) {
   return (
     <div>
       <PanelHeader title="Notifications" desc="What we’d email you about." />
@@ -838,7 +838,7 @@ export function NotificationsPanel({ account }: PanelProps) {
 
 /* ── 6. privacy & data ────────────────────────────────────────────────── */
 
-export function PrivacyPanel({ account, portfolios }: PanelProps) {
+function PrivacyPanel({ account, portfolios }: PanelProps) {
   const router = useRouter();
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");

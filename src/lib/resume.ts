@@ -28,7 +28,7 @@ import {
  * row rather than new CSS. A few carry a finishing touch keyed off
  * `data-template`; keep those small.
  */
-export type TemplateParts = {
+type TemplateParts = {
   /** `left` / `right` put Skills, Certifications, Languages and Awards in a narrow column. */
   layout: "one" | "left" | "right";
   /** The narrow column's ground. `solid` runs the accent down the whole sheet. */
@@ -68,7 +68,7 @@ export const TEMPLATE_CATEGORIES: Array<{ id: TemplateCategory; name: string }> 
   { id: "entry", name: "Entry level" },
 ];
 
-export type ResumeTemplate = TemplateParts & {
+type ResumeTemplate = TemplateParts & {
   id: ResumeTemplateId;
   name: string;
   desc: string;
@@ -470,9 +470,9 @@ export const TEMPLATE_DEFAULTS = Object.fromEntries(RESUME_TEMPLATES.map((t) => 
 >;
 
 /** Width of the narrow column, in mm. */
-export const ASIDE_MM = { tint: 58, rule: 56, solid: 60, plain: 56 } as const;
+const ASIDE_MM = { tint: 58, rule: 56, solid: 60, plain: 56 } as const;
 /** Gap between the columns, in mm — wider when the aside is solid colour, so its text keeps clear of the edge. */
-export const COLUMN_GAP_MM = { tint: 7, rule: 8, solid: 12, plain: 7 } as const;
+const COLUMN_GAP_MM = { tint: 7, rule: 8, solid: 12, plain: 7 } as const;
 
 export const COLUMN_OPTIONS: Array<{ id: ResumeColumns; name: string }> = [
   { id: "auto", name: "Template" },
@@ -528,24 +528,6 @@ export function initialsOf(name: string): string {
 }
 
 export const RESUME_ACCENTS = ["#111111", "#1d3f8a", "#0f766e", "#1f3a32", "#5b2545", "#b5261e", "#8a6f1f", "#334155"];
-
-/** Faces that hold up at 10pt for a page of prose. */
-export const RESUME_FONTS: FontId[] = [
-  "inter",
-  "dm-sans",
-  "manrope",
-  "lexend",
-  "outfit",
-  "archivo",
-  "schibsted-grotesk",
-  "source-serif-4",
-  "lora",
-  "fraunces",
-  "bitter",
-  "roboto-slab",
-  "playfair-display",
-  "space-grotesk",
-];
 
 export const BLOCK_LABEL: Record<ResumeBlock, string> = {
   summary: "Summary",
@@ -642,10 +624,10 @@ export function contactItems(p: Portfolio): ContactItem[] {
   return items;
 }
 
-export type ProjectItem = { id: string; title: string; tab: string; description: string; url: string };
+type ProjectItem = { id: string; title: string; tab: string; description: string; url: string };
 
 /** What the resume calls the page's own sections. */
-export const PROJECTS_HEADING = "Projects";
+const PROJECTS_HEADING = "Projects";
 
 /**
  * The page's own sections switched on for the resume, as entries under one
@@ -728,7 +710,7 @@ export function visibleBlocks(p: Portfolio): ResumeBlock[] {
    line under it, a date, any further lines, and tags.
    ──────────────────────────────────────────────────────────────────────── */
 
-export type ListEntry = {
+type ListEntry = {
   id: string;
   title: string;
   /** Where or from whom: the company, the school, the issuer. */
@@ -746,7 +728,7 @@ const line = (...parts: string[]) => parts.map((s) => s.trim()).filter(Boolean).
 const entry = (e: Partial<ListEntry> & { id: string; title: string }): ListEntry => ({ sub: "", date: "", lines: [], tags: [], url: "", ...e });
 
 /** One list's entries as the page draws them; blank rows drop out. */
-export function listEntries(resume: Resume, list: PageBlock): ListEntry[] {
+function listEntries(resume: Resume, list: PageBlock): ListEntry[] {
   switch (list) {
     case "experience":
       return resume.experience

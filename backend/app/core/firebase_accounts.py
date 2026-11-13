@@ -40,7 +40,7 @@ from app.core.errors import ServiceUnavailable
 
 logger = logging.getLogger("app.firebase")
 
-TOKEN_URL = "https://oauth2.googleapis.com/token"
+TOKEN_URL = "https://oauth2.googleapis.com/token"  # noqa: S105 - a URL, not a secret
 LOOKUP_URL = "https://identitytoolkit.googleapis.com/v1/projects/{project}/accounts:lookup"
 DELETE_URL = "https://identitytoolkit.googleapis.com/v1/projects/{project}/accounts:delete"
 SCOPE = "https://www.googleapis.com/auth/identitytoolkit"
@@ -115,7 +115,8 @@ class FirebaseAccounts:
                 }
             ).encode()
             request = urllib.request.Request(TOKEN_URL, data=body, method="POST")
-            with urllib.request.urlopen(request, timeout=TIMEOUT_SECONDS) as response:
+            # S310: the URL is this module's https constant, never caller input.
+            with urllib.request.urlopen(request, timeout=TIMEOUT_SECONDS) as response:  # noqa: S310
                 payload = json.load(response)
 
             self._token = payload["access_token"]
@@ -123,7 +124,8 @@ class FirebaseAccounts:
             return self._token
 
     def _post(self, url: str, body: dict) -> dict:
-        request = urllib.request.Request(
+        # S310: every caller passes one of this module's https constants.
+        request = urllib.request.Request(  # noqa: S310
             url.format(project=urllib.parse.quote(self._project, safe="")),
             data=json.dumps(body).encode(),
             method="POST",
@@ -132,7 +134,7 @@ class FirebaseAccounts:
                 "Content-Type": "application/json",
             },
         )
-        with urllib.request.urlopen(request, timeout=TIMEOUT_SECONDS) as response:
+        with urllib.request.urlopen(request, timeout=TIMEOUT_SECONDS) as response:  # noqa: S310
             return json.load(response)
 
     def _lookup_sync(self, uid: str) -> AccountState:

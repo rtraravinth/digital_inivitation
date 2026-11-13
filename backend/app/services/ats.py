@@ -334,7 +334,7 @@ def job_title(jd: str) -> str:
 
 def required_years(jd: str) -> int:
     found = [
-        int(n) for n in re.findall(r"(\d{1,2})\s*\+?\s*(?:-\s*\d{1,2}\s*)?(?:years|yrs)", jd, re.I)
+        int(n) for n in re.findall(r"(\d{1,2})\s*(?:\+\s*)?(?:-\s*\d{1,2}\s*)?(?:years|yrs)", jd, re.I)
     ]
     return max((n for n in found if n <= 25), default=0)
 

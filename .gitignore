@@ -52,3 +52,9 @@ next-env.d.ts
 # graphify knowledge graph output
 graphify-out/
 .claude/
+
+# CodeQL databases, scan results, and VS Code extension scaffolding
+codeql-dbs/
+codeql-results/
+codeql-custom-queries-*/
+.vscode/

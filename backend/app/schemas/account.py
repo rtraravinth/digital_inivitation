@@ -6,7 +6,10 @@ field, so the Account page consumes it with no mapping layer.
 
 from __future__ import annotations
 
+import re
 import uuid
+from datetime import datetime
+from typing import Literal
 
 from pydantic import EmailStr, Field, field_validator
 
@@ -14,15 +17,15 @@ from app.models.enums import PlanId
 from app.schemas.asset import AssetOut
 from app.schemas.common import CamelModel, SafeUrl, StrictCamelModel
 
-HANDLE_PATTERN = r"^[a-z0-9][a-z0-9-]{1,30}[a-z0-9]$"
+SUBDOMAIN_PATTERN = r"^[a-z0-9][a-z0-9-]{1,30}[a-z0-9]$"
 
-#: Handles that can never be claimed, because the address is
-#: ``facet.com/<handle>/<slug>`` and these are, or may become, something else
+#: Subdomains that can never be claimed, because the address is
+#: ``<subdomain>.facetfolio.com/<slug>`` and these are, or may become, something else
 #: at that position — an app route, a hostname, or a word a support page will
-#: want. This list can only ever grow: once an account holds a handle, taking
+#: want. This list can only ever grow: once an account holds a subdomain, taking
 #: it back breaks every link already shared, so anything doubtful belongs here
 #: on the first day rather than the second.
-RESERVED_HANDLES: frozenset[str] = frozenset(
+RESERVED_SUBDOMAINS: frozenset[str] = frozenset(
     {
         # routes this app already serves
         "account",
@@ -108,7 +111,7 @@ class LinkItem(StrictCamelModel):
 
 class ProfileOut(CamelModel):
     name: str
-    handle: str | None
+    subdomain: str | None
     current: str
     about: str
     tags: list[str]
@@ -127,18 +130,44 @@ class SecurityOut(CamelModel):
     sign_in_provider: str
 
 
+class DnsRecordOut(CamelModel):
+    """One record to add at the domain's DNS provider."""
+
+    type: Literal["TXT", "CNAME", "A", "ALIAS"]
+    #: What a DNS provider's "Host" or "Name" field wants: relative to the
+    #: registered domain, "@" for the domain itself.
+    host: str
+    #: The same name written out in full.
+    name: str
+    value: str
+    purpose: Literal["verify", "route"]
+
+
+class DomainSetupOut(CamelModel):
+    domain: str
+    verified: bool
+    verified_at: datetime | None
+    records: list[DnsRecordOut]
+    #: Only on a check's answer: whether the domain already resolves to us.
+    #: Null otherwise — nothing is looked up to read the account.
+    routing_ok: bool | None = None
+
+
 class AccountOut(CamelModel):
     profile: ProfileOut
     security: SecurityOut
     plan: PlanId
     custom_domain: str
+    #: Null with no domain set, or when this server has no root domain to
+    #: point one at (``FACET_ROOT_DOMAIN``).
+    domain_setup: DomainSetupOut | None
     notifications: dict[str, bool]
     privacy: dict[str, bool]
 
 
 class ProfilePatch(StrictCamelModel):
     name: str | None = Field(default=None, max_length=200)
-    handle: str | None = Field(default=None, pattern=HANDLE_PATTERN)
+    subdomain: str | None = Field(default=None, pattern=SUBDOMAIN_PATTERN)
     current: str | None = Field(default=None, max_length=2000)
     about: str | None = Field(default=None, max_length=5000)
     tags: list[str] | None = Field(default=None, max_length=40)
@@ -158,13 +187,23 @@ class PlanPatch(StrictCamelModel):
     plan: PlanId
 
 
+#: A hostname of two labels or more, ASCII (punycode for anything else).
+DOMAIN_PATTERN = re.compile(
+    r"^(?=.{4,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+(?:[a-z]{2,63}|xn--[a-z0-9-]{1,59})$"
+)
+
+
 class DomainPatch(StrictCamelModel):
     custom_domain: str = Field(default="", max_length=255)
 
     @field_validator("custom_domain")
     @classmethod
     def _tidy(cls, value: str) -> str:
-        return value.strip().lower().removeprefix("https://").removeprefix("http://").strip("/")
+        value = value.strip().lower().removeprefix("https://").removeprefix("http://")
+        value = value.split("/", 1)[0].rstrip(".")
+        if value and not DOMAIN_PATTERN.match(value):
+            raise ValueError("Enter a domain like yourname.com, without a path.")
+        return value
 
 
 class NotificationsPatch(StrictCamelModel):

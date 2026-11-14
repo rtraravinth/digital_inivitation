@@ -18,7 +18,7 @@ type SessionUser = {
   /** Null for an account made with a phone number. */
   email: string | null;
   name: string;
-  handle: string | null;
+  subdomain: string | null;
 };
 
 type SessionStatus = "loading" | "in" | "out";
@@ -59,7 +59,7 @@ function bootstrap() {
       if (!ok) return emit({ user: null, status: "out" });
       try {
         const account = await api.get<{
-          profile: { name: string; handle: string | null };
+          profile: { name: string; subdomain: string | null };
           security: { email: string | null };
         }>("/account");
         emit({
@@ -67,7 +67,7 @@ function bootstrap() {
             id: "me",
             email: account.security.email,
             name: account.profile.name,
-            handle: account.profile.handle,
+            subdomain: account.profile.subdomain,
           },
           status: "in",
         });
@@ -103,12 +103,12 @@ function adopt(response: AuthResponse) {
  * Trade a Firebase ID token for a FACET session.
  *
  * Firebase has proved who this is; the API decides which account that is.
- * A token nobody owns yet answers 422 `handle_required` — the sign-in page
- * then asks for a name and handle and calls this again with them.
+ * A token nobody owns yet answers 422 `subdomain_required` — the sign-in page
+ * then asks for a name and subdomain and calls this again with them.
  */
 export async function exchange(
   idToken: string,
-  newAccount?: { name: string; handle: string },
+  newAccount?: { name: string; subdomain: string },
 ) {
   adopt(await api.post<AuthResponse>("/auth/firebase", { idToken, ...newAccount }));
 }

@@ -15,6 +15,8 @@ dependencies = [
   "pillow>=11.0",
   "python-multipart>=0.0.17",
   "typer>=0.15",
+  # Custom-domain verification reads TXT and CNAME records.
+  "dnspython>=2.7",
 ]
 
 [project.optional-dependencies]

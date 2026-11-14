@@ -14,9 +14,9 @@ from PIL import Image
 from sqlalchemy import select
 
 from app.models import Asset
-from tests.factories import TEST_HANDLE
+from tests.factories import TEST_SUBDOMAIN
 
-PUBLIC = f"/api/v1/public/p/{TEST_HANDLE}"
+PUBLIC = f"/api/v1/public/p/{TEST_SUBDOMAIN}"
 
 
 def png_bytes(colour=(10, 20, 30)) -> bytes:

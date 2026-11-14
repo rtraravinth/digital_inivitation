@@ -220,8 +220,8 @@ class PortfolioService:
         self, user_id: uuid.UUID, slug: str, *, exclude_id: uuid.UUID | None = None
     ) -> None:
         if not await self.slug_available(user_id, slug, exclude_id=exclude_id):
-            # Only within this account: the address is facet.page/<handle>/<slug>,
-            # so the handle in front is what separates one person's "freelancer"
+            # Only within this account: the address is <subdomain>.facetfolio.com/<slug>,
+            # so the subdomain in front is what separates one person's "freelancer"
             # from another's.
             raise Conflict(
                 "You already have a page at that address.",

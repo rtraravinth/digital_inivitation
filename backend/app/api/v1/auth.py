@@ -62,7 +62,7 @@ def _user_out(user: User) -> UserOut:
         id=user.id,
         email=user.email,
         name=user.profile.name if user.profile else "",
-        handle=user.profile.handle if user.profile else None,
+        subdomain=user.profile.subdomain if user.profile else None,
     )
 
 
@@ -85,7 +85,7 @@ async def firebase_sign_in(
 ) -> AuthOut:
     identity = await verify(payload.id_token)
     user, tokens = await AuthService(session).sign_in(
-        identity, device, accounts, name=payload.name, handle=payload.handle
+        identity, device, accounts, name=payload.name, subdomain=payload.subdomain
     )
     _set_refresh_cookie(response, tokens.refresh_token)
     return _auth_out(user, tokens)

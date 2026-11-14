@@ -90,16 +90,33 @@ class Settings(BaseSettings):
     storage_quota_bytes: int = Field(default=250 * 1024 * 1024, ge=1024 * 1024)
     public_base_url: str = "http://localhost:8000"
 
+    #: The domain pages are published under: ``<subdomain>.<root_domain>/
+    #: <slug>``. Matches ``NEXT_PUBLIC_ROOT_DOMAIN`` on the frontend. Empty
+    #: turns custom domains off — there is no address for one to point at.
+    root_domain: str = ""
+    #: What a custom domain's CNAME (or an apex's ALIAS) points at. Empty
+    #: means the root domain itself.
+    domain_cname_target: str = ""
+    #: The host's address for an apex domain's A record, where it has a
+    #: fixed one (Render's is in render.yaml). Empty offers ALIAS/ANAME to
+    #: the CNAME target instead, which most DNS providers support.
+    domain_apex_ips: list[str] = []
+
     media_root: Path = Path("media")
 
     @property
     def cors_origin_regex(self) -> str | None:
-        """Private-network origins on :3000, in dev and test only."""
+        """Private-network origins on :3000, in dev and test only.
+
+        ``*.localhost`` too: a published page on its subdomain in
+        development (``rohan.localhost:3000``) reports its views from there.
+        """
         if self.is_prod or not self.cors_dev_lan:
             return None
         return (
             r"^https?://("
-            r"192\.168\.\d{1,3}\.\d{1,3}"
+            r"[a-z0-9-]+\.localhost"
+            r"|192\.168\.\d{1,3}\.\d{1,3}"
             r"|10\.\d{1,3}\.\d{1,3}\.\d{1,3}"
             r"|172\.(1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3}"
             r"):3000$"

@@ -15,7 +15,7 @@ from app.core.firebase import FirebaseIdentity
 from app.core.firebase_accounts import AccountChecker
 from app.core.security import create_access_token, hash_token, new_refresh_token
 from app.models import AccountProfile, AccountSettings, AuthSession, User
-from app.services.account import assert_handle_available
+from app.services.account import assert_subdomain_available
 
 logger = logging.getLogger("app.auth")
 
@@ -55,7 +55,7 @@ class AuthService:
         accounts: AccountChecker,
         *,
         name: str | None = None,
-        handle: str | None = None,
+        subdomain: str | None = None,
     ) -> tuple[User, IssuedTokens]:
         """Open a session for whoever Firebase has verified.
 
@@ -66,9 +66,9 @@ class AuthService:
            It is linked, but **only if Firebase has verified the address**:
            otherwise anyone could register ``someone@example.com`` with a
            password in Firebase and walk into that person's portfolios.
-        3. Nobody yet — create the account. That needs a handle, because the
-           handle is the front of every address the account publishes; without
-           one this answers 422 ``handle_required`` and the sign-in page asks.
+        3. Nobody yet — create the account. That needs a subdomain, because the
+           subdomain is the front of every address the account publishes; without
+           one this answers 422 ``subdomain_required`` and the sign-in page asks.
         """
         # Firebase's verdict first: a valid-looking ID token from before a
         # password reset or a revocation, or for a disabled user, opens nothing.
@@ -85,7 +85,7 @@ class AuthService:
             user = await self._link_by_email(identity)
 
         if user is None:
-            user = await self._create(identity, name, handle)
+            user = await self._create(identity, name, subdomain)
 
         if not user.is_active:
             raise Unauthenticated("This account is closed.", code="account_inactive")
@@ -120,7 +120,7 @@ class AuthService:
         return user
 
     async def _create(
-        self, identity: FirebaseIdentity, name: str | None, handle: str | None
+        self, identity: FirebaseIdentity, name: str | None, subdomain: str | None
     ) -> User:
         if identity.email is not None and not identity.email_verified:
             raise PermissionDenied(
@@ -128,21 +128,21 @@ class AuthService:
                 code="email_unverified",
             )
 
-        if not handle:
+        if not subdomain:
             raise ValidationFailed(
                 "Pick the address your pages will live at.",
-                code="handle_required",
+                code="subdomain_required",
                 details={"name": identity.name},
             )
 
-        # Before the user row, so a taken handle does not leave a half-made
+        # Before the user row, so a taken subdomain does not leave a half-made
         # account behind — and checked here rather than trusted to the unique
         # index, which cannot tell "taken" from "reserved".
-        await assert_handle_available(self.session, handle)
+        await assert_subdomain_available(self.session, subdomain)
 
         user = User(email=identity.email, firebase_uid=identity.uid, is_active=True)
         user.profile = AccountProfile(
-            name=(name or identity.name or "").strip()[:200], handle=handle, tags=[], links=[]
+            name=(name or identity.name or "").strip()[:200], subdomain=subdomain, tags=[], links=[]
         )
         user.settings = AccountSettings()
 

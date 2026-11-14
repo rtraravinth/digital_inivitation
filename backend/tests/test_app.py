@@ -26,14 +26,14 @@ async def test_a_supplied_request_id_is_echoed_back(client):
 
 
 async def test_validation_failure_names_the_field(client):
-    response = await client.post("/api/v1/auth/firebase", json={"handle": "x"})
+    response = await client.post("/api/v1/auth/firebase", json={"subdomain": "x"})
     assert response.status_code == 422
 
     error = response.json()["error"]
     assert error["code"] == "validation_failed"
     fields = {item["field"] for item in error["details"]["fields"]}
     assert "idToken" in fields
-    assert "handle" in fields
+    assert "subdomain" in fields
 
 
 async def test_field_messages_are_written_for_a_person(client):

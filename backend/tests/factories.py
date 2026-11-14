@@ -24,13 +24,13 @@ from app.models import User
 #: the way Google's keys would refuse a forgery.
 FAKE_TOKEN_PREFIX = "fake-firebase-token:"
 
-#: The first user's handle. Published addresses are
-#: /api/v1/public/p/<handle>/<slug>, so tests need it by name.
-TEST_HANDLE = "rohan"
+#: The first user's subdomain. Published addresses are
+#: /api/v1/public/p/<subdomain>/<slug>, so tests need it by name.
+TEST_SUBDOMAIN = "rohan"
 
 #: The second user's, for the tests that prove one account cannot reach
-#: another's pages through its own handle.
-OTHER_HANDLE = "priya"
+#: another's pages through its own subdomain.
+OTHER_SUBDOMAIN = "priya"
 
 
 def firebase_token(
@@ -108,16 +108,16 @@ async def sign_in(client: AsyncClient, token: str, **extra) -> object:
 
 
 async def register(
-    client: AsyncClient, email: str, *, name: str = "Test Person", handle: str | None = None
+    client: AsyncClient, email: str, *, name: str = "Test Person", subdomain: str | None = None
 ) -> dict:
-    # The handle is the base of every address the account publishes, so it is
+    # The subdomain is the base of every address the account publishes, so it is
     # required at sign-up. Derived from the local part here so a test that
     # does not care about addresses still gets a valid one.
     response = await sign_in(
         client,
         firebase_token(email),
         name=name,
-        handle=handle or email.split("@")[0].replace(".", "-"),
+        subdomain=subdomain or email.split("@")[0].replace(".", "-"),
     )
     assert response.status_code == 200, response.text
     return response.json()
@@ -129,7 +129,7 @@ def bearer(client: AsyncClient, access_token: str) -> None:
 
 @pytest.fixture
 async def registered(client: AsyncClient) -> dict:
-    return await register(client, "rohan@example.com", name="Rohan Mehta", handle=TEST_HANDLE)
+    return await register(client, "rohan@example.com", name="Rohan Mehta", subdomain=TEST_SUBDOMAIN)
 
 
 @pytest.fixture
@@ -153,7 +153,9 @@ async def other_auth_client(app) -> AsyncIterator[AsyncClient]:
         base_url="http://test",
         headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0) Firefox/133.0"},
     ) as other:
-        payload = await register(other, "priya@example.com", name="Priya Nair", handle=OTHER_HANDLE)
+        payload = await register(
+            other, "priya@example.com", name="Priya Nair", subdomain=OTHER_SUBDOMAIN
+        )
         bearer(other, payload["token"]["accessToken"])
         yield other
 

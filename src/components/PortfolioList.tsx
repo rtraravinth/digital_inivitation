@@ -13,7 +13,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
 import { AppHeader } from "./AppHeader";
-import { ICON, Icon, IconButton, Modal, NoHandleNotice, Segmented, StatusPill } from "./ui";
+import { ICON, Icon, IconButton, Modal, NoSubdomainNotice, Segmented, StatusPill } from "./ui";
 import { CreatePortfolioDialog } from "./CreatePortfolioDialog";
 import { PagePreview } from "./PagePreview";
 import { ShareDialog } from "./ShareDialog";
@@ -181,8 +181,8 @@ export function PortfolioList() {
             )}
           </AnimatePresence>
 
-          {accountReady && !account.profile.handle && live > 0 && (
-            <NoHandleNotice live={live} />
+          {accountReady && !account.profile.subdomain && live > 0 && (
+            <NoSubdomainNotice live={live} />
           )}
 
           {/* ── title row ───────────────────────────────────────── */}
@@ -573,7 +573,7 @@ function Card({
   actions: Actions;
   featured: boolean;
 }) {
-  const handle = useAccount().account.profile.handle;
+  const subdomain = useAccount().account.profile.subdomain;
   const reduced = useReducedMotion();
   const live = p.status === "live";
   const gx = useMotionValue(50);
@@ -581,7 +581,7 @@ function Card({
   const edge = useMotionTemplate`radial-gradient(280px circle at ${gx}% ${gy}%, color-mix(in srgb, var(--color-ink) 70%, transparent), transparent 70%)`;
   const now = useNow();
   const [hot, setHot] = useState(false);
-  const address = live && handle ? displayUrl(liveUrl(handle, p.slug)) : live ? "no public address yet" : "draft · not public yet";
+  const address = live && subdomain ? displayUrl(liveUrl(subdomain, p.slug)) : live ? "no public address yet" : "draft · not public yet";
 
   return (
     <motion.article
@@ -660,7 +660,7 @@ function Card({
             >
               {/* The pan moves one box height, so the page has to run to at
                   least two: a featured card's box is taller than 16:10. */}
-              <PagePreview p={p} handle={handle} screens={featured ? 3 : 2} />
+              <PagePreview p={p} subdomain={subdomain} screens={featured ? 3 : 2} />
             </motion.div>
 
             {/* ── the dock ── */}
@@ -701,7 +701,7 @@ function Card({
               >
                 {p.name}
               </h2>
-              <PageLink p={p} handle={handle} />
+              <PageLink p={p} subdomain={subdomain} />
             </div>
             {live && (
               <IconButton label={`Share ${p.name}`} onClick={() => actions.onShare(p.id)}>
@@ -823,7 +823,7 @@ function DockButton({ onClick, icon, label }: { onClick: () => void; icon: React
  * A draft has no public address yet — it answers 404 until it is published —
  * so it says so and links its preview instead of printing a dead link.
  */
-function PageLink({ p, handle }: { p: Portfolio; handle: string }) {
+function PageLink({ p, subdomain }: { p: Portfolio; subdomain: string }) {
   const [copied, setCopied] = useState(false);
   const live = p.status === "live";
 
@@ -842,19 +842,19 @@ function PageLink({ p, handle }: { p: Portfolio; handle: string }) {
     );
   }
 
-  if (!handle) {
+  if (!subdomain) {
     return (
       <Link
         href="/account"
         className="mt-1 inline-flex max-w-full items-center gap-1 text-[12.5px] underline underline-offset-2"
         style={{ color: "var(--color-ink)" }}
       >
-        <span className="truncate">No public address — choose a handle</span>
+        <span className="truncate">No public address — choose a subdomain</span>
       </Link>
     );
   }
 
-  const url = liveUrl(handle, p.slug);
+  const url = liveUrl(subdomain, p.slug);
   return (
     <div className="mt-1 flex min-w-0 items-center gap-1">
       <a
@@ -913,7 +913,7 @@ function PageLink({ p, handle }: { p: Portfolio; handle: string }) {
  * motion, where a panel chasing the pointer is exactly what was turned off.
  */
 function List({ portfolios, actions }: { portfolios: Portfolio[]; actions: Actions }) {
-  const handle = useAccount().account.profile.handle;
+  const subdomain = useAccount().account.profile.subdomain;
   const reduced = useReducedMotion();
   const [peek, setPeek] = useState<Portfolio | null>(null);
   const px = useSpring(0, { stiffness: 320, damping: 32 });
@@ -967,11 +967,11 @@ function List({ portfolios, actions }: { portfolios: Portfolio[]; actions: Actio
                   className="relative aspect-[16/10] overflow-hidden rounded-md grayscale transition-[filter] duration-500 group-hover:grayscale-0"
                   style={{ border: "1px solid var(--color-divider)", background: "var(--color-surface)" }}
                 >
-                  <PagePreview p={p} handle={handle} />
+                  <PagePreview p={p} subdomain={subdomain} />
                 </div>
                 <div className="min-w-0">
                   <span className="block truncate text-[14px] font-medium">{p.name}</span>
-                  <PageLink p={p} handle={handle} />
+                  <PageLink p={p} subdomain={subdomain} />
                 </div>
                 <span className="hidden md:block">
                   <StatusPill live={live} />
@@ -1046,7 +1046,7 @@ function List({ portfolios, actions }: { portfolios: Portfolio[]; actions: Actio
                       exit={{ opacity: 0 }}
                       transition={{ duration: 0.2 }}
                     >
-                      <PagePreview p={peek} handle={handle} />
+                      <PagePreview p={peek} subdomain={subdomain} />
                     </motion.div>
                   </AnimatePresence>
                 </div>
@@ -1232,7 +1232,7 @@ function EditDetails({
   onSave: (fields: Pick<Portfolio, "name" | "summary" | "slug">) => void;
   onUnpublish: () => void;
 }) {
-  const handle = useAccount().account.profile.handle;
+  const subdomain = useAccount().account.profile.subdomain;
   const [name, setName] = useState(portfolio.name);
   const [summary, setSummary] = useState(portfolio.summary);
   const [slug, setSlug] = useState(portfolio.slug);
@@ -1349,7 +1349,7 @@ function EditDetails({
                 className="flex-none truncate py-2 pr-0.5 pl-3 font-mono text-[12.5px]"
                 style={{ color: "var(--color-neutral-600)", maxWidth: "55%" }}
               >
-                {displayUrl(liveUrl(handle || "your-handle", ""))}
+                {displayUrl(liveUrl(subdomain || "your-subdomain", ""))}
               </span>
               <input
                 id="ed-slug"

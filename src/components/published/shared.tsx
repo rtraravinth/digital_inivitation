@@ -594,7 +594,7 @@ export function href(url: string) {
 }
 
 export function SectionLinks({ p, section }: { p: Portfolio; section: Section }) {
-  const handle = usePublishedHandle();
+  const subdomain = usePublishedSubdomain();
   const record = useRecordClick();
   if (section.links.length === 0) return null;
   return (
@@ -605,7 +605,7 @@ export function SectionLinks({ p, section }: { p: Portfolio; section: Section })
           href={href(l.url)}
           target="_blank"
           rel="noopener noreferrer"
-          onClick={() => record(handle, p.slug, section.id)}
+          onClick={() => record(subdomain, p.slug, section.id)}
           // The mark, not the raw accent: cloth red on board measures 2.44:1,
           // and an author's accent on their own ground can be worse.
           className="published-link inline-flex min-h-[30px] items-center gap-2 text-[14px] font-medium"
@@ -689,7 +689,7 @@ export function Media({
  * and sets it in the display face instead.
  */
 export function SectionAside({ p, section }: { p: Portfolio; section: Section }) {
-  const handle = usePublishedHandle();
+  const subdomain = usePublishedSubdomain();
   const record = useRecordClick();
   return (
     <>
@@ -708,7 +708,7 @@ export function SectionAside({ p, section }: { p: Portfolio; section: Section })
         <a
           href={assetSrc(section.file)}
           download={section.file.name}
-          onClick={() => record(handle, p.slug, section.id)}
+          onClick={() => record(subdomain, p.slug, section.id)}
           className="btn btn-secondary min-h-[38px] self-start"
           style={{ fontSize: 13 }}
         >
@@ -748,25 +748,34 @@ export function usePublishedPrivacy() {
 }
 
 /**
- * The owner's handle, from the address that served this page.
+ * The owner's subdomain, from the address that served this page.
  *
- * Click recording posts to /public/p/<handle>/<slug>/clicks, and a slug alone
- * no longer identifies a page — two accounts can both have "investors".
+ * Click recording posts to /public/p/<subdomain>/<slug>/clicks, and a slug
+ * alone no longer identifies a page — two accounts can both have "investors".
+ *
+ * `ownHost` is true when the page was served on the owner's own host — their
+ * subdomain or their custom domain — where the page is `/<slug>`, not
+ * `/p/<subdomain>/<slug>`.
  */
-const HandleContext = createContext<string>("");
+const SubdomainContext = createContext<{ subdomain: string; ownHost: boolean }>({
+  subdomain: "",
+  ownHost: false,
+});
 
-export function PublishedHandleProvider({
+export function PublishedSubdomainProvider({
   value,
+  ownHost = false,
   children,
 }: {
   value: string;
+  ownHost?: boolean;
   children: React.ReactNode;
 }) {
-  return <HandleContext.Provider value={value}>{children}</HandleContext.Provider>;
+  return <SubdomainContext.Provider value={{ subdomain: value, ownHost }}>{children}</SubdomainContext.Provider>;
 }
 
-export function usePublishedHandle() {
-  return useContext(HandleContext);
+export function usePublishedSubdomain() {
+  return useContext(SubdomainContext).subdomain;
 }
 
 /**
@@ -803,12 +812,13 @@ function useIsPreview() {
  * A preview is served from `/preview/<id>`, and the public address does not
  * resolve at all until the portfolio is published — the API answers 404 for
  * a draft on purpose. A section link that always pointed at
- * `/p/<handle>/<slug>` was therefore a dead end for exactly the drafts the
+ * `/p/<subdomain>/<slug>` was therefore a dead end for exactly the drafts the
  * preview exists to show.
  */
 export function usePageHref(p: Portfolio): string {
-  const handle = usePublishedHandle();
-  return useIsPreview() ? previewPath(p.id) : pagePath(handle, p.slug);
+  const { subdomain, ownHost } = useContext(SubdomainContext);
+  if (useIsPreview()) return previewPath(p.id);
+  return ownHost ? `/${p.slug}` : pagePath(subdomain, p.slug);
 }
 
 

@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 import uuid
+from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
-from sqlalchemy import Boolean, CheckConstraint, ForeignKey, String, Text
+from sqlalchemy import Boolean, CheckConstraint, DateTime, ForeignKey, Index, String, Text, text
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -38,8 +39,8 @@ class AccountProfile(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), unique=True, nullable=False
     )
     name: Mapped[str] = mapped_column(String(200), nullable=False, default="")
-    # Nullable so two accounts without a handle do not collide on "".
-    handle: Mapped[str | None] = mapped_column(String(64), unique=True, nullable=True)
+    # Nullable so two accounts without a subdomain do not collide on "".
+    subdomain: Mapped[str | None] = mapped_column(String(64), unique=True, nullable=True)
     current: Mapped[str] = mapped_column(Text, nullable=False, default="")
     about: Mapped[str] = mapped_column(Text, nullable=False, default="")
     tags: Mapped[list[str]] = mapped_column(JSONB, nullable=False, default=list)
@@ -54,13 +55,30 @@ class AccountProfile(UUIDPrimaryKeyMixin, TimestampMixin, Base):
 
 class AccountSettings(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     __tablename__ = "account_settings"
-    __table_args__ = (CheckConstraint(f"plan IN ({sql_in(PLANS)})", name="plan_is_known"),)
+    __table_args__ = (
+        CheckConstraint(f"plan IN ({sql_in(PLANS)})", name="plan_is_known"),
+        # Anyone may type any domain; only one account can prove it. Unique
+        # among verified rows alone, so a squatter typing a domain first
+        # cannot block its real owner.
+        Index(
+            "uq_account_settings_verified_domain",
+            "custom_domain",
+            unique=True,
+            postgresql_where=text("custom_domain_verified_at IS NOT NULL"),
+        ),
+    )
 
     user_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), unique=True, nullable=False
     )
     plan: Mapped[str] = mapped_column(String(16), nullable=False, default="free")
     custom_domain: Mapped[str] = mapped_column(String(255), nullable=False, default="")
+    #: When the TXT record proving the domain was last seen. Null until
+    #: then, and again whenever the domain changes; only a verified domain
+    #: serves pages.
+    custom_domain_verified_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
     notifications: Mapped[dict[str, bool]] = mapped_column(
         JSONB, nullable=False, default=default_notifications
     )

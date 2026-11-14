@@ -28,7 +28,7 @@ export function CreatePortfolioDialog({
   onCancel: () => void;
   onCreate: (name: string, slug: string, startFrom: StartFrom, summary: string) => Promise<void> | void;
 }) {
-  const handle = useAccount().account.profile.handle;
+  const subdomain = useAccount().account.profile.subdomain;
   const [name, setName] = useState("");
   const [slug, setSlug] = useState("");
   const [slugTouched, setSlugTouched] = useState(false);
@@ -145,7 +145,7 @@ export function CreatePortfolioDialog({
             style={{ border: "1px solid var(--color-divider)", background: "var(--color-surface)" }}
           >
             <span className="max-w-[55%] flex-none truncate py-2 pl-3 font-mono text-[12.5px]" style={{ color: "var(--color-neutral-600)" }}>
-              {displayUrl(liveUrl(handle || "your-handle", ""))}
+              {displayUrl(liveUrl(subdomain || "your-subdomain", ""))}
             </span>
             <input
               id="cp-slug"

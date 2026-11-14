@@ -91,7 +91,7 @@ async def test_a_token_from_before_the_reset_opens_nothing(client, registered, f
 
 async def test_a_disabled_user_cannot_sign_in(client, firebase_accounts):
     firebase_accounts.states["uid-off@example.com"] = AccountState(exists=True, disabled=True)
-    response = await sign_in(client, firebase_token("off@example.com"), handle="off-person")
+    response = await sign_in(client, firebase_token("off@example.com"), subdomain="off-person")
     assert response.status_code == 401
 
 

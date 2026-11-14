@@ -41,7 +41,8 @@ import {
   rememberLinkEmail,
 } from "@/lib/firebase";
 import { exchange } from "@/lib/session";
-import { displayUrl, isSlug, liveUrl } from "@/lib/slug";
+import { subdomainFrame, subdomainProblem } from "@/lib/hosts";
+import { displayUrl, liveUrl } from "@/lib/slug";
 import { PASSWORD_MIN } from "@/lib/types";
 import { LinkIcon } from "@/lib/icons";
 import { ThemeSwitch } from "./AppHeader";
@@ -68,7 +69,7 @@ type Step =
   | { kind: "link-start" }
   | { kind: "link-email" }
   | { kind: "phone-code"; phone: string }
-  | { kind: "handle" };
+  | { kind: "subdomain" };
 
 /* ── the sign-in screen ───────────────────────────────────────────────────
    Two halves on a wide screen: what Facet makes, drawn as a stack of pages
@@ -78,7 +79,7 @@ type Step =
    Firebase does the proving — Google, GitHub, a password, an email link or a
    phone code — and `exchange()` trades the ID token it issues for a FACET
    session. A person Firebase knows but FACET does not is asked for a name
-   and handle (the "handle" step) before the account is made.
+   and subdomain (the "subdomain" step) before the account is made.
    ──────────────────────────────────────────────────────────────────────── */
 
 export function SignIn() {
@@ -99,7 +100,7 @@ export function SignIn() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [code, setCode] = useState("");
   const [name, setName] = useState("");
-  const [handle, setHandle] = useState("");
+  const [subdomain, setSubdomain] = useState("");
 
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<ApiError | Error | null>(null);
@@ -130,20 +131,13 @@ export function SignIn() {
   }
 
   const mismatch = mode === "up" && confirmPassword.length > 0 && password !== confirmPassword;
-  // Says which rule the handle breaks, once there is something to judge.
-  const handleProblem = !handle
-    ? null
-    : handle.length < 2
-      ? "A handle needs at least two characters."
-      : handle.endsWith("-")
-        ? "A handle can’t end with a hyphen."
-        : !isSlug(handle)
-          ? "Use lowercase letters, numbers and hyphens only."
-          : null;
+  // Says which rule the subdomain breaks, once there is something to judge.
+  const frame = subdomainFrame();
+  const subdomainIssue = subdomain ? subdomainProblem(subdomain) : null;
 
   /** The API names the offending field on a 422; show it where it happened. */
   const fieldError = (field: string) => (error instanceof ApiError ? error.fieldError(field) : null);
-  const formError = error && !fieldError("name") && !fieldError("handle") ? messageFor(error) : null;
+  const formError = error && !fieldError("name") && !fieldError("subdomain") ? messageFor(error) : null;
 
   /* ── the one way out of Firebase and into FACET ─────────────────────── */
 
@@ -152,16 +146,16 @@ export function SignIn() {
    * is dropped once FACET has one: its token is in memory only, and nothing
    * after this page needs it.
    */
-  async function finish(user: User, newAccount?: { name: string; handle: string }) {
+  async function finish(user: User, newAccount?: { name: string; subdomain: string }) {
     try {
       await exchange(await user.getIdToken(), newAccount);
     } catch (caught) {
-      if (caught instanceof ApiError && caught.code === "handle_required") {
+      if (caught instanceof ApiError && caught.code === "subdomain_required") {
         // Firebase knows them; FACET does not yet. Keep the Firebase sign-in
         // in memory for the second call.
         const suggested = caught.details.name;
         if (typeof suggested === "string" && !name) setName(suggested);
-        setStep({ kind: "handle" });
+        setStep({ kind: "subdomain" });
         return;
       }
       if (caught instanceof ApiError && caught.code === "email_unverified") {
@@ -326,14 +320,14 @@ export function SignIn() {
     });
   }
 
-  function claimHandle() {
+  function claimSubdomain() {
     return run(async () => {
       const user = firebaseAuth().currentUser;
       if (!user) {
         setStep({ kind: "choose" });
         throw new Error("That sign-in expired. Please sign in again.");
       }
-      await finish(user, { name: name.trim(), handle: handle.trim().toLowerCase() });
+      await finish(user, { name: name.trim(), subdomain: subdomain.trim().toLowerCase() });
     });
   }
 
@@ -354,8 +348,8 @@ export function SignIn() {
     event.preventDefault();
     if (!firebaseConfigured) return;
     switch (step.kind) {
-      case "handle":
-        return claimHandle();
+      case "subdomain":
+        return claimSubdomain();
       case "phone-code":
         return confirmCode();
       case "link-start":
@@ -380,8 +374,8 @@ export function SignIn() {
 
   const ready = (() => {
     switch (step.kind) {
-      case "handle":
-        return isSlug(handle);
+      case "subdomain":
+        return !subdomainProblem(subdomain);
       case "phone-code":
         return code.trim().length >= 6;
       case "link-start":
@@ -436,7 +430,7 @@ export function SignIn() {
       lede: `We texted a six-digit code to ${"phone" in step ? step.phone : ""}.`,
       action: "Verify",
     },
-    handle: {
+    subdomain: {
       title: "One last thing",
       lede: "Pick the address your pages will live at. You can change your name later.",
       action: "Create my account",
@@ -534,7 +528,7 @@ export function SignIn() {
 
                 {!waiting && (
                   <form onSubmit={submit} className="flex flex-col gap-4" noValidate>
-                    {step.kind === "handle" && (
+                    {step.kind === "subdomain" && (
                       <>
                         <div className="field">
                           <label htmlFor="name">Your name</label>
@@ -550,7 +544,7 @@ export function SignIn() {
                         </div>
 
                         <div className="field">
-                          <label htmlFor="handle">Handle</label>
+                          <label htmlFor="subdomain">Subdomain</label>
                           {/* Asked for before the account exists because it is the base
                               of every page the account will publish. Leaving it until
                               /account is what let accounts exist with no address. */}
@@ -558,20 +552,22 @@ export function SignIn() {
                             className="flex items-center overflow-hidden rounded-[var(--radius-md)] focus-within:ring-2 focus-within:ring-[var(--color-ink)]"
                             style={{ border: "1px solid var(--color-divider)", background: "var(--color-surface)" }}
                           >
-                            <span
-                              className="flex-none py-2 pr-0.5 pl-3 font-mono text-[12.5px]"
-                              style={{ color: "var(--color-neutral-600)" }}
-                            >
-                              /p/
-                            </span>
+                            {frame.before && (
+                              <span
+                                className="flex-none py-2 pr-0.5 pl-3 font-mono text-[12.5px]"
+                                style={{ color: "var(--color-neutral-600)" }}
+                              >
+                                {frame.before}
+                              </span>
+                            )}
                             <input
-                              id="handle"
-                              className="min-w-0 flex-1 bg-transparent py-2 pr-3 font-mono text-[14px] outline-none"
+                              id="subdomain"
+                              className={`min-w-0 flex-1 bg-transparent py-2 font-mono text-[14px] outline-none ${frame.before ? "" : "pl-3"} ${frame.after ? "pr-0.5" : "pr-3"}`}
                               style={{ color: "var(--color-ink)", border: 0, minHeight: 40 }}
-                              value={handle}
+                              value={subdomain}
                               // Cleaned as typed; the server judges the finished value.
                               onChange={(e) =>
-                                setHandle(
+                                setSubdomain(
                                   e.target.value
                                     .toLowerCase()
                                     .replace(/[^a-z0-9-]+/g, "-")
@@ -581,18 +577,27 @@ export function SignIn() {
                               }
                               autoComplete="username"
                               placeholder="your-name"
-                              aria-describedby="handle-note"
+                              aria-describedby="subdomain-note"
+                              maxLength={32}
                               required
                             />
+                            {frame.after && (
+                              <span
+                                className="flex-none py-2 pr-3 font-mono text-[12.5px]"
+                                style={{ color: "var(--color-neutral-600)" }}
+                              >
+                                {frame.after}
+                              </span>
+                            )}
                           </div>
                           <FieldNote
-                            id="handle-note"
-                            error={fieldError("handle") ?? handleProblem}
+                            id="subdomain-note"
+                            error={fieldError("subdomain") ?? subdomainIssue}
                             hint={
                               <>
                                 Your pages live under it —{" "}
                                 <span className="font-mono" style={{ color: "var(--color-ink)" }}>
-                                  {displayUrl(liveUrl(handle || "your-name", "your-page"))}
+                                  {displayUrl(liveUrl(subdomain || "your-name", "your-page"))}
                                 </span>
                               </>
                             }

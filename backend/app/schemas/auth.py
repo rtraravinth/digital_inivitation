@@ -8,14 +8,14 @@ from typing import Literal
 
 from pydantic import EmailStr, Field, field_validator
 
-from app.schemas.account import HANDLE_PATTERN
+from app.schemas.account import SUBDOMAIN_PATTERN
 from app.schemas.common import CamelModel
 
 
 class FirebaseSignInRequest(CamelModel):
     """A Firebase ID token, traded for a FACET session.
 
-    ``name`` and ``handle`` are read only when the token belongs to nobody
+    ``name`` and ``subdomain`` are read only when the token belongs to nobody
     yet — they are what a new account is made with. An existing account
     ignores them; its profile is edited on /account.
     """
@@ -24,13 +24,13 @@ class FirebaseSignInRequest(CamelModel):
     id_token: str = Field(min_length=20, max_length=8192)
     name: str | None = Field(default=None, max_length=200)
     #: The base of every address the account will ever publish —
-    #: facet.com/<handle>/<slug>. Asked for before the account exists, so an
+    #: <subdomain>.facetfolio.com/<slug>. Asked for before the account exists, so an
     #: account can never be without one.
-    handle: str | None = Field(default=None, pattern=HANDLE_PATTERN)
+    subdomain: str | None = Field(default=None, pattern=SUBDOMAIN_PATTERN)
 
-    @field_validator("handle", mode="before")
+    @field_validator("subdomain", mode="before")
     @classmethod
-    def _normalise_handle(cls, value: str | None) -> str | None:
+    def _normalise_subdomain(cls, value: str | None) -> str | None:
         # Before, not after: the pattern is lowercase-only, so trimming and
         # lowercasing has to happen first or "Aravinth" fails as a format
         # error rather than being read as the typo it is.
@@ -50,7 +50,7 @@ class UserOut(CamelModel):
     #: None for an account made with a phone number.
     email: EmailStr | None
     name: str = ""
-    handle: str | None = None
+    subdomain: str | None = None
 
 
 class AuthOut(CamelModel):

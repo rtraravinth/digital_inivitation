@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from tests.factories import TEST_HANDLE
+from tests.factories import TEST_SUBDOMAIN
 
 FULL_RESUME = {
     "email": "rohan@example.com",
@@ -160,7 +160,7 @@ async def test_the_public_page_gets_only_the_lists_placed_on_it(client, auth_cli
     await _place(auth_client, portfolio, 0, ["experience", "skills"])
     live = await _publish_with_resume(auth_client, portfolio)
 
-    response = await client.get(f"/api/v1/public/p/{TEST_HANDLE}/{live['slug']}")
+    response = await client.get(f"/api/v1/public/p/{TEST_SUBDOMAIN}/{live['slug']}")
     assert response.status_code == 200
     resume = response.json()["resume"]
     assert resume["experience"][0]["company"] == "Northwell Kitchens"
@@ -178,7 +178,7 @@ async def test_the_public_page_gets_only_the_lists_placed_on_it(client, auth_cli
 async def test_a_list_placed_nowhere_never_leaves_the_account(client, auth_client, portfolio):
     live = await _publish_with_resume(auth_client, portfolio)
 
-    response = await client.get(f"/api/v1/public/p/{TEST_HANDLE}/{live['slug']}")
+    response = await client.get(f"/api/v1/public/p/{TEST_SUBDOMAIN}/{live['slug']}")
     assert all(entries == [] for entries in response.json()["resume"].values())
     assert "Northwell Kitchens" not in response.text
 
@@ -189,7 +189,7 @@ async def test_a_list_in_a_hidden_section_never_leaves_the_account(client, auth_
     await _place(auth_client, portfolio, 0, ["experience"], hidden=True)
     live = await _publish_with_resume(auth_client, portfolio)
 
-    response = await client.get(f"/api/v1/public/p/{TEST_HANDLE}/{live['slug']}")
+    response = await client.get(f"/api/v1/public/p/{TEST_SUBDOMAIN}/{live['slug']}")
     assert response.json()["resume"]["experience"] == []
     assert "Northwell Kitchens" not in response.text
 

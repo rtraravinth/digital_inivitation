@@ -6,7 +6,7 @@ import io
 
 from PIL import Image
 
-from tests.factories import TEST_HANDLE
+from tests.factories import TEST_SUBDOMAIN
 
 
 def png_bytes(width: int = 300, height: int = 300) -> bytes:
@@ -28,20 +28,20 @@ async def go_live(auth_client, portfolio: dict) -> dict:
 
 
 async def test_an_unpublished_page_is_404(client, portfolio):
-    response = await client.get(f"/api/v1/public/p/{TEST_HANDLE}/{portfolio['slug']}")
+    response = await client.get(f"/api/v1/public/p/{TEST_SUBDOMAIN}/{portfolio['slug']}")
     assert response.status_code == 404
     assert response.json()["error"]["code"] == "page_not_found"
 
 
 async def test_an_unknown_slug_is_404(client):
-    response = await client.get(f"/api/v1/public/p/{TEST_HANDLE}/nobody-here")
+    response = await client.get(f"/api/v1/public/p/{TEST_SUBDOMAIN}/nobody-here")
     assert response.status_code == 404
 
 
 async def test_a_published_page_is_readable_without_a_token(client, published):
     client.headers.pop("Authorization", None)
 
-    response = await client.get(f"/api/v1/public/p/{TEST_HANDLE}/{published['slug']}")
+    response = await client.get(f"/api/v1/public/p/{TEST_SUBDOMAIN}/{published['slug']}")
     assert response.status_code == 200
 
     body = response.json()
@@ -53,7 +53,7 @@ async def test_a_published_page_is_readable_without_a_token(client, published):
 async def test_an_unpublished_page_stops_being_readable(auth_client, client, published):
     await auth_client.post(f"/api/v1/portfolios/{published['id']}/unpublish")
     assert (
-        await client.get(f"/api/v1/public/p/{TEST_HANDLE}/{published['slug']}")
+        await client.get(f"/api/v1/public/p/{TEST_SUBDOMAIN}/{published['slug']}")
     ).status_code == 404
 
 
@@ -64,7 +64,7 @@ async def test_hidden_sections_never_reach_the_published_payload(auth_client, cl
     )
     published = await go_live(auth_client, portfolio)
 
-    body = (await client.get(f"/api/v1/public/p/{TEST_HANDLE}/{published['slug']}")).json()
+    body = (await client.get(f"/api/v1/public/p/{TEST_SUBDOMAIN}/{published['slug']}")).json()
     assert all(section["id"] != section_id for section in body["sections"])
 
 
@@ -76,13 +76,13 @@ async def test_show_contact_off_removes_the_header_links_from_the_body(
         json={"links": [{"id": "l1", "label": "Email", "url": "rohan@northwell.in"}]},
     )
     published = await go_live(auth_client, portfolio)
-    assert (await client.get(f"/api/v1/public/p/{TEST_HANDLE}/{published['slug']}")).json()[
+    assert (await client.get(f"/api/v1/public/p/{TEST_SUBDOMAIN}/{published['slug']}")).json()[
         "header"
     ]["links"]
 
     await auth_client.patch("/api/v1/account/privacy", json={"showContact": False})
 
-    body = (await client.get(f"/api/v1/public/p/{TEST_HANDLE}/{published['slug']}")).json()
+    body = (await client.get(f"/api/v1/public/p/{TEST_SUBDOMAIN}/{published['slug']}")).json()
     # Absent from the payload, not merely hidden by CSS.
     assert body["header"]["links"] == []
     assert body["showContact"] is False
@@ -92,21 +92,21 @@ async def test_show_contact_off_removes_the_header_links_from_the_body(
 async def test_indexable_off_sets_noindex_and_the_header(auth_client, client, published):
     await auth_client.patch("/api/v1/account/privacy", json={"indexable": False})
 
-    response = await client.get(f"/api/v1/public/p/{TEST_HANDLE}/{published['slug']}")
+    response = await client.get(f"/api/v1/public/p/{TEST_SUBDOMAIN}/{published['slug']}")
     assert response.status_code == 200
     assert response.json()["noindex"] is True
     assert "noindex" in response.headers["x-robots-tag"]
 
 
 async def test_indexable_on_sends_no_robots_header(client, published):
-    response = await client.get(f"/api/v1/public/p/{TEST_HANDLE}/{published['slug']}")
+    response = await client.get(f"/api/v1/public/p/{TEST_SUBDOMAIN}/{published['slug']}")
     assert "x-robots-tag" not in response.headers
     assert response.json()["noindex"] is False
 
 
 async def test_badge_off_is_reported_to_the_page(auth_client, client, published):
     await auth_client.patch("/api/v1/account/privacy", json={"badge": False})
-    assert (await client.get(f"/api/v1/public/p/{TEST_HANDLE}/{published['slug']}")).json()[
+    assert (await client.get(f"/api/v1/public/p/{TEST_SUBDOMAIN}/{published['slug']}")).json()[
         "badge"
     ] is False
 
@@ -147,7 +147,7 @@ async def test_the_published_payload_uses_public_asset_urls(auth_client, client,
     )
     published = await go_live(auth_client, portfolio)
 
-    body = (await client.get(f"/api/v1/public/p/{TEST_HANDLE}/{published['slug']}")).json()
+    body = (await client.get(f"/api/v1/public/p/{TEST_SUBDOMAIN}/{published['slug']}")).json()
     assert body["sections"][0]["images"][0]["url"] == f"/api/v1/public/assets/{asset['id']}"
 
 

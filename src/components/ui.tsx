@@ -11,6 +11,7 @@ import Link from "next/link";
 import { useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import type { CSSProperties, ReactNode } from "react";
+import { displayUrl, liveUrl } from "@/lib/slug";
 
 /* ── the app's shared pieces ──────────────────────────────────────────────
    What Portfolios and Stats both draw, kept in one place so the two screens
@@ -288,14 +289,14 @@ export function TiltPanel({
 }
 
 /**
- * Said wherever it matters when the account has no handle.
+ * Said wherever it matters when the account has no subdomain.
  *
- * A published page lives at /p/<handle>/<page>, so without a handle a "live"
+ * A published page lives at <subdomain>.<root>/<page>, so without a subdomain a "live"
  * page has no address anyone can open — and since a visit is counted when
  * someone opens the page, its stats can only ever read zero. Nothing else in
  * the app made that visible: the page said Live and the numbers said 0.
  */
-export function NoHandleNotice({ live }: { live: number }) {
+export function NoSubdomainNotice({ live }: { live: number }) {
   return (
     <div
       role="status"
@@ -311,12 +312,12 @@ export function NoHandleNotice({ live }: { live: number }) {
       </span>
       <span className="min-w-0 flex-1 text-[13.5px] leading-snug">
         <strong className="font-semibold">Your pages don’t have a public address yet.</strong>{" "}
-        Every page lives at <span className="font-mono text-[12.5px]">/p/your-handle/page</span>, and
-        your account has no handle — so {live === 1 ? "your live page" : `your ${live} live pages`}{" "}
-        can’t be opened by anyone, and can’t get visits. Choose a handle to fix it.
+        Every page lives at <span className="font-mono text-[12.5px]">{displayUrl(liveUrl("your-subdomain", "page"))}</span>, and
+        your account has no subdomain — so {live === 1 ? "your live page" : `your ${live} live pages`}{" "}
+        can’t be opened by anyone, and can’t get visits. Choose a subdomain to fix it.
       </span>
       <Link href="/account" className="btn btn-primary" style={{ minHeight: 32, padding: "0.35rem 0.85rem", fontSize: 13 }}>
-        Choose a handle
+        Choose a subdomain
       </Link>
     </div>
   );

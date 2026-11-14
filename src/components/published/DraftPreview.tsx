@@ -13,14 +13,14 @@ import {
   PreviewProvider,
   PrivacyProvider,
   PublishedBody,
-  PublishedHandleProvider,
+  PublishedSubdomainProvider,
   SectionDetail,
 } from "./themes";
 
 /**
  * The owner's own preview, at /preview/<id>.
  *
- * `/p/<handle>/<slug>` only exists while a portfolio is live — the API
+ * `/p/<subdomain>/<slug>` only exists while a portfolio is live — the API
  * answers 404 for a draft on purpose — so pointing the app's Preview buttons
  * at it meant a dead end for exactly the pages that most need looking at.
  * This renders the same themes from the store instead, so a draft previews
@@ -80,14 +80,14 @@ export function DraftPreview({ id }: { id: string }) {
   return (
     <PreviewProvider value>
       <PrivacyProvider value={privacy}>
-        <PublishedHandleProvider value={account.profile.handle}>
+        <PublishedSubdomainProvider value={account.profile.subdomain}>
           {section ? (
             <SectionDetail p={shown} section={section} />
           ) : (
             <PublishedBody p={shown} />
           )}
           <OwnerBar p={portfolio} />
-        </PublishedHandleProvider>
+        </PublishedSubdomainProvider>
       </PrivacyProvider>
     </PreviewProvider>
   );

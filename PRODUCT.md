@@ -21,7 +21,7 @@ page covering everything the person does; the tailored pages are slices of it.
 
 FACET builds published web pages for one person's work. A portfolio is a
 header plus any number of sections, each with the same four fields — title,
-description, tab, links — and is published at `facet.page/<handle>/<slug>` in
+description, tab, links — and is published at `<subdomain>.facetfolio.com/<slug>` in
 one of five themes.
 
 Success is a complete, production-grade build that demonstrates the author's

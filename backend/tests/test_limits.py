@@ -20,15 +20,15 @@ def limits_on(monkeypatch):
 
 async def _published(auth_client, portfolio) -> tuple[str, str]:
     await auth_client.post(f"/api/v1/portfolios/{portfolio['id']}/publish")
-    handle = (await auth_client.get("/api/v1/account")).json()["profile"]["handle"]
-    return handle, portfolio["slug"]
+    subdomain = (await auth_client.get("/api/v1/account")).json()["profile"]["subdomain"]
+    return subdomain, portfolio["slug"]
 
 
 async def test_page_views_past_the_limit_are_quietly_not_counted(
     auth_client, client, portfolio, limits_on
 ):
-    handle, slug = await _published(auth_client, portfolio)
-    url = f"/api/v1/public/p/{handle}/{slug}/views"
+    subdomain, slug = await _published(auth_client, portfolio)
+    url = f"/api/v1/public/p/{subdomain}/{slug}/views"
     answers = [
         await client.post(url, json={"referrer": "", "dedupeKey": f"k{i}"}) for i in range(35)
     ]

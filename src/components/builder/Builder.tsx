@@ -58,7 +58,7 @@ const SHEET: Array<{ id: SheetTab; label: string }> = [
 const REPLAY = <path d="M3 12a9 9 0 1 0 3-6.7M3 4v5h5" />;
 
 export function Builder({ id }: { id: string }) {
-  const handle = useAccount().account.profile.handle;
+  const subdomain = useAccount().account.profile.subdomain;
   const { ready, storageError, getPortfolio, updatePortfolio } = usePortfolios();
   const reduced = useReducedMotion();
   const [device, setDevice] = useState<Device>("desktop");
@@ -267,7 +267,7 @@ export function Builder({ id }: { id: string }) {
               </span>
             </div>
             <div className="min-h-0 flex-1">
-              <Canvas p={p} handle={handle} device={device} replay={replay} />
+              <Canvas p={p} subdomain={subdomain} device={device} replay={replay} />
             </div>
             <p className="m-0 mt-2 flex-none text-center text-[12px]" style={{ color: "var(--color-neutral-600)" }}>
               Live preview — every change shows here as you make it. Your own clicks in it are never counted.
@@ -319,7 +319,7 @@ export function Builder({ id }: { id: string }) {
           </div>
           <div className="h-[460px] px-4 pt-3 pb-4">
             <div className="h-full overflow-hidden rounded-2xl" style={{ border: "1px solid var(--color-divider)", background: "var(--color-bg)" }}>
-              <Canvas p={p} handle={handle} device="mobile" replay={replay} panX={false} chrome={false} />
+              <Canvas p={p} subdomain={subdomain} device="mobile" replay={replay} panX={false} chrome={false} />
             </div>
           </div>
 

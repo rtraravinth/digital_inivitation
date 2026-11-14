@@ -25,6 +25,9 @@ ARG NEXT_PUBLIC_FIREBASE_API_KEY=""
 ARG NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=""
 ARG NEXT_PUBLIC_FIREBASE_PROJECT_ID=""
 ARG NEXT_PUBLIC_FIREBASE_APP_ID=""
+# The domain pages publish under (<subdomain>.<root>/<slug>). Empty serves
+# them at /p/<subdomain>/<slug> on whatever address the app has.
+ARG NEXT_PUBLIC_ROOT_DOMAIN=""
 # Both are read at build time. An empty API URL makes every browser request
 # relative, i.e. same-origin; the proxy target is where Next forwards them.
 ENV NEXT_PUBLIC_API_URL="" \
@@ -32,6 +35,7 @@ ENV NEXT_PUBLIC_API_URL="" \
     NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=$NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN \
     NEXT_PUBLIC_FIREBASE_PROJECT_ID=$NEXT_PUBLIC_FIREBASE_PROJECT_ID \
     NEXT_PUBLIC_FIREBASE_APP_ID=$NEXT_PUBLIC_FIREBASE_APP_ID \
+    NEXT_PUBLIC_ROOT_DOMAIN=$NEXT_PUBLIC_ROOT_DOMAIN \
     API_PROXY_TARGET="http://127.0.0.1:8000" \
     NEXT_TELEMETRY_DISABLED=1
 RUN npm run build && npm prune --omit=dev

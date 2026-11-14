@@ -15,6 +15,7 @@ from sqlalchemy import delete, func, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import get_settings
 from app.core.ids import new_id
 from app.models import AccountSettings, LinkClick, PageView, Portfolio, User
 from app.schemas.analytics import DayCount, SummaryOut, Totals
@@ -42,7 +43,8 @@ def source_from_referrer(referrer: str) -> str:
         return "X"
     if "mail" in host or "gmail" in host:
         return "Email"
-    if "localhost" in host or "facet.page" in host:
+    root = get_settings().root_domain.split(":", 1)[0]
+    if "localhost" in host or (root and (host == root or host.endswith(f".{root}"))):
         return "Direct"
     return host
 

@@ -32,7 +32,7 @@ from app.schemas.section import DateEntry, SectionOut, Stat
 #: segment starts and ends alphanumeric. The address is facet.page/<slug>, so
 #: it has to survive being typed and read aloud — and it is nested, because
 #: the published route is a catch-all and the seeded pages use
-#: One segment. The handle in front of it is what makes the address unique,
+#: One segment. The subdomain in front of it is what makes the address unique,
 #: so a slug has no reason to nest — "rohan/investors" only existed because a
 #: flat global namespace had nothing else to separate accounts with.
 _SEGMENT = r"[a-z0-9](?:[a-z0-9-]*[a-z0-9])?"

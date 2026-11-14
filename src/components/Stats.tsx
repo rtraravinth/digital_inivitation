@@ -8,7 +8,7 @@ import { AppHeader } from "./AppHeader";
 import { PagePreview } from "./PagePreview";
 import { CountUp } from "./published/fx";
 import { Bars, LegendMark, Ring, Sparkline, TrendChart, longDay, type Day } from "./stats/charts";
-import { ICON, Icon, NoHandleNotice, Segmented, TiltPanel } from "./ui";
+import { ICON, Icon, NoSubdomainNotice, Segmented, TiltPanel } from "./ui";
 import {
   RANGES,
   dailySeries,
@@ -60,7 +60,7 @@ export function Stats() {
   const params = useSearchParams();
   const reduced = useReducedMotion();
   const { account, ready: accountReady } = useAccount();
-  const handle = account.profile.handle;
+  const subdomain = account.profile.subdomain;
   // ?p= deep-links one page's stats — the Portfolios menu's "Views and clicks".
   const [picked, setPicked] = useState<string | null>(() => params.get("p"));
   const [refreshing, setRefreshing] = useState(false);
@@ -187,9 +187,9 @@ export function Stats() {
             </motion.div>
           </div>
 
-          {accountReady && !handle && portfolios.length > 0 && (
+          {accountReady && !subdomain && portfolios.length > 0 && (
             <div className="mt-6">
-              <NoHandleNotice live={portfolios.length} />
+              <NoSubdomainNotice live={portfolios.length} />
             </div>
           )}
 
@@ -228,7 +228,7 @@ export function Stats() {
                       live={p.status === "live"}
                       figure={analytics.views[p.slug] ?? 0}
                     >
-                      <PagePreview p={p} handle={handle} />
+                      <PagePreview p={p} subdomain={subdomain} />
                     </PickCard>
                   ))}
                 </div>

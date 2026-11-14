@@ -89,7 +89,7 @@ async def test_copying_another_users_portfolio_is_404(auth_client, other_auth_cl
 
 
 async def test_a_taken_slug_is_409_within_one_account(auth_client):
-    """Scoped to the owner: the handle in front of it separates accounts."""
+    """Scoped to the owner: the subdomain in front of it separates accounts."""
     await auth_client.post(
         "/api/v1/portfolios",
         json={"name": "A", "slug": "shared-slug", "startFrom": {"kind": "blank"}},

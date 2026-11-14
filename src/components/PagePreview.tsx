@@ -4,7 +4,7 @@ import { useCallback, useState } from "react";
 import {
   PreviewProvider,
   PublishedBody,
-  PublishedHandleProvider,
+  PublishedSubdomainProvider,
 } from "./published/themes";
 import type { Portfolio } from "@/lib/types";
 
@@ -31,7 +31,7 @@ import type { Portfolio } from "@/lib/types";
  * because its breakpoints answer to the window, and a desktop layout squeezed
  * into a phone's card would be neither.
  */
-export function PagePreview({ p, handle, screens = 1 }: { p: Portfolio; handle: string; screens?: number }) {
+export function PagePreview({ p, subdomain, screens = 1 }: { p: Portfolio; subdomain: string; screens?: number }) {
   const [width, setWidth] = useState(0);
   const [near, setNear] = useState(false);
 
@@ -75,9 +75,9 @@ export function PagePreview({ p, handle, screens = 1 }: { p: Portfolio; handle: 
           style={{ width: device, height: device * 0.625 * screens, transform: `scale(${scale})` }}
         >
           <PreviewProvider value>
-            <PublishedHandleProvider value={handle}>
+            <PublishedSubdomainProvider value={subdomain}>
               <PublishedBody p={still} />
-            </PublishedHandleProvider>
+            </PublishedSubdomainProvider>
           </PreviewProvider>
         </div>
       )}

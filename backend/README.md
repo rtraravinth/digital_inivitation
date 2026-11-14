@@ -43,7 +43,7 @@ each other's rows. Uploads go to a temporary directory, never your `media/`.
 ## Development commands
 
 ```bash
-.venv/Scripts/python -m app.cli create-user --email you@example.com --handle you
+.venv/Scripts/python -m app.cli create-user --email you@example.com --subdomain you
 .venv/Scripts/python -m app.cli seed --email you@example.com
 .venv/Scripts/python -m app.cli routes
 ```
@@ -125,13 +125,17 @@ references it.
 
 ## Deliberately not implemented
 
-Three `/account` groups need third-party services this project has not chosen.
+Two `/account` groups need third-party services this project has not chosen.
 Their settings are stored and change nothing, and both the API docs and the UI
 say so plainly:
 
 - **Billing** — needs a payment processor.
-- **Custom domains** — needs DNS and a host.
 - **Email notifications** — needs a mail service.
+
+Custom domains are not on it either: `PATCH /account/domain` answers with the
+DNS records to add, `POST /account/domain/verify` looks them up, and a
+verified domain serves its owner's pages (`app/services/domains.py`). They
+need `FACET_ROOT_DOMAIN` set.
 
 Sign-in is not on that list: Firebase Authentication does it (see
 `app/core/firebase.py`), and this API holds no password or second factor.

@@ -21,7 +21,7 @@ import {
   type DeviceSession,
 } from "@/lib/account";
 import { resetAnalytics, type Analytics } from "@/lib/analytics";
-import { messageFor } from "@/lib/api";
+import { ApiError, messageFor } from "@/lib/api";
 import { readImageAsset } from "@/lib/assets";
 import { signOut } from "@/lib/session";
 import { displayUrl, liveUrl } from "@/lib/slug";
@@ -843,6 +843,8 @@ function PrivacyPanel({ account, portfolios }: PanelProps) {
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [confirming, setConfirming] = useState(false);
+  // The API asks for a sign-in from the last few minutes before deleting.
+  const [needsSignIn, setNeedsSignIn] = useState(false);
   const [typed, setTyped] = useState("");
 
   return (
@@ -853,6 +855,18 @@ function PrivacyPanel({ account, portfolios }: PanelProps) {
       />
       {message && <Message kind="ok">{message}</Message>}
       {error && <Message kind="error">{error}</Message>}
+      {needsSignIn && (
+        <button
+          type="button"
+          className="btn btn-secondary self-start"
+          onClick={async () => {
+            await signOut();
+            router.replace("/signin");
+          }}
+        >
+          Sign in again
+        </button>
+      )}
 
       <Card title="Privacy">
         {PRIVACY_SETTINGS.map((s) => (
@@ -911,6 +925,7 @@ function PrivacyPanel({ account, portfolios }: PanelProps) {
                       router.replace("/signin");
                     } catch (caught) {
                       setError(messageFor(caught));
+                      setNeedsSignIn(caught instanceof ApiError && caught.code === "reauth_required");
                       setConfirming(false);
                     }
                   }}

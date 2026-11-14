@@ -112,7 +112,7 @@ async def _seed(email: str, mode: str) -> int:
         if user is None:
             raise typer.BadParameter(f"No account for {email}. Run create-user first.")
 
-        result = await TransferService(session).import_(user, payload, mode)
+        result = await TransferService(session).import_(user, payload, mode, trusted=True)
         await session.commit()
         return result.imported
 

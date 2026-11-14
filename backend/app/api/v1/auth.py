@@ -24,6 +24,7 @@ from app.core.config import get_settings
 from app.core.errors import Unauthenticated
 from app.core.firebase import FirebaseVerifierDep
 from app.core.firebase_accounts import AccountCheckerDep
+from app.core.ratelimit import RefreshLimit, SignInLimit
 from app.models import User
 from app.schemas.auth import AuthOut, FirebaseSignInRequest, SessionOut, TokenOut, UserOut
 from app.schemas.common import ERROR_RESPONSES
@@ -74,6 +75,7 @@ def _auth_out(user: User, tokens: IssuedTokens) -> AuthOut:
 
 @router.post("/firebase", response_model=AuthOut, summary="Sign in with a Firebase ID token")
 async def firebase_sign_in(
+    _: SignInLimit,
     payload: FirebaseSignInRequest,
     response: Response,
     session: SessionDep,
@@ -91,6 +93,7 @@ async def firebase_sign_in(
 
 @router.post("/refresh", response_model=AuthOut, summary="Exchange the refresh cookie")
 async def refresh(
+    _: RefreshLimit,
     response: Response,
     session: SessionDep,
     device: DeviceDep,

@@ -406,3 +406,82 @@ async def test_an_older_exports_page_lists_become_sections(auth_client):
     ]
     assert detail["sections"][0]["onResume"] is False
     assert "pageBlocks" not in detail["resume"]
+
+
+# ── an import stores nothing the editor could not ─────────────────────────
+
+
+async def _import_one(auth_client, portfolio: dict) -> dict:
+    response = await auth_client.post(
+        "/api/v1/import", json={"mode": "merge", "portfolios": [portfolio]}
+    )
+    assert response.status_code == 200, response.text
+    listed = (await auth_client.get("/api/v1/portfolios")).json()
+    stored = next(p for p in listed if p["name"] == portfolio["name"])
+    return (await auth_client.get(f"/api/v1/portfolios/{stored['id']}")).json()
+
+
+async def test_an_import_never_publishes(auth_client):
+    stored = await _import_one(auth_client, {"name": "Live?", "slug": "live-q", "status": "live"})
+    assert stored["status"] == "draft"
+
+
+async def test_an_imported_accent_must_be_a_colour(auth_client):
+    # It lands in a style attribute on the public page.
+    stored = await _import_one(
+        auth_client, {"name": "CSS", "slug": "css", "accent": "red;background:url(//e/x)"}
+    )
+    assert stored["accent"] == "#b5261e"
+
+
+async def test_an_invalid_layout_key_is_dropped_and_the_list_still_loads(auth_client):
+    stored = await _import_one(
+        auth_client,
+        {
+            "name": "Layout",
+            "slug": "layout",
+            "layout": {"sectionStyle": "<b>", "junk": 1, "motion": "subtle"},
+        },
+    )
+    assert stored["layout"]["sectionStyle"] == "theme"
+    assert stored["layout"]["motion"] == "subtle"
+    assert "junk" not in stored["layout"]
+
+
+async def test_imported_text_and_lists_are_held_to_the_editors_limits(auth_client):
+    good = {"id": "l1", "label": "Site", "url": "https://example.com"}
+    stored = await _import_one(
+        auth_client,
+        {
+            "name": "Limits",
+            "slug": "limits",
+            "header": {
+                "description": "x" * 300_000,
+                "tags": ["ok", {"not": "a tag"}, "t" * 500],
+                "links": [good, {"weird": True}, "not an object"],
+            },
+            "sections": [{"title": "t" * 5000, "quote": {"anything": ["goes"]}}] * 150,
+        },
+    )
+    assert len(stored["header"]["description"]) == 20_000
+    assert stored["header"]["tags"] == ["ok", "t" * 60]
+    assert [link["url"] for link in stored["header"]["links"]] == ["https://example.com"]
+    assert len(stored["sections"]) == 100
+    assert len(stored["sections"][0]["title"]) == 500
+    assert stored["sections"][0]["quote"] is None
+
+
+async def test_an_import_cannot_take_an_account_past_its_portfolio_limit(auth_client):
+    many = [{"name": f"P{i}", "slug": f"p-{i}"} for i in range(51)]
+    response = await auth_client.post("/api/v1/import", json={"mode": "merge", "portfolios": many})
+    assert response.status_code == 422
+
+    fifty = many[:50]
+    assert (
+        await auth_client.post("/api/v1/import", json={"mode": "merge", "portfolios": fifty})
+    ).status_code == 200
+    one_more = await auth_client.post(
+        "/api/v1/import", json={"mode": "merge", "portfolios": [{"name": "X", "slug": "x-1"}]}
+    )
+    assert one_more.status_code == 422
+    assert one_more.json()["error"]["code"] == "too_many_portfolios"

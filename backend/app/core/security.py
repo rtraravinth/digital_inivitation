@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import hashlib
 import secrets
+from contextvars import ContextVar
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
@@ -22,6 +23,11 @@ from pydantic import BaseModel
 
 from app.core.config import get_settings
 from app.core.errors import Unauthenticated
+
+#: The FACET session the current request is authenticated with, set by
+#: ``get_caller``. Asset URLs minted during the request are tied to it, so
+#: signing a device out stops its image links too.
+current_session_id: ContextVar[str | None] = ContextVar("current_session_id", default=None)
 
 
 class AccessClaims(BaseModel):
@@ -78,22 +84,26 @@ def create_asset_token(asset_id: str, *, ttl_minutes: int | None = None) -> str:
     settings = get_settings()
     now = datetime.now(UTC)
     minutes = settings.asset_url_ttl_minutes if ttl_minutes is None else ttl_minutes
-    return _encode(
-        {
-            "sub": asset_id,
-            "typ": "asset",
-            "iat": int(now.timestamp()),
-            "exp": int((now + timedelta(minutes=minutes)).timestamp()),
-        }
-    )
+    payload: dict[str, Any] = {
+        "sub": asset_id,
+        "typ": "asset",
+        "iat": int(now.timestamp()),
+        "exp": int((now + timedelta(minutes=minutes)).timestamp()),
+    }
+    session_id = current_session_id.get()
+    if session_id:
+        payload["sid"] = session_id
+    return _encode(payload)
 
 
-def decode_asset_token(token: str) -> str:
-    """The asset id the token was signed for. Raises on anything else."""
-    subject = _decode(token, expected_type="asset").get("sub")
-    if not isinstance(subject, str):
+def decode_asset_token(token: str) -> tuple[str, str | None]:
+    """The asset id the token was signed for, and the session it was minted
+    in (``None`` for one minted outside a request). Raises on anything else."""
+    payload = _decode(token, expected_type="asset")
+    subject, session_id = payload.get("sub"), payload.get("sid")
+    if not isinstance(subject, str) or not isinstance(session_id, str | None):
         raise Unauthenticated("That token is not valid.", code="invalid_token")
-    return subject
+    return subject, session_id
 
 
 def hash_token(plaintext: str) -> str:

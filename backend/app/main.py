@@ -15,7 +15,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import get_settings
 from app.core.errors import install_error_handlers
 from app.core.logging import configure_logging
-from app.core.middleware import RequestContextMiddleware
+from app.core.middleware import (
+    BodySizeLimitMiddleware,
+    RequestContextMiddleware,
+    SecurityHeadersMiddleware,
+)
 
 logger = logging.getLogger("app.request")
 
@@ -63,6 +67,8 @@ def create_app() -> FastAPI:
         openapi_url=None if settings.is_prod else "/openapi.json",
     )
 
+    app.add_middleware(BodySizeLimitMiddleware, limit=settings.max_body_bytes)
+    app.add_middleware(SecurityHeadersMiddleware, hsts=settings.is_prod)
     app.add_middleware(RequestContextMiddleware)
     app.add_middleware(
         CORSMiddleware,

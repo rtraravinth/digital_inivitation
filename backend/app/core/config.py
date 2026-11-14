@@ -78,6 +78,16 @@ class Settings(BaseSettings):
     # loads, but every view and click it reports is dropped by CORS and the
     # owner's stats read zero. Off in prod, where origins are listed outright.
     cors_dev_lan: bool = True
+
+    #: Per-client request limits (``app/core/ratelimit.py``). On everywhere
+    #: but the test suite, whose one client would trip them; the tests of the
+    #: limits themselves switch it back on.
+    rate_limit_enabled: bool = True
+    #: The largest request body the API reads. An upload is capped at 15MB of
+    #: file; the rest is multipart framing, and an import's JSON fits too.
+    max_body_bytes: int = Field(default=20 * 1024 * 1024, ge=1024)
+    #: Stored uploads per account, in bytes.
+    storage_quota_bytes: int = Field(default=250 * 1024 * 1024, ge=1024 * 1024)
     public_base_url: str = "http://localhost:8000"
 
     media_root: Path = Path("media")

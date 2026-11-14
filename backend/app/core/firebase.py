@@ -20,6 +20,7 @@ are the ones Firebase documents for third-party verification:
 
 from __future__ import annotations
 
+import threading
 import time
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -41,6 +42,13 @@ JWKS_URL = (
 
 #: Seconds of clock difference tolerated between Google and this server.
 LEEWAY_SECONDS = 60
+
+#: How often an unrecognised key id may send us back to Google for the keys.
+#: Google rotates them every few days, so once a minute is ample; without a
+#: floor, every forged token naming a random ``kid`` costs an outbound call.
+KEY_REFETCH_SECONDS = 60
+_last_refetch = 0.0
+_refetch_lock = threading.Lock()
 
 
 @dataclass(frozen=True)
@@ -64,6 +72,24 @@ def _jwks_client() -> jwt.PyJWKClient:
     # Keys are cached in-process; Google rotates them every few days and the
     # client refetches when a token names a key id it has not seen.
     return jwt.PyJWKClient(JWKS_URL, cache_keys=True, lifespan=6 * 60 * 60, timeout=10)
+
+
+def _signing_key(token: str) -> Any:
+    """The key ``token`` names, refetching the set at most once a minute."""
+    global _last_refetch
+    kid = jwt.get_unverified_header(token).get("kid")
+    client = _jwks_client()
+    for key in client.get_signing_keys():
+        if key.key_id == kid:
+            return key
+    with _refetch_lock:
+        if time.monotonic() - _last_refetch < KEY_REFETCH_SECONDS:
+            raise _rejected()
+        _last_refetch = time.monotonic()
+    for key in client.get_signing_keys(refresh=True):
+        if key.key_id == kid:
+            return key
+    raise _rejected()
 
 
 def _rejected() -> Unauthenticated:
@@ -124,7 +150,7 @@ def _verify_sync(token: str) -> FirebaseIdentity:
         )
 
     try:
-        key = _jwks_client().get_signing_key_from_jwt(token)
+        key = _signing_key(token)
         claims = jwt.decode(
             token,
             key.key,

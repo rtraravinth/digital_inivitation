@@ -91,6 +91,11 @@ class AnalyticsService:
         if not await self._counting_allowed(portfolio):
             return False
 
+        # Only a section a visitor can see on this page: an id from another
+        # page, or a hidden section, would put clicks where none can happen.
+        if not any(s.id == section_id and not s.hidden for s in portfolio.sections):
+            return False
+
         self.session.add(
             LinkClick(
                 portfolio_id=portfolio.id,

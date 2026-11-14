@@ -23,7 +23,7 @@ from typing import Any, Literal
 from pydantic import Field, ValidationError
 
 from app.models.enums import FontId
-from app.schemas.common import CamelModel, StrictCamelModel
+from app.schemas.common import CamelModel, SafeUrl, StrictCamelModel
 
 #: Mirrors ``RESUME_TEMPLATE_IDS`` in src/lib/types.ts. A template is only a
 #: look, so adding one needs no migration — but an id the frontend sends must
@@ -172,7 +172,7 @@ class Certification(StrictCamelModel):
     name: str = _LINE
     issuer: str = _LINE
     date: str = _DATE
-    url: str = Field(default="", max_length=2000)
+    url: SafeUrl = ""
 
 
 class Language(StrictCamelModel):

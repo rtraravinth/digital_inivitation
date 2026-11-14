@@ -243,3 +243,14 @@ async def test_reset_cannot_reach_someone_elses_portfolio(
     assert (await auth_client.get("/api/v1/analytics/summary")).json()["views"] == {
         published["slug"]: 1
     }
+
+
+async def test_a_click_on_a_section_not_on_the_page_is_not_counted(client, auth_client, published):
+    import uuid
+
+    response = await client.post(
+        f"/api/v1/public/p/{TEST_HANDLE}/{published['slug']}/clicks",
+        json={"sectionId": str(uuid.uuid4()), "url": "https://example.com"},
+    )
+    assert response.status_code == 202
+    assert response.json()["counted"] is False

@@ -12,6 +12,7 @@ from typing import Any, Literal
 
 from pydantic import Field
 
+from app.models.enums import PORTFOLIOS_MAX
 from app.schemas.common import CamelModel
 
 
@@ -19,7 +20,7 @@ class ImportRequest(CamelModel):
     #: ``replace`` clears what is there first; ``merge`` keeps it and renames
     #: any clashing slug rather than failing the whole file.
     mode: Literal["replace", "merge"] = "merge"
-    portfolios: list[dict[str, Any]] = Field(default_factory=list)
+    portfolios: list[dict[str, Any]] = Field(default_factory=list, max_length=PORTFOLIOS_MAX)
 
 
 class ImportResultOut(CamelModel):

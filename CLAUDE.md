@@ -31,7 +31,7 @@ npm run build
 npm run lint
 npm run typecheck
 npm run knip
-cd backend && .venv/bin/python -m pytest    # 387 tests (.venv/Scripts on Windows)
+cd backend && .venv/bin/python -m pytest    # 424 tests (.venv/Scripts on Windows)
 ```
 
 **CI runs all of these on every pull request** (`.github/workflows/ci.yml`),
@@ -795,6 +795,39 @@ it, but two rules matter from this side:
   refuses `env == "prod"` with `DEV_JWT_SECRET` or a secret under 32
   characters, so a host that forgets `FACET_JWT_SECRET` fails at boot
   instead of accepting forged tokens.
+- **Every page carries a nonce Content Security Policy** (`src/proxy.ts`).
+  Scripts run only with the request's nonce (`'strict-dynamic'` lets
+  Firebase's popup loader through); `layout.tsx` puts it on `THEME_BOOT`.
+  Styles allow `'unsafe-inline'` because themes style through attributes.
+  An inline `<script>` without `nonce={nonce}` will not run — add the nonce,
+  never `'unsafe-inline'` to `script-src`. A new third-party origin goes in
+  `contentSecurityPolicy()`. The other headers (`nosniff`, framing, HSTS,
+  Referrer-Policy) are in `next.config.ts`; the API sets its own
+  (`SecurityHeadersMiddleware`), except a CSP on PDFs, which Chrome's viewer
+  will not open under `object-src 'none'`.
+- **Limits** (`app/core/ratelimit.py`): sign-in 10/min and refresh 30/min
+  per address; uploads 30/min and imports 5/min per account; views and
+  clicks over their limit answer 202 `counted: false`, never 429. Counters are
+  in process memory — one API process. Request bodies stop at 20MB
+  (`BodySizeLimitMiddleware`), uploads at 250MB per account, 50 portfolios
+  per account, 100 sections per portfolio. Images over 50 megapixels are
+  refused from the header before decoding; decoding runs in a thread, two at
+  a time. The test suite runs with rate limits off.
+- **An import is held to the editor's schemas** (`services/transfer.py`):
+  every field is validated or dropped, `layout` key by key, and it always
+  lands as a draft. Only `trusted=True` (the CLI and the seed) keeps a page's
+  published state.
+- **A URL that can run code is stored as ""** (`SafeUrl` in
+  `schemas/common.py`): only http, https, mailto and tel, or no scheme.
+  Emptied rather than refused, so an old row cannot break a read.
+- **A signed asset URL dies with its session.** The token carries the
+  minting session's id (`current_session_id`, set by `get_caller`).
+- **Deleting an account needs a sign-in from the last 15 minutes** (403
+  `reauth_required`; the account page offers "Sign in again").
+- **Refresh is serialised.** The row is locked, tabs take turns through
+  `navigator.locks`, and a token rotated in the last 10 seconds answers 401
+  `refresh_token_rotated` without revoking anything. An older replay still
+  revokes every session.
 - **`src/lib/api.ts` is the only module that knows the API exists.** It owns
   the access token, one silent refresh-and-retry on a 401, and turning an
   error envelope into an `ApiError` with a `code` a caller can branch on.
@@ -910,7 +943,7 @@ deleted.
 - **Slugs are global.** Two accounts cannot both hold `rohan`, because the
   address is `facet.page/<slug>` with nothing in front of it. The create
   dialog surfaces the 409 as a message.
-- **The frontend has no test runner.** The backend has 387 pytest tests;
+- **The frontend has no test runner.** The backend has 424 pytest tests;
   changes here are checked with `npm run lint`, `npm run build` and by
   actually opening the app.
 

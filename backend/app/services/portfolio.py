@@ -8,9 +8,9 @@ from datetime import UTC, datetime
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.errors import Conflict, NotFound
+from app.core.errors import Conflict, NotFound, ValidationFailed
 from app.models import Asset, Portfolio, PortfolioHeader, Section, SectionImage, User
-from app.models.enums import DEFAULT_TAB
+from app.models.enums import DEFAULT_TAB, PORTFOLIOS_MAX
 from app.models.portfolio import default_layout
 from app.schemas.asset import asset_out
 from app.schemas.portfolio import (
@@ -113,6 +113,19 @@ def relative_time(moment: datetime) -> str:
         return f"{days} day{'' if days == 1 else 's'} ago"
     months = days // 30
     return f"{months} month{'' if months == 1 else 's'} ago"
+
+
+async def assert_room_for_portfolios(session: AsyncSession, user: User, adding: int) -> None:
+    """Refuse to take an account past ``PORTFOLIOS_MAX``."""
+    held = await session.scalar(
+        select(func.count()).select_from(Portfolio).where(Portfolio.user_id == user.id)
+    )
+    if (held or 0) + adding > PORTFOLIOS_MAX:
+        raise ValidationFailed(
+            f"An account can hold up to {PORTFOLIOS_MAX} portfolios.",
+            code="too_many_portfolios",
+            details={"limit": PORTFOLIOS_MAX},
+        )
 
 
 class PortfolioService:
@@ -219,6 +232,7 @@ class PortfolioService:
     # ── writes ──────────────────────────────────────────────────────────
 
     async def create(self, user: User, payload: PortfolioCreate) -> Portfolio:
+        await assert_room_for_portfolios(self.session, user, 1)
         await self._assert_slug_free(user.id, payload.slug)
 
         portfolio = Portfolio(

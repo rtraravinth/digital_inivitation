@@ -10,14 +10,17 @@ from __future__ import annotations
 
 import hashlib
 import io
+import threading
 import xml.etree.ElementTree as ElementTree
 from dataclasses import dataclass
 
 from fastapi import UploadFile
 from PIL import Image, ImageOps, UnidentifiedImageError
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from starlette.concurrency import run_in_threadpool
 
+from app.core.config import get_settings
 from app.core.errors import NotFound, PayloadTooLarge, UnsupportedMedia
 from app.models import AccountProfile, Asset, PortfolioHeader, Section, SectionImage, User
 from app.models.enums import AssetKind
@@ -26,6 +29,17 @@ from app.services.storage import build_key, get_storage
 #: Mirrors src/lib/assets.ts. There they were a storage ceiling; here they are
 #: a sanity bound, because the bytes no longer have to fit in localStorage.
 IMAGE_MAX_DIM = 1400
+
+#: The largest bitmap an upload may decode to. Read from the header before
+#: any pixel is decoded: a 435KB PNG of one colour can be 144 million pixels,
+#: over half a gigabyte once decoded. 50MP is past a 48MP phone camera.
+IMAGE_MAX_PIXELS = 50_000_000
+# Pillow's own guard, as a backstop to the check above.
+Image.MAX_IMAGE_PIXELS = IMAGE_MAX_PIXELS
+
+#: Images decoded at once, across every request. Each can briefly need a few
+#: hundred MB, so this, not the request count, is what bounds memory.
+_DECODE_SLOTS = threading.BoundedSemaphore(2)
 IMAGE_TARGET_BYTES = 420 * 1024
 FILE_MAX_BYTES = 800 * 1024
 
@@ -87,6 +101,14 @@ def format_bytes(count: int) -> str:
     return f"{count / (1024 * 1024):.1f} MB"
 
 
+def _too_large(width: int, height: int) -> PayloadTooLarge:
+    return PayloadTooLarge(
+        "That image is too large to process. Resize it below 50 megapixels.",
+        code="image_too_large",
+        details={"maxPixels": IMAGE_MAX_PIXELS, "width": width, "height": height},
+    )
+
+
 class AssetService:
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
@@ -97,12 +119,15 @@ class AssetService:
         if not raw:
             raise UnsupportedMedia("That file is empty.", code="empty_upload")
 
+        # Decoding and re-encoding is CPU-bound and can take a second: off the
+        # event loop, or every other request waits for it.
         processed = (
-            self._process_image(raw)
+            await run_in_threadpool(self._process_image, raw)
             if kind == "image"
             else self._process_file(raw, upload.content_type)
         )
 
+        await self._assert_room(user, len(processed.data))
         digest = hashlib.sha256(processed.data).hexdigest()
         key = build_key(user.id, digest, processed.extension)
 
@@ -126,6 +151,24 @@ class AssetService:
         await self.session.flush()
         return asset
 
+    async def _assert_room(self, user: User, adding: int) -> None:
+        """Refuse an upload that would take the account past its quota.
+
+        Counted after processing, so a photo is charged for the JPEG that is
+        kept, not the original that was sent.
+        """
+        quota = get_settings().storage_quota_bytes
+        used = await self.session.scalar(
+            select(func.coalesce(func.sum(Asset.byte_size), 0)).where(Asset.user_id == user.id)
+        )
+        if (used or 0) + adding > quota:
+            raise PayloadTooLarge(
+                "Your uploads have used all the space this account has. "
+                "Delete some files to make room.",
+                code="storage_full",
+                details={"limit": quota, "used": int(used or 0)},
+            )
+
     async def _read_capped(self, upload: UploadFile) -> bytes:
         buffer = bytearray()
         while chunk := await upload.read(64 * 1024):
@@ -145,13 +188,27 @@ class AssetService:
 
         try:
             with Image.open(io.BytesIO(raw)) as probe:
+                # Image.open reads only the header, so this costs nothing yet.
+                width, height = probe.size
+                if width * height > IMAGE_MAX_PIXELS:
+                    raise _too_large(width, height)
                 probe.verify()
             image = Image.open(io.BytesIO(raw))
+        except Image.DecompressionBombError as exc:
+            raise _too_large(0, 0) from exc
         except (UnidentifiedImageError, OSError) as exc:
             # A shell script named .png reaches exactly here.
             raise UnsupportedMedia(
                 "That file is not an image we can read.", code="unsupported_media"
             ) from exc
+
+        with _DECODE_SLOTS:
+            return self._shrink(image)
+
+    def _shrink(self, image: Image.Image) -> ProcessedUpload:
+        # A JPEG can decode straight at 1/2, 1/4 or 1/8 scale; ask for the
+        # smallest that still covers the target, before any pixel is read.
+        image.draft("RGB", (IMAGE_MAX_DIM, IMAGE_MAX_DIM))
 
         # A phone photo carries its rotation in EXIF; bake it in before the
         # orientation tag is dropped by the re-encode.

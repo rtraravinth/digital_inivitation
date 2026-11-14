@@ -16,7 +16,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.errors import Conflict, NotFound, Unauthenticated
-from app.core.security import decode_access_token
+from app.core.security import current_session_id, decode_access_token
 from app.db.session import get_session
 from app.models import AuthSession, Portfolio, User
 from app.services.auth import DeviceInfo
@@ -62,6 +62,9 @@ async def get_caller(request: Request, session: SessionDep) -> Caller:
     if user is None or not user.is_active:
         raise Unauthenticated("Please sign in again.", code="session_revoked")
 
+    # Rate limits count a signed-in caller by account, not by address.
+    request.state.user_id = str(user.id)
+    current_session_id.set(str(auth_session.id))
     return Caller(user=user, session_id=str(auth_session.id))
 
 

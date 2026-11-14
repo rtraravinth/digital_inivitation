@@ -12,7 +12,7 @@ import binascii
 import re
 from typing import Any
 
-from pydantic import TypeAdapter, ValidationError
+from pydantic import BaseModel, TypeAdapter, ValidationError
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -27,17 +27,22 @@ from app.models.enums import (
     LEGACY_THEMES,
     SECTION_BLOCKS_MAX,
     SECTION_IMAGES_MAX,
+    SECTIONS_MAX,
     STATUSES,
     TAB_MAX_LENGTH,
+    TAG_MAX_LENGTH,
     THEMES,
 )
 from app.models.portfolio import default_layout
+from app.schemas.account import LinkItem
 from app.schemas.asset import asset_out
 from app.schemas.blocks import Block
-from app.schemas.portfolio import Footer
+from app.schemas.portfolio import ACCENT_PATTERN, Footer, Layout
 from app.schemas.resume import resume_from_stored
+from app.schemas.section import DateEntry, Quote, Stat
 from app.schemas.transfer import ImportResultOut
 from app.services.asset import AssetService
+from app.services.portfolio import assert_room_for_portfolios
 
 DATA_URI = re.compile(r"^data:(?P<mime>[\w.+/-]+)?;base64,(?P<payload>.+)$", re.DOTALL)
 SLUG_SAFE = re.compile(r"[^a-z0-9/-]+")
@@ -105,7 +110,12 @@ class TransferService:
 
     # ── import ──────────────────────────────────────────────────────────
 
-    async def import_(self, user: User, payload: list[Any], mode: str) -> ImportResultOut:
+    async def import_(
+        self, user: User, payload: list[Any], mode: str, *, trusted: bool = False
+    ) -> ImportResultOut:
+        """Load an export. ``trusted`` is for the CLI and the seed, which are
+        run by whoever runs the server; it keeps each page's published state.
+        A file from the API is never trusted that far."""
         if not all(isinstance(item, dict) for item in payload):
             raise ValidationFailed(
                 "That file is not a FACET export.", code="invalid_import_payload"
@@ -119,6 +129,8 @@ class TransferService:
                 await self.session.delete(portfolio)
             await self.session.flush()
 
+        await assert_room_for_portfolios(self.session, user, len(payload))
+
         taken = set((await self.session.scalars(select(Portfolio.slug))).all())
 
         renamed: dict[str, str] = {}
@@ -131,13 +143,15 @@ class TransferService:
                 renamed[wanted] = slug
             taken.add(slug)
 
-            await self._create_from_dict(user, raw, slug)
+            await self._create_from_dict(user, raw, slug, trusted=trusted)
             imported += 1
 
         await self.session.flush()
         return ImportResultOut(imported=imported, renamed=renamed)
 
-    async def _create_from_dict(self, user: User, raw: dict[str, Any], slug: str) -> Portfolio:
+    async def _create_from_dict(
+        self, user: User, raw: dict[str, Any], slug: str, *, trusted: bool
+    ) -> Portfolio:
         header_raw = raw.get("header") or {}
         sections_raw = [s for s in (raw.get("sections") or []) if isinstance(s, dict)]
         sections_raw = _page_block_sections(raw.get("resume")) + sections_raw
@@ -146,10 +160,12 @@ class TransferService:
             user_id=user.id,
             # Ids in the payload are never reused: importing your own export
             # twice must not collide with what is already stored.
-            name=str(raw.get("name") or "Untitled")[:200],
+            name=_text(raw.get("name"), 200) or "Untitled",
             slug=slug,
-            status=_one_of(raw.get("status"), STATUSES, "draft"),
-            summary=str(raw.get("summary") or "")[:2000],
+            # Always a draft: publishing is its own step with its own checks,
+            # and a file must not be a way around it.
+            status=_one_of(raw.get("status"), STATUSES, "draft") if trusted else "draft",
+            summary=_text(raw.get("summary"), 2000),
             # An export from an older build names a retired theme; it lands on
             # the one that replaced it rather than on the default.
             theme=_one_of(
@@ -157,12 +173,13 @@ class TransferService:
                 THEMES,
                 DEFAULT_THEME,
             ),
-            accent=str(raw.get("accent") or DEFAULT_ACCENT)[:32],
+            # Lands in a style attribute on the published page, like groundHex.
+            accent=_matching(raw.get("accent"), ACCENT_PATTERN, DEFAULT_ACCENT),
             ground=_one_of(raw.get("ground"), GROUNDS, "light"),
             ground_hex=_hex_or_blank(raw.get("groundHex")),
             font=_one_of(raw.get("font"), FONTS, "archivo"),
             body_font=_one_of(raw.get("bodyFont"), FONTS, "archivo"),
-            layout={**default_layout(), **(raw.get("layout") or {})},
+            layout=_layout_of(raw.get("layout")),
             # An export from before resumes existed has none; an invalid one
             # lands on the defaults rather than failing the whole import.
             resume=resume_from_stored(raw.get("resume")).model_dump(by_alias=True),
@@ -170,24 +187,24 @@ class TransferService:
         )
 
         portfolio.header = PortfolioHeader(
-            name=str(header_raw.get("name") or "")[:200],
-            current=str(header_raw.get("current") or ""),
-            description=str(header_raw.get("description") or ""),
-            tags=list(header_raw.get("tags") or []),
-            links=list(header_raw.get("links") or []),
-            numbers=_page_list(header_raw, sections_raw, "numbers"),
-            dates=_page_list(header_raw, sections_raw, "dates"),
+            name=_text(header_raw.get("name"), 200),
+            current=_text(header_raw.get("current"), 2000),
+            description=_text(header_raw.get("description"), 20_000),
+            tags=_tags_of(header_raw.get("tags")),
+            links=_valid(header_raw.get("links"), LinkItem, 60),
+            numbers=_valid(_page_list(header_raw, sections_raw, "numbers"), Stat, 40),
+            dates=_valid(_page_list(header_raw, sections_raw, "dates"), DateEntry, 60),
             portrait_asset_id=await self._restore_asset(user, header_raw.get("portrait")),
         )
 
         portfolio.sections = [
             Section(
                 position=index,
-                title=str(section.get("title") or ""),
-                description=str(section.get("description") or ""),
+                title=_text(section.get("title"), 500),
+                description=_text(section.get("description"), 20_000),
                 tab=_tab_of(section),
-                links=list(section.get("links") or []),
-                quote=section.get("quote"),
+                links=_valid(section.get("links"), LinkItem, 60),
+                quote=_quote_of(section.get("quote")),
                 hidden=bool(section.get("hidden")),
                 on_resume=bool(section.get("onResume", True)),
                 file_asset_id=await self._restore_asset(user, section.get("file")),
@@ -197,7 +214,7 @@ class TransferService:
                     for position, asset_id in enumerate(await self._restore_images(user, section))
                 ],
             )
-            for index, section in enumerate(sections_raw)
+            for index, section in enumerate(sections_raw[:SECTIONS_MAX])
         ]
 
         self.session.add(portfolio)
@@ -212,10 +229,13 @@ class TransferService:
             raw = [section.get("image")]
         restored = []
         for item in raw:
+            if len(restored) >= SECTION_IMAGES_MAX:
+                # Stop before decoding and storing pictures that would be cut.
+                break
             asset_id = await self._restore_asset(user, item)
             if asset_id is not None and asset_id not in restored:
                 restored.append(asset_id)
-        return restored[:SECTION_IMAGES_MAX]
+        return restored
 
     async def _restore_asset(self, user: User, raw: Any):
         """Reattach an asset from an export.
@@ -378,6 +398,61 @@ def _asset_dict(asset: Asset | None) -> dict[str, Any] | None:
 
 
 HEX_COLOUR = re.compile(r"#[0-9a-fA-F]{6}")
+
+
+def _text(value: Any, limit: int) -> str:
+    """A string field, cut to the length the edit endpoints allow."""
+    return value[:limit] if isinstance(value, str) else ""
+
+
+def _matching(value: Any, pattern: str, fallback: str) -> str:
+    return value if isinstance(value, str) and re.fullmatch(pattern, value) else fallback
+
+
+def _valid(raw: Any, model: type[BaseModel], limit: int) -> list[dict[str, Any]]:
+    """The entries that pass ``model``, as stored, up to ``limit``.
+
+    The import checks with the schemas the editor's writes use, so a file can
+    store nothing the editor could not. One bad entry is dropped, not the file.
+    """
+    kept: list[dict[str, Any]] = []
+    for item in raw if isinstance(raw, list) else []:
+        if len(kept) >= limit:
+            break
+        try:
+            kept.append(model.model_validate(item).model_dump(by_alias=True))
+        except ValidationError:
+            continue
+    return kept
+
+
+def _tags_of(raw: Any) -> list[str]:
+    if not isinstance(raw, list):
+        return []
+    return [t.strip()[:TAG_MAX_LENGTH] for t in raw if isinstance(t, str) and t.strip()][:40]
+
+
+def _quote_of(raw: Any) -> dict[str, Any] | None:
+    try:
+        return Quote.model_validate(raw).model_dump(by_alias=True) if raw else None
+    except ValidationError:
+        return None
+
+
+def _layout_of(raw: Any) -> dict[str, Any]:
+    """The defaults, overlaid with each stored key that validates on its own.
+
+    Every read validates ``layout`` against ``Layout``, so one bad key here
+    would make the whole portfolio list fail to load.
+    """
+    layout = default_layout()
+    for key, value in raw.items() if isinstance(raw, dict) else ():
+        try:
+            Layout.model_validate({**layout, key: value})
+        except ValidationError:
+            continue
+        layout[key] = value
+    return layout
 
 
 def _one_of(value: Any, allowed: tuple[str, ...], fallback: str) -> str:

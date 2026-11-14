@@ -19,6 +19,12 @@ from app.services.account import assert_handle_available
 
 logger = logging.getLogger("app.auth")
 
+#: A refresh token rotated this recently is a race, not a theft: two tabs
+#: that sent the same cookie at once. It is refused without revoking every
+#: session, which would sign the person out on all their devices for opening
+#: two tabs. Older replays still revoke everything.
+REUSE_GRACE_SECONDS = 10
+
 
 @dataclass(frozen=True)
 class DeviceInfo:
@@ -190,12 +196,18 @@ class AuthService:
         before it — exactly the sessions Firebase itself would end.
         """
         hashed = hash_token(plaintext)
+        # Locked: two refreshes with one token must not both rotate it.
         auth_session = await self.session.scalar(
-            select(AuthSession).where(AuthSession.refresh_token_hash == hashed)
+            select(AuthSession).where(AuthSession.refresh_token_hash == hashed).with_for_update()
         )
 
         if auth_session is None:
             raise Unauthenticated("Please sign in again.", code="invalid_refresh_token")
+
+        if auth_session.revoked_at is not None and datetime.now(
+            UTC
+        ) - auth_session.revoked_at < timedelta(seconds=REUSE_GRACE_SECONDS):
+            raise Unauthenticated("Please sign in again.", code="refresh_token_rotated")
 
         if auth_session.revoked_at is not None:
             logger.warning(

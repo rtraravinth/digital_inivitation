@@ -7,9 +7,11 @@ token checks are in test_firebase.py.
 
 from __future__ import annotations
 
-from sqlalchemy import select
+from datetime import timedelta
 
-from app.models import AccountProfile, AccountSettings, User
+from sqlalchemy import select, update
+
+from app.models import AccountProfile, AccountSettings, AuthSession, User
 from tests.factories import bearer, firebase_token, sign_in
 
 
@@ -20,7 +22,18 @@ def _replace_refresh_cookie(client, value: str) -> None:
     which one gets sent is then a coin toss rather than a test.
     """
     client.cookies.clear()
-    client.cookies.set("facet_refresh", value, domain="test", path="/api/v1/auth")
+    # httpx files the base URL's host "test" under "test.local"; any other
+    # domain puts the cookie in the jar and never sends it.
+    client.cookies.set("facet_refresh", value, domain="test.local", path="/api/v1/auth")
+
+
+async def _age_rotations(db_session) -> None:
+    """Move every rotation past the grace window, so a replay reads as theft."""
+    await db_session.execute(
+        update(AuthSession)
+        .where(AuthSession.revoked_at.is_not(None))
+        .values(revoked_at=AuthSession.revoked_at - timedelta(minutes=1))
+    )
 
 
 # ── a new account ────────────────────────────────────────────────────────
@@ -208,7 +221,9 @@ async def test_an_unverified_email_cannot_take_an_address_in_use(client, registe
 # ── refresh and sign out ─────────────────────────────────────────────────
 
 
-async def test_refresh_rotates_the_token_and_the_old_one_stops_working(client, registered):
+async def test_refresh_rotates_the_token_and_the_old_one_stops_working(
+    client, registered, db_session
+):
     first = client.cookies.get("facet_refresh")
 
     response = await client.post("/api/v1/auth/refresh")
@@ -216,23 +231,50 @@ async def test_refresh_rotates_the_token_and_the_old_one_stops_working(client, r
     assert response.json()["token"]["accessToken"]
     assert client.cookies.get("facet_refresh") != first
 
+    await _age_rotations(db_session)
     _replace_refresh_cookie(client, first)
     reused = await client.post("/api/v1/auth/refresh")
     assert reused.status_code == 401
     assert reused.json()["error"]["code"] == "invalid_refresh_token"
 
 
-async def test_reusing_a_rotated_token_revokes_every_session(client, registered):
+async def test_two_tabs_refreshing_at_once_do_not_sign_out_every_device(client, registered):
+    """The second tab sent the same cookie a moment after the first rotated it.
+
+    That is a race, not a theft: refuse it, but leave every other session be.
+    """
+    shared = client.cookies.get("facet_refresh")
+    assert (await client.post("/api/v1/auth/refresh")).status_code == 200
+    rotated = client.cookies.get("facet_refresh")
+
+    _replace_refresh_cookie(client, shared)
+    second_tab = await client.post("/api/v1/auth/refresh")
+    assert second_tab.status_code == 401
+    assert second_tab.json()["error"]["code"] == "refresh_token_rotated"
+
+    # The first tab's new token still works: nothing was revoked.
+    _replace_refresh_cookie(client, rotated)
+    assert (await client.post("/api/v1/auth/refresh")).status_code == 200
+
+
+async def test_reusing_a_rotated_token_revokes_every_session(client, registered, db_session):
     """A replayed refresh token means it leaked. Drop everything."""
     leaked = client.cookies.get("facet_refresh")
-    await client.post("/api/v1/auth/refresh")
+    rotated = await client.post("/api/v1/auth/refresh")
+    assert rotated.status_code == 200
+    current_token = client.cookies.get("facet_refresh")
+    await _age_rotations(db_session)
 
-    client.headers["Authorization"] = f"Bearer {registered['token']['accessToken']}"
     _replace_refresh_cookie(client, leaked)
-    await client.post("/api/v1/auth/refresh")
+    replay = await client.post("/api/v1/auth/refresh")
+    assert replay.json()["error"]["code"] == "invalid_refresh_token"
 
-    # The access token issued before the replay is dead too.
+    # The session the rotation opened — the one the thief or the owner now
+    # holds — is dead too: its access token and its refresh token.
+    client.headers["Authorization"] = f"Bearer {rotated.json()['token']['accessToken']}"
     assert (await client.get("/api/v1/auth/sessions")).status_code == 401
+    _replace_refresh_cookie(client, current_token)
+    assert (await client.post("/api/v1/auth/refresh")).status_code == 401
 
 
 async def test_refresh_without_a_cookie_is_401(client):

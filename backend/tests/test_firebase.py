@@ -28,10 +28,11 @@ def keys(monkeypatch):
 
     class _Key:
         key = public
+        key_id = "test"  # the kid the test tokens name
 
     class _Client:
-        def get_signing_key_from_jwt(self, token):
-            return _Key()
+        def get_signing_keys(self, refresh=False):
+            return [_Key()]
 
     monkeypatch.setattr(firebase, "_jwks_client", lambda: _Client())
     monkeypatch.setenv("FACET_FIREBASE_PROJECT_ID", PROJECT)

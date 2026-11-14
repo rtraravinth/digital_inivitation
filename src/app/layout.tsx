@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { headers } from "next/headers";
 import {
   Archivo,
   Bitter,
@@ -122,7 +123,10 @@ export const metadata: Metadata = {
     "One page with a header and as many sections as you need. Keep a full one for everything you do, and short ones for the rooms where only part of it matters.",
 };
 
-export default function RootLayout({ children }: LayoutProps<"/">) {
+export default async function RootLayout({ children }: LayoutProps<"/">) {
+  // Set by src/proxy.ts with the Content Security Policy; an inline script
+  // runs only if it carries it.
+  const nonce = (await headers()).get("x-nonce") ?? undefined;
   return (
     // `suppressHydrationWarning` because the boot script below sets
     // `data-theme` and `color-scheme` on this element before React hydrates,
@@ -137,7 +141,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
             which runs after first paint and brings the flash back. The cost
             is a development-only React warning on the 404 page, which renders
             this layout on the client. */}
-        <script dangerouslySetInnerHTML={{ __html: THEME_BOOT }} />
+        <script nonce={nonce} dangerouslySetInnerHTML={{ __html: THEME_BOOT }} />
       </head>
       <body className="min-h-full flex flex-col">
         {/*

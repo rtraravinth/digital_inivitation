@@ -14,7 +14,7 @@ from sqlalchemy.orm import selectinload
 
 from app.core.errors import NotFound, ValidationFailed
 from app.models import Asset, Portfolio, Section, SectionImage
-from app.models.enums import DEFAULT_TAB
+from app.models.enums import DEFAULT_TAB, SECTIONS_MAX
 from app.schemas.section import SectionOrder, SectionPatch
 from app.services.asset import AssetService
 
@@ -36,6 +36,12 @@ class SectionService:
         self.session = session
 
     async def add(self, portfolio: Portfolio) -> Section:
+        if len(portfolio.sections) >= SECTIONS_MAX:
+            raise ValidationFailed(
+                f"A portfolio can hold up to {SECTIONS_MAX} sections.",
+                code="too_many_sections",
+                details={"limit": SECTIONS_MAX},
+            )
         section = Section(
             portfolio_id=portfolio.id,
             position=len(portfolio.sections),

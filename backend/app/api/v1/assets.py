@@ -9,9 +9,10 @@ from fastapi.responses import FileResponse, Response
 
 from app.api.deps import CurrentUser, SessionDep, get_caller
 from app.api.route import TransactionRoute
-from app.core.errors import NotFound
+from app.core.errors import NotFound, Unauthenticated
+from app.core.ratelimit import UploadLimit
 from app.core.security import decode_asset_token
-from app.models import Asset
+from app.models import Asset, AuthSession
 from app.models.enums import AssetKind
 from app.schemas.asset import AssetOut, asset_out
 from app.schemas.common import ERROR_RESPONSES
@@ -40,6 +41,7 @@ router = APIRouter(
 async def upload_asset(
     session: SessionDep,
     user: CurrentUser,
+    _: UploadLimit,
     file: UploadFile = File(description="The file to store"),
     kind: AssetKind = Form(default="image", description="image or file"),
 ) -> AssetOut:
@@ -78,8 +80,14 @@ async def _readable(
         caller = await get_caller(request, session)
         return await AssetService(session).get_owned(caller.user, asset_id)
 
-    if decode_asset_token(token) != str(asset_id):
+    signed_for, session_id = decode_asset_token(token)
+    if signed_for != str(asset_id):
         raise NotFound("That upload does not exist.", code="asset_not_found")
+    if session_id is not None:
+        # Signed out, or signed out everywhere: the link goes with the session.
+        minted_in = await session.get(AuthSession, uuid.UUID(session_id))
+        if minted_in is None or not minted_in.is_active:
+            raise Unauthenticated("Please sign in again.", code="session_revoked")
 
     asset = await session.get(Asset, asset_id)
     if asset is None:

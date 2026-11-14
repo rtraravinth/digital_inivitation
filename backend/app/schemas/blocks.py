@@ -30,7 +30,7 @@ from typing import Annotated, Literal
 from pydantic import Field
 
 from app.models.enums import BLOCK_ITEMS_MAX, SECTION_IMAGES_MAX
-from app.schemas.common import StrictCamelModel
+from app.schemas.common import SafeUrl, StrictCamelModel
 
 _ID = Field(max_length=64)
 _SHORT = Field(default="", max_length=200)
@@ -55,7 +55,7 @@ class TestimonialItem(StrictCamelModel):
 class ClientItem(StrictCamelModel):
     id: str = _ID
     name: str = _SHORT
-    url: str = Field(default="", max_length=2000)
+    url: SafeUrl = ""
 
 
 class TabItem(StrictCamelModel):
@@ -183,7 +183,7 @@ class ContactBlock(_Block):
     location: str = _SHORT
     #: An optional booking link — a calendar page, say — and its label.
     cta_label: str = Field(default="", max_length=60)
-    cta_url: str = Field(default="", max_length=2000)
+    cta_url: SafeUrl = ""
     #: Whether to draw the compose form, or only the details.
     form: bool = True
 

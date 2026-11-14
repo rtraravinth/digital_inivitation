@@ -331,3 +331,37 @@ async def test_an_access_token_is_not_an_asset_token(auth_client, registered):
 async def test_a_bearer_token_still_opens_an_unsigned_url(auth_client):
     asset = (await upload(auth_client, png_bytes(200, 200))).json()
     assert (await auth_client.get(f"/api/v1/assets/{asset['id']}")).status_code == 200
+
+
+def _flat_png(width: int, height: int) -> bytes:
+    # One colour compresses to almost nothing: a tiny file, a huge bitmap.
+    buffer = io.BytesIO()
+    Image.new("L", (width, height)).save(buffer, format="PNG", optimize=True)
+    return buffer.getvalue()
+
+
+@pytest.mark.parametrize(("width", "height"), [(12_000, 12_000), (20_000, 10_000)])
+async def test_a_decompression_bomb_is_refused_before_it_is_decoded(auth_client, width, height):
+    data = _flat_png(width, height)
+    assert len(data) < 1024 * 1024
+    response = await upload(auth_client, data, name="bomb.png")
+    assert response.status_code == 413
+    assert response.json()["error"]["code"] == "image_too_large"
+
+
+async def test_a_large_but_reasonable_photo_still_uploads(auth_client):
+    response = await upload(auth_client, png_bytes(6000, 4000))
+    assert response.status_code == 201
+    assert max(response.json()["width"], response.json()["height"]) == 1400
+
+
+async def test_a_signed_url_stops_working_when_its_session_signs_out(auth_client, client):
+    asset = (await upload(auth_client, png_bytes(40, 30))).json()
+    signed = asset["url"]
+    assert "?t=" in signed
+    assert (await client.get(signed, headers={"Authorization": ""})).status_code == 200
+
+    assert (await auth_client.post("/api/v1/auth/logout")).status_code == 204
+    after = await client.get(signed, headers={"Authorization": ""})
+    assert after.status_code == 401
+    assert after.json()["error"]["code"] == "session_revoked"

@@ -8,11 +8,17 @@ is real.
 
 from __future__ import annotations
 
+import uuid
+from datetime import UTC, datetime, timedelta
+
 from fastapi import APIRouter, status
 
-from app.api.deps import CurrentUser, SessionDep
+from app.api.deps import CallerDep, CurrentUser, SessionDep
 from app.api.route import TransactionRoute
+from app.core.config import get_settings
+from app.core.errors import PermissionDenied
 from app.core.firebase_accounts import AccountCheckerDep
+from app.models import AuthSession
 from app.schemas.account import (
     AccountOut,
     DomainPatch,
@@ -108,7 +114,7 @@ async def update_privacy(
     summary="Delete the account and everything in it",
 )
 async def delete_account(
-    session: SessionDep, user: CurrentUser, accounts: AccountCheckerDep
+    session: SessionDep, caller: CallerDep, accounts: AccountCheckerDep
 ) -> None:
     """Delete the FACET account and its Firebase login, both or neither.
 
@@ -117,6 +123,17 @@ async def delete_account(
     nothing is gone — rather than leaving a Firebase login that would sign
     straight back in to a fresh, empty account.
     """
+    # Irreversible, so it needs a fresh sign-in, not just a valid token: a
+    # stolen access token, or a laptop left open, must not be enough.
+    signed_in = await session.get(AuthSession, uuid.UUID(caller.session_id))
+    max_age = timedelta(seconds=get_settings().firebase_max_auth_age_seconds)
+    if signed_in is None or datetime.now(UTC) - signed_in.signed_in_at > max_age:
+        raise PermissionDenied(
+            "For your safety, sign in again before deleting your account.",
+            code="reauth_required",
+        )
+    user = caller.user
+
     uid = user.firebase_uid
     keys = await AccountService(session).delete_account(user)
     if uid is not None:

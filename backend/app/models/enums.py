@@ -130,3 +130,12 @@ def sql_in(values: tuple[str, ...]) -> str:
 SECTION_IMAGES_MAX: Final[int] = 12
 SECTION_BLOCKS_MAX: Final[int] = 12
 BLOCK_ITEMS_MAX: Final[int] = 40
+
+#: How many portfolios one account may hold, and sections one portfolio may
+#: hold. Far past any real page — the seed's busiest has nine sections —
+#: and there so an import or a script cannot fill the database.
+PORTFOLIOS_MAX: Final[int] = 50
+SECTIONS_MAX: Final[int] = 100
+
+#: One header tag: a word or a short phrase, never a paragraph.
+TAG_MAX_LENGTH: Final[int] = 60

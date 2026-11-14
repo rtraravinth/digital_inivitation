@@ -196,3 +196,21 @@ async def test_delete_account_removes_the_user_and_everything_under_it(
     assert portfolios == 0
 
     assert (await other_auth_client.get("/api/v1/account")).status_code == 200
+
+
+async def test_deleting_an_account_needs_a_recent_sign_in(auth_client, db_session):
+    from datetime import timedelta
+
+    from sqlalchemy import update
+
+    from app.models import AuthSession
+
+    # A session signed in an hour ago: the token is valid, the person may not
+    # be the one at the keyboard.
+    await db_session.execute(
+        update(AuthSession).values(signed_in_at=AuthSession.signed_in_at - timedelta(hours=1))
+    )
+    refused = await auth_client.delete("/api/v1/account")
+    assert refused.status_code == 403
+    assert refused.json()["error"]["code"] == "reauth_required"
+    assert (await auth_client.get("/api/v1/account")).status_code == 200

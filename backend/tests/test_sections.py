@@ -221,3 +221,12 @@ async def test_a_section_id_from_another_portfolio_is_404(auth_client, portfolio
         json={"title": "wrong parent"},
     )
     assert response.status_code == 404
+
+
+async def test_a_portfolio_holds_at_most_a_hundred_sections(auth_client, portfolio):
+    url = f"/api/v1/portfolios/{portfolio['id']}/sections"
+    for _ in range(99):  # the fixture added the first
+        assert (await auth_client.post(url, json={})).status_code == 201
+    refused = await auth_client.post(url, json={})
+    assert refused.status_code == 422
+    assert refused.json()["error"]["code"] == "too_many_sections"

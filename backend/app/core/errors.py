@@ -40,6 +40,7 @@ class AppError(Exception):
         code: str | None = None,
         details: dict[str, Any] | None = None,
         keep_writes: bool = False,
+        headers: dict[str, str] | None = None,
     ) -> None:
         super().__init__(message)
         self.message = message
@@ -50,6 +51,8 @@ class AppError(Exception):
         #: is revoked, sign in again" — where rolling back would undo the very
         #: revocation the error reports. ``TransactionRoute`` reads it.
         self.keep_writes = keep_writes
+        #: Response headers the error carries, such as ``Retry-After``.
+        self.headers = headers or {}
 
     def envelope(self) -> dict[str, Any]:
         return {
@@ -90,6 +93,11 @@ class PayloadTooLarge(AppError):
 class UnsupportedMedia(AppError):
     status_code = 415
     default_code = "unsupported_media"
+
+
+class RateLimited(AppError):
+    status_code = 429
+    default_code = "rate_limited"
 
 
 class ValidationFailed(AppError):
@@ -174,7 +182,9 @@ def _field_message(error: dict[str, Any]) -> str:
 
 
 def _render(error: AppError) -> JSONResponse:
-    response = JSONResponse(status_code=error.status_code, content=error.envelope())
+    response = JSONResponse(
+        status_code=error.status_code, content=error.envelope(), headers=error.headers
+    )
     if error.status_code == 401:
         # A 401 without this header is not a complete 401.
         response.headers["WWW-Authenticate"] = "Bearer"

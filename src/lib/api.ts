@@ -110,14 +110,31 @@ async function send(path: string, init: RequestInit): Promise<Response> {
 /** Shared so that ten concurrent 401s cause one refresh, not ten. */
 let refreshInFlight: Promise<boolean> | null = null;
 
+/**
+ * One tab refreshes at a time. Every tab shares the refresh cookie, and the
+ * API rotates it on each refresh: two tabs sending the same cookie at once
+ * look like a stolen token being replayed. Behind a cross-tab lock, the
+ * second tab starts only after the first has stored the new cookie.
+ */
+async function oneTabAtATime(work: () => Promise<boolean>): Promise<boolean> {
+  const locks = typeof navigator !== "undefined" ? navigator.locks : undefined;
+  return locks ? await locks.request("facet-refresh", work) : work();
+}
+
+async function postRefresh(): Promise<Response> {
+  return fetch(`${API_BASE}${PREFIX}/auth/refresh`, { method: "POST", credentials: "include" });
+}
+
 export async function refreshSession(): Promise<boolean> {
   if (!refreshInFlight) {
-    refreshInFlight = (async () => {
+    refreshInFlight = oneTabAtATime(async () => {
       try {
-        const response = await fetch(`${API_BASE}${PREFIX}/auth/refresh`, {
-          method: "POST",
-          credentials: "include",
-        });
+        let response = await postRefresh();
+        if (response.status === 401 && (await toApiError(response.clone())).code === "refresh_token_rotated") {
+          // Another tab rotated the cookie a moment ago (a browser without
+          // navigator.locks). The jar holds the new one now: try once more.
+          response = await postRefresh();
+        }
         if (!response.ok) return false;
         const body = await response.json();
         setAccessToken(body.token.accessToken);
@@ -127,7 +144,7 @@ export async function refreshSession(): Promise<boolean> {
       } finally {
         refreshInFlight = null;
       }
-    })();
+    });
   }
   return refreshInFlight;
 }

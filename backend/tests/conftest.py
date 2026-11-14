@@ -59,6 +59,8 @@ def settings_env(media_root: Path):
     os.environ["FACET_ALEMBIC_URL"] = test_url
     os.environ["FACET_MEDIA_ROOT"] = str(media_root)
     os.environ["FACET_JWT_SECRET"] = "test-secret-not-used-anywhere-else"
+    # One test client is one "visitor"; tests of the limits turn them on.
+    os.environ["FACET_RATE_LIMIT_ENABLED"] = "false"
 
     get_settings.cache_clear()
     yield get_settings()

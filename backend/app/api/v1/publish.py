@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import uuid
 
-from fastapi import APIRouter, Response, status
+from fastapi import APIRouter, Request, Response, status
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
@@ -17,6 +17,7 @@ from app.api.deps import SessionDep
 from app.api.route import TransactionRoute
 from app.api.v1.assets import serve
 from app.core.errors import NotFound
+from app.core.ratelimit import LINK_CLICK, PAGE_VIEW, allowed
 from app.models import (
     AccountProfile,
     AccountSettings,
@@ -134,8 +135,11 @@ async def read_published(handle: str, slug: str, session: SessionDep, response: 
     summary="Record a page view",
 )
 async def record_view(
-    handle: str, slug: str, payload: RecordViewRequest, session: SessionDep
+    handle: str, slug: str, payload: RecordViewRequest, session: SessionDep, request: Request
 ) -> dict[str, bool]:
+    if not allowed(PAGE_VIEW, request):
+        # Over the limit is "not counted", not an error a visitor would see.
+        return {"counted": False}
     portfolio, _ = await _load_published(session, handle, slug)
     counted = await AnalyticsService(session).record_view(
         portfolio, payload.referrer, payload.dedupe_key
@@ -151,8 +155,10 @@ async def record_view(
     summary="Record a click on a section link",
 )
 async def record_click(
-    handle: str, slug: str, payload: RecordClickRequest, session: SessionDep
+    handle: str, slug: str, payload: RecordClickRequest, session: SessionDep, request: Request
 ) -> dict[str, bool]:
+    if not allowed(LINK_CLICK, request):
+        return {"counted": False}
     portfolio, _ = await _load_published(session, handle, slug)
     counted = await AnalyticsService(session).record_click(
         portfolio, payload.section_id, payload.url

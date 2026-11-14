@@ -10,6 +10,7 @@ from pydantic import Field
 
 from app.models.enums import (
     DEFAULT_TRACKING,
+    TAG_MAX_LENGTH,
     Density,
     FontId,
     Ground,
@@ -23,7 +24,7 @@ from app.models.enums import (
 )
 from app.schemas.account import LinkItem
 from app.schemas.asset import AssetOut
-from app.schemas.common import CamelModel, StrictCamelModel
+from app.schemas.common import CamelModel, SafeUrl, StrictCamelModel
 from app.schemas.resume import Resume
 from app.schemas.section import DateEntry, SectionOut, Stat
 
@@ -45,6 +46,8 @@ ACCENT_PATTERN = r"^#[0-9a-fA-F]{6}$"
 #: preset". Empty rather than null because a null in a PATCH already means
 #: "field not sent", so there would be no way left to clear a custom ground.
 GROUND_HEX_PATTERN = r"^(#[0-9a-fA-F]{6})?$"
+
+TagText = Annotated[str, Field(max_length=TAG_MAX_LENGTH)]
 
 
 class Layout(StrictCamelModel):
@@ -73,7 +76,7 @@ class Footer(StrictCamelModel):
     text: str = Field(default="", max_length=2000)
     #: The button under the headline — usually a mailto or a booking page.
     cta_label: str = Field(default="", max_length=60)
-    cta_url: str = Field(default="", max_length=2000)
+    cta_url: SafeUrl = ""
     #: Links of the footer's own, beside the header's contact links.
     links: list[LinkItem] = Field(default_factory=list, max_length=30)
     #: The small print, e.g. "© 2026 Priya Raman · Bengaluru".
@@ -104,7 +107,7 @@ class HeaderPatch(StrictCamelModel):
     name: str | None = Field(default=None, max_length=200)
     current: str | None = Field(default=None, max_length=2000)
     description: str | None = Field(default=None, max_length=20_000)
-    tags: list[str] | None = Field(default=None, max_length=40)
+    tags: list[TagText] | None = Field(default=None, max_length=40)
     links: list[LinkItem] | None = Field(default=None, max_length=60)
     numbers: list[Stat] | None = Field(default=None, max_length=40)
     dates: list[DateEntry] | None = Field(default=None, max_length=60)

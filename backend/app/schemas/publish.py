@@ -11,8 +11,10 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 
+from pydantic import Field
+
 from app.models.enums import FontId, Ground, ThemeId
-from app.schemas.common import CamelModel
+from app.schemas.common import CamelModel, SafeUrl
 from app.schemas.portfolio import Footer, HeaderOut, Layout
 from app.schemas.resume import PublicResume
 from app.schemas.section import SectionOut
@@ -46,12 +48,12 @@ class PublicPortfolioOut(CamelModel):
 
 
 class RecordViewRequest(CamelModel):
-    referrer: str = ""
+    referrer: str = Field(default="", max_length=2000)
     #: One page load's identifier. Repeats collapse to a single view, which is
     #: what stops a refresh loop or a retried request inflating the count.
-    dedupe_key: str = ""
+    dedupe_key: str = Field(default="", max_length=100)
 
 
 class RecordClickRequest(CamelModel):
     section_id: uuid.UUID
-    url: str = ""
+    url: SafeUrl = ""

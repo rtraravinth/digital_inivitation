@@ -142,8 +142,19 @@ async def test_the_seed_imports_and_reads_back(auth_client):
     assert all(row["sectionCount"] > 0 for row in rows)
 
 
-async def test_the_seeds_live_pages_publish_and_serve(auth_client, client):
+async def _import_seed_and_publish(auth_client) -> None:
+    """An import always lands as drafts; publish what the seed has live."""
     await auth_client.post("/api/v1/import", json={"mode": "replace", "portfolios": seed_payload()})
+    live = {p["slug"] for p in seed_payload() if p.get("status") == "live"}
+    assert live, "the seed has no live page to test against"
+    for row in (await auth_client.get("/api/v1/portfolios")).json():
+        if row["slug"] in live:
+            published = await auth_client.post(f"/api/v1/portfolios/{row['id']}/publish")
+            assert published.status_code == 200, published.text
+
+
+async def test_the_seeds_live_pages_publish_and_serve(auth_client, client):
+    await _import_seed_and_publish(auth_client)
 
     rows = (await auth_client.get("/api/v1/portfolios")).json()
     full = next(row for row in rows if row["slug"] == "full")
@@ -161,7 +172,7 @@ async def test_the_seeds_live_pages_publish_and_serve(auth_client, client):
 
 
 async def test_seeded_hidden_sections_stay_off_the_published_page(auth_client, client):
-    await auth_client.post("/api/v1/import", json={"mode": "replace", "portfolios": seed_payload()})
+    await _import_seed_and_publish(auth_client)
     payload = seed_payload()
 
     for portfolio in payload:

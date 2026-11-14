@@ -12,7 +12,7 @@ from pydantic import EmailStr, Field, field_validator
 
 from app.models.enums import PlanId
 from app.schemas.asset import AssetOut
-from app.schemas.common import CamelModel, StrictCamelModel
+from app.schemas.common import CamelModel, SafeUrl, StrictCamelModel
 
 HANDLE_PATTERN = r"^[a-z0-9][a-z0-9-]{1,30}[a-z0-9]$"
 
@@ -98,7 +98,7 @@ RESERVED_HANDLES: frozenset[str] = frozenset(
 class LinkItem(StrictCamelModel):
     id: str = Field(max_length=64)
     label: str = Field(default="", max_length=200)
-    url: str = Field(default="", max_length=2000)
+    url: SafeUrl = ""
     #: Overrides the icon the frontend would work out from `url`. Empty means
     #: "decide from the address", which is what almost every link wants. Not
     #: constrained to a known set: an id this build does not recognise renders

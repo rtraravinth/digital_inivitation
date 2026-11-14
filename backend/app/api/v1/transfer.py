@@ -8,6 +8,7 @@ from fastapi import APIRouter
 
 from app.api.deps import CurrentUser, SessionDep
 from app.api.route import TransactionRoute
+from app.core.ratelimit import ImportLimit
 from app.schemas.common import ERROR_RESPONSES
 from app.schemas.transfer import ImportRequest, ImportResultOut
 from app.services.transfer import TransferService
@@ -29,6 +30,6 @@ async def export_all(session: SessionDep, user: CurrentUser) -> list[dict[str, A
 
 @router.post("/import", response_model=ImportResultOut, summary="Load an export back in")
 async def import_all(
-    payload: ImportRequest, session: SessionDep, user: CurrentUser
+    payload: ImportRequest, session: SessionDep, user: CurrentUser, _: ImportLimit
 ) -> ImportResultOut:
     return await TransferService(session).import_(user, payload.portfolios, payload.mode)

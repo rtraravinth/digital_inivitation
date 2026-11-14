@@ -8,7 +8,31 @@ import type { NextConfig } from "next";
 // build time; rewrites are baked into the build.
 const apiProxyTarget = process.env.API_PROXY_TARGET?.replace(/\/$/, "");
 
+/**
+ * Sent with every response, pages and static files alike. The Content
+ * Security Policy is not here: it carries a per-request nonce, so
+ * src/proxy.ts sets it.
+ */
+const SECURITY_HEADERS = [
+  { key: "X-Content-Type-Options", value: "nosniff" },
+  // Other sites get the origin, never the path: a draft's /preview/<id> or
+  // an editor URL stays on this site.
+  { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+  // The older spelling of CSP's frame-ancestors, for browsers without it.
+  { key: "X-Frame-Options", value: "SAMEORIGIN" },
+  { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=(), payment=(), usb=()" },
+  // Browsers ignore this over plain http, so it is safe in development and
+  // on a LAN; over https it pins the site to https for two years.
+  { key: "Strict-Transport-Security", value: "max-age=63072000; includeSubDomains" },
+];
+
 const nextConfig: NextConfig = {
+  poweredByHeader: false,
+
+  async headers() {
+    return [{ source: "/:path*", headers: SECURITY_HEADERS }];
+  },
+
   async rewrites() {
     if (!apiProxyTarget) return [];
     return [

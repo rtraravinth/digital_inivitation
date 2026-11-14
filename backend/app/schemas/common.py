@@ -8,10 +8,40 @@ no snake_case leaking into the API surface.
 
 from __future__ import annotations
 
-from typing import Any
+import re
+from typing import Annotated, Any
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import AfterValidator, BaseModel, ConfigDict, Field
 from pydantic.alias_generators import to_camel
+
+#: A scheme, as a browser reads one: letters first, then a colon. Not one
+#: followed by a digit, which is a port ("localhost:3000"), not a scheme.
+_SCHEME = re.compile(r"^([a-zA-Z][a-zA-Z0-9+.\-]*):(?!\d)")
+
+#: Every scheme a link on a page may use. ``javascript:``, ``data:`` and
+#: ``vbscript:`` can run code when clicked; nothing a person links to needs
+#: anything outside this list.
+SAFE_SCHEMES = frozenset({"http", "https", "mailto", "tel"})
+
+
+def safe_url(value: str) -> str:
+    """The address, or "" if it could run code when opened.
+
+    Emptied rather than refused, because stored rows are read back through
+    the same schemas: refusing would turn one bad row from an older build
+    into a page that cannot load. A bare host ("northwell.in") is kept; the
+    frontend completes it with https://.
+    """
+    # Browsers drop tabs and newlines inside a scheme: "java\tscript:".
+    if any(ord(char) < 0x20 or ord(char) == 0x7F for char in value):
+        return ""
+    match = _SCHEME.match(value.strip())
+    if match and match.group(1).lower() not in SAFE_SCHEMES:
+        return ""
+    return value
+
+
+SafeUrl = Annotated[str, Field(max_length=2000), AfterValidator(safe_url)]
 
 
 class CamelModel(BaseModel):

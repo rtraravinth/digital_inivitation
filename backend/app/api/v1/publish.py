@@ -30,6 +30,7 @@ from app.models import (
 from app.schemas.common import ERROR_RESPONSES
 from app.schemas.portfolio import Layout
 from app.schemas.publish import (
+    DomainOwnerOut,
     PublicPortfolioOut,
     RecordClickRequest,
     RecordViewRequest,
@@ -46,18 +47,18 @@ router = APIRouter(
 )
 
 
-async def _load_published(session: SessionDep, handle: str, slug: str) -> tuple[Portfolio, dict]:
-    """The published portfolio at ``<handle>/<slug>`` and its privacy switches.
+async def _load_published(session: SessionDep, subdomain: str, slug: str) -> tuple[Portfolio, dict]:
+    """The published portfolio at ``<subdomain>/<slug>`` and its privacy switches.
 
     One query with eager loads: a published page must not issue a query per
-    section. The handle is joined rather than looked up first, so a wrong
-    handle is the same 404 as a wrong slug — neither confirms the other.
+    section. The subdomain is joined rather than looked up first, so a wrong
+    subdomain is the same 404 as a wrong slug — neither confirms the other.
     """
     portfolio = await session.scalar(
         select(Portfolio)
         .join(AccountProfile, AccountProfile.user_id == Portfolio.user_id)
         .where(
-            AccountProfile.handle == handle.lower(),
+            AccountProfile.subdomain == subdomain.lower(),
             Portfolio.slug == slug,
             Portfolio.status == "live",
         )
@@ -81,12 +82,36 @@ async def _load_published(session: SessionDep, handle: str, slug: str) -> tuple[
 
 
 @router.get(
-    "/p/{handle}/{slug}",
+    "/domains/{domain}",
+    response_model=DomainOwnerOut,
+    summary="Whose verified custom domain this is",
+    description=(
+        "The subdomain whose pages a custom domain serves. 404 unless an "
+        "account has verified the domain and holds a subdomain."
+    ),
+)
+async def read_domain_owner(domain: str, session: SessionDep) -> DomainOwnerOut:
+    subdomain = await session.scalar(
+        select(AccountProfile.subdomain)
+        .join(AccountSettings, AccountSettings.user_id == AccountProfile.user_id)
+        .where(
+            AccountSettings.custom_domain == domain.lower().rstrip("."),
+            AccountSettings.custom_domain_verified_at.is_not(None),
+            AccountProfile.subdomain.is_not(None),
+        )
+    )
+    if subdomain is None:
+        raise NotFound("There is no page at that address.", code="page_not_found")
+    return DomainOwnerOut(subdomain=subdomain)
+
+
+@router.get(
+    "/p/{subdomain}/{slug}",
     response_model=PublicPortfolioOut,
     summary="Read a published page",
 )
-async def read_published(handle: str, slug: str, session: SessionDep, response: Response):
-    portfolio, privacy = await _load_published(session, handle, slug)
+async def read_published(subdomain: str, slug: str, session: SessionDep, response: Response):
+    portfolio, privacy = await _load_published(session, subdomain, slug)
 
     indexable = privacy.get("indexable", True)
     show_contact = privacy.get("showContact", True)
@@ -130,17 +155,17 @@ async def read_published(handle: str, slug: str, session: SessionDep, response: 
 
 
 @router.post(
-    "/p/{handle}/{slug}/views",
+    "/p/{subdomain}/{slug}/views",
     status_code=status.HTTP_202_ACCEPTED,
     summary="Record a page view",
 )
 async def record_view(
-    handle: str, slug: str, payload: RecordViewRequest, session: SessionDep, request: Request
+    subdomain: str, slug: str, payload: RecordViewRequest, session: SessionDep, request: Request
 ) -> dict[str, bool]:
     if not allowed(PAGE_VIEW, request):
         # Over the limit is "not counted", not an error a visitor would see.
         return {"counted": False}
-    portfolio, _ = await _load_published(session, handle, slug)
+    portfolio, _ = await _load_published(session, subdomain, slug)
     counted = await AnalyticsService(session).record_view(
         portfolio, payload.referrer, payload.dedupe_key
     )
@@ -150,16 +175,16 @@ async def record_view(
 
 
 @router.post(
-    "/p/{handle}/{slug}/clicks",
+    "/p/{subdomain}/{slug}/clicks",
     status_code=status.HTTP_202_ACCEPTED,
     summary="Record a click on a section link",
 )
 async def record_click(
-    handle: str, slug: str, payload: RecordClickRequest, session: SessionDep, request: Request
+    subdomain: str, slug: str, payload: RecordClickRequest, session: SessionDep, request: Request
 ) -> dict[str, bool]:
     if not allowed(LINK_CLICK, request):
         return {"counted": False}
-    portfolio, _ = await _load_published(session, handle, slug)
+    portfolio, _ = await _load_published(session, subdomain, slug)
     counted = await AnalyticsService(session).record_click(
         portfolio, payload.section_id, payload.url
     )

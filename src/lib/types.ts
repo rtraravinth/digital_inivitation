@@ -950,8 +950,8 @@ function emptySection(id: string): Section {
 export const PASSWORD_MIN = 8;
 
 /** The same page on this app: the route that actually serves it. */
-export function pagePath(handle: string, slug: string): string {
-  return `/p/${handle}/${slug}`;
+export function pagePath(subdomain: string, slug: string): string {
+  return `/p/${subdomain}/${slug}`;
 }
 
 /**
@@ -967,7 +967,7 @@ export function previewPath(id: string): string {
 
 export type AccountProfile = {
   name: string;
-  handle: string;
+  subdomain: string;
   current: string;
   about: string;
   tags: string[];
@@ -1095,11 +1095,35 @@ export const PRIVACY_SETTINGS: Array<{
   },
 ];
 
+/** One record to add at a custom domain's DNS provider. */
+export type DnsRecord = {
+  type: "TXT" | "CNAME" | "A" | "ALIAS";
+  /** What a provider's "Host" / "Name" field wants; "@" is the domain itself. */
+  host: string;
+  /** The same name in full. */
+  name: string;
+  value: string;
+  /** `verify` proves the domain is yours; `route` points it at us. */
+  purpose: "verify" | "route";
+};
+
+/** A custom domain's records and whether its TXT record has been found. */
+export type DomainSetup = {
+  domain: string;
+  verified: boolean;
+  verifiedAt: string | null;
+  records: DnsRecord[];
+  /** Only on a check's answer: whether the domain resolves to us yet. */
+  routingOk: boolean | null;
+};
+
 export type AccountSettings = {
   profile: AccountProfile;
   security: AccountSecurity;
   plan: PlanId;
   customDomain: string;
+  /** Null with no domain set, or when the server has no root domain. */
+  domainSetup: DomainSetup | null;
   notifications: Record<NotificationKey, boolean>;
   privacy: Record<PrivacyKey, boolean>;
 };
@@ -1111,7 +1135,7 @@ export function defaultAccount(): AccountSettings {
   return {
     profile: {
       name: "",
-      handle: "",
+      subdomain: "",
       current: "",
       about: "",
       tags: [],
@@ -1126,6 +1150,7 @@ export function defaultAccount(): AccountSettings {
     },
     plan: "free",
     customDomain: "",
+    domainSetup: null,
     notifications: {
       booking: true,
       weekly: true,
@@ -1143,7 +1168,7 @@ export function defaultAccount(): AccountSettings {
 }
 
 /**
- * The three /account groups that still need a third-party service this build
+ * The two /account groups that still need a third-party service this build
  * has not chosen. Their settings are stored and enforce nothing, and each
  * group renders a <ServerNotice> saying so in as many words.
  *
@@ -1152,7 +1177,6 @@ export function defaultAccount(): AccountSettings {
  */
 export const NEEDS_SERVER = {
   billing: "Taking a payment needs a payment processor.",
-  domain: "Serving your own domain needs DNS and a host.",
   email: "Sending mail needs a mail service.",
 } as const;
 

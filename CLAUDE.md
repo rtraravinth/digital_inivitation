@@ -31,7 +31,7 @@ npm run build
 npm run lint
 npm run typecheck
 npm run knip
-cd backend && .venv/bin/python -m pytest    # 424 tests (.venv/Scripts on Windows)
+cd backend && .venv/bin/python -m pytest    # 444 tests (.venv/Scripts on Windows)
 ```
 
 **CI runs all of these on every pull request** (`.github/workflows/ci.yml`),
@@ -90,6 +90,46 @@ verified address claims it), then starts both.
 - **Uploads live on the container's disk** (`FACET_MEDIA_ROOT`). On a host
   that wipes it — Render's free plan does — pictures do not survive a
   restart. `render.yaml` says how to attach a disk.
+
+## Addresses: subdomains and custom domains
+
+**A published page is `<subdomain>.facetfolio.com/<slug>`.** The subdomain
+is claimed at sign-up (it used to be called the handle — the column, the wire
+field and the error codes are `subdomain` everywhere now, migration
+`e5b9c2d7a481`), and each portfolio's slug is the path. Previews stay at
+`facetfolio.com/preview/<id>`, on the app's own host.
+
+- **`src/proxy.ts` routes by Host** (`classifyHost()` in `lib/hosts.ts`):
+  a subdomain's `/<slug>` is rewritten to `/p/<subdomain>/<slug>`, a verified
+  custom domain's to `/d/<domain>/<slug>`, and on the app's host
+  `/p/<subdomain>/<slug>` 308-redirects to the subdomain, so old links land
+  on the new address. It sets `x-facet-host` (stripping any client copy) so
+  `PublishedRoute` knows in-page links are `/<slug>`, not `/p/…`.
+- **`NEXT_PUBLIC_ROOT_DOMAIN` turns it on, and is build-time.** Empty, nothing
+  routes by host and pages stay at `/p/<subdomain>/<slug>` — what a LAN phone
+  test needs. `localhost:3000` works in development: every `*.localhost`
+  reaches this machine, so `rohan.localhost:3000/founder` serves (dev CORS
+  and `allowedDevOrigins` allow it). The API reads `FACET_ROOT_DOMAIN`;
+  `scripts/start.sh` copies the frontend's value. Once a root is set, every
+  other host is taken for a custom domain, so the host's own name
+  (`*.onrender.com`) goes in `FACET_APP_HOSTS`.
+- **`liveUrl()` is the one place a public address is built.** Never write
+  `/p/` into a link a visitor gets.
+- **A custom domain is proved by TXT, not by pointing it here.** The account
+  page shows the records from `services/domains.py`: TXT
+  `_facet-verify.<domain>` = an HMAC of the account and domain (nothing
+  stored), and a CNAME (A, or ALIAS where `FACET_DOMAIN_APEX_IPS` is empty,
+  at a bare domain) to `FACET_DOMAIN_CNAME_TARGET`. "Check DNS" looks both
+  up (`core/dns_lookup.py`, dnspython; tests fake it); the TXT record sets
+  `custom_domain_verified_at`, the routing record is only reported. Only a
+  verified domain serves (`GET /public/domains/{domain}`), and a partial
+  unique index lets one account hold a domain verified — typing a domain
+  claims nothing. Changing the domain, or a check that no longer finds the
+  TXT record, unverifies it.
+- **HTTPS for a custom domain is the host's job.** On Render each owner's
+  domain must be added to the service before it gets a certificate, and the
+  root needs both `facetfolio.com` and `*.facetfolio.com`. Nothing here
+  automates that yet; the records and verification are real either way.
 
 ## Layout
 
@@ -714,8 +754,8 @@ TOTP columns and recovery codes; there is no password route.
   claimed. **It requires `email_verified`** — otherwise anyone could register
   someone else's address with a password in Firebase and walk into their
   portfolios. An unverified email also cannot make an account (403
-  `email_unverified`). A token nobody owns yet answers 422 `handle_required`
-  and the page asks for a name and handle, then posts again.
+  `email_unverified`). A token nobody owns yet answers 422 `subdomain_required`
+  and the page asks for a name and subdomain, then posts again.
 - **FACET's sessions end when Firebase's do.** Firebase never expires a
   session on a clock; it ends one when the user is deleted or disabled, or
   when `validSince` moves past the sign-in (password change or reset, email
@@ -888,7 +928,7 @@ a signed-in one had their own settings applied to somebody else's page.
 `PublishedBody` wherever it is *not* the published page — `/preview/[id]`
 and the builder canvas — and two things read that context.
 `useRecordClick` goes quiet, so the owner's own clicks never reach analytics.
-`usePageHref` returns `/preview/<id>` instead of `/p/<handle>/<slug>`, because
+`usePageHref` returns `/preview/<id>` instead of the public address, because
 the public address does not resolve until the portfolio is published: a
 section title inside a draft preview used to link straight to a 404. Render
 `PublishedBody` anywhere new and wrap it in both providers, or it will quietly
@@ -896,7 +936,7 @@ claim to be the live page.
 
 ## The account page
 
-**Profile is the account's, not a portfolio's.** Name, photo, handle and
+**Profile is the account's, not a portfolio's.** Name, photo, subdomain and
 "What you do now (profession)". Nothing in it is copied into a new
 portfolio — each header is written in its own editor — so the page must not
 say otherwise. It used to show "About you" and "Starting tags and links"
@@ -924,13 +964,13 @@ deleted.
   writes, so it went, and with it `Section.kind` — the picker was the only
   thing that ever set a kind, and every kind was the same fields underneath.
   Do not rebuild it from the canvas.
-- **Three `/account` groups still describe services this build has not
-  chosen.** Billing needs a payment processor, custom domains need DNS and a
-  host, email notifications need a mail service. Each renders a
+- **Two `/account` groups still describe services this build has not
+  chosen.** Billing needs a payment processor and email notifications need a
+  mail service. Each renders a
   `<ServerNotice>` saying so in as many words. Do not quietly make them look
   functional — if you add one, delete its notice in the same change.
-  Everything else on that page is real: sign-in (through Firebase), the
-  password-reset email, the device list and its revoke buttons, and all four
+  Everything else on that page is real: sign-in (through Firebase), custom
+  domains (see "Addresses"), the password-reset email, the device list and its revoke buttons, and all four
   Privacy switches. Two-step says "not offered yet" — it is Firebase's to
   provide and needs its Blaze plan.
 - **The published page has no signed-out vs. owner distinction**, so
@@ -940,10 +980,10 @@ deleted.
   keyboard-reachable and need no pointer heuristics.
 - **The canvas says "all 12 themes"; there are five.** Five are built and
   real. Do not pad the gallery to hit the number in the artboard.
-- **Slugs are global.** Two accounts cannot both hold `rohan`, because the
-  address is `facet.page/<slug>` with nothing in front of it. The create
-  dialog surfaces the 409 as a message.
-- **The frontend has no test runner.** The backend has 424 pytest tests;
+- **Slugs are per account.** The subdomain in front of a slug is the
+  namespace, so two accounts can both have `/founder`; one account cannot
+  have two. The create dialog surfaces the 409 as a message.
+- **The frontend has no test runner.** The backend has 444 pytest tests;
   changes here are checked with `npm run lint`, `npm run build` and by
   actually opening the app.
 

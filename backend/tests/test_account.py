@@ -10,12 +10,20 @@ from app.models import Portfolio, User
 async def test_get_account_returns_the_ui_shape_in_camel_case(auth_client):
     body = (await auth_client.get("/api/v1/account")).json()
 
-    assert set(body) == {"profile", "security", "plan", "customDomain", "notifications", "privacy"}
+    assert set(body) == {
+        "profile",
+        "security",
+        "plan",
+        "customDomain",
+        "domainSetup",
+        "notifications",
+        "privacy",
+    }
     assert set(body["notifications"]) == {"booking", "weekly", "brokenLink", "mention", "product"}
     assert set(body["privacy"]) == {"indexable", "showContact", "countVisits", "badge"}
     assert set(body["profile"]) == {
         "name",
-        "handle",
+        "subdomain",
         "current",
         "about",
         "tags",
@@ -91,27 +99,29 @@ async def test_profile_link_without_an_icon_still_validates(auth_client):
     assert response.json()["profile"]["links"][0]["icon"] == ""
 
 
-async def test_handle_is_unique_across_users(auth_client, other_auth_client):
+async def test_subdomain_is_unique_across_users(auth_client, other_auth_client):
     assert (
-        await auth_client.patch("/api/v1/account/profile", json={"handle": "rohan"})
+        await auth_client.patch("/api/v1/account/profile", json={"subdomain": "rohan"})
     ).status_code == 200
 
-    response = await other_auth_client.patch("/api/v1/account/profile", json={"handle": "rohan"})
+    response = await other_auth_client.patch("/api/v1/account/profile", json={"subdomain": "rohan"})
     assert response.status_code == 409
-    assert response.json()["error"]["code"] == "handle_taken"
+    assert response.json()["error"]["code"] == "subdomain_taken"
 
 
-async def test_keeping_your_own_handle_is_not_a_conflict(auth_client):
-    await auth_client.patch("/api/v1/account/profile", json={"handle": "rohan"})
+async def test_keeping_your_own_subdomain_is_not_a_conflict(auth_client):
+    await auth_client.patch("/api/v1/account/profile", json={"subdomain": "rohan"})
     response = await auth_client.patch(
-        "/api/v1/account/profile", json={"handle": "rohan", "name": "Renamed"}
+        "/api/v1/account/profile", json={"subdomain": "rohan", "name": "Renamed"}
     )
     assert response.status_code == 200
     assert response.json()["profile"]["name"] == "Renamed"
 
 
-async def test_an_invalid_handle_is_422(auth_client):
-    response = await auth_client.patch("/api/v1/account/profile", json={"handle": "Not A Handle"})
+async def test_an_invalid_subdomain_is_422(auth_client):
+    response = await auth_client.patch(
+        "/api/v1/account/profile", json={"subdomain": "Not A Subdomain"}
+    )
     assert response.status_code == 422
 
 

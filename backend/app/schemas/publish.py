@@ -57,3 +57,9 @@ class RecordViewRequest(CamelModel):
 class RecordClickRequest(CamelModel):
     section_id: uuid.UUID
     url: SafeUrl = ""
+
+
+class DomainOwnerOut(CamelModel):
+    """The subdomain behind a verified custom domain."""
+
+    subdomain: str

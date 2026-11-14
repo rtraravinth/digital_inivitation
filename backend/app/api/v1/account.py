@@ -1,7 +1,7 @@
 """The /account surface.
 
 Some of this is stored state that enforces nothing, because it describes a
-service this build does not have — billing, DNS, outbound mail. Those
+service this build does not have — billing and outbound mail. Those
 endpoints say so in their docstrings, and the UI says so on screen. The rest
 is real.
 """
@@ -16,6 +16,7 @@ from fastapi import APIRouter, status
 from app.api.deps import CallerDep, CurrentUser, SessionDep
 from app.api.route import TransactionRoute
 from app.core.config import get_settings
+from app.core.dns_lookup import DnsLookupDep
 from app.core.errors import PermissionDenied
 from app.core.firebase_accounts import AccountCheckerDep
 from app.models import AuthSession
@@ -70,14 +71,29 @@ async def set_plan(payload: PlanPatch, session: SessionDep, user: CurrentUser) -
 @router.patch(
     "/account/domain",
     response_model=AccountOut,
-    summary="Set a custom domain (stored only)",
+    summary="Set a custom domain",
     description=(
-        "Records the domain. Nothing serves it — that needs DNS and a host "
-        "this build does not configure."
+        "Stores the domain and answers with the DNS records to add for it. "
+        "A changed domain is unverified until `POST /account/domain/verify` "
+        "finds its TXT record; empty removes it."
     ),
 )
 async def set_domain(payload: DomainPatch, session: SessionDep, user: CurrentUser) -> AccountOut:
     return await AccountService(session).set_domain(user, payload)
+
+
+@router.post(
+    "/account/domain/verify",
+    response_model=AccountOut,
+    summary="Check a custom domain's DNS records",
+    description=(
+        "Looks up the TXT record that proves the domain and the record that "
+        "routes it here. The TXT record verifies the domain; `routingOk` "
+        "says whether it already resolves to this service."
+    ),
+)
+async def verify_domain(session: SessionDep, user: CurrentUser, lookup: DnsLookupDep) -> AccountOut:
+    return await AccountService(session).verify_domain(user, lookup)
 
 
 @router.patch(

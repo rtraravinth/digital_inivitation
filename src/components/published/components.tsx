@@ -36,7 +36,7 @@ import {
   UiIcon,
   headline,
   href,
-  usePublishedHandle,
+  usePublishedSubdomain,
   usePublishedPrivacy,
   useRecordClick,
 } from "./shared";
@@ -350,7 +350,7 @@ function TestimonialsView({ block }: { block: TestimonialsBlock }) {
 }
 
 function ClientsView({ p, section, block }: { p: Portfolio; section: Section; block: ClientsBlock }) {
-  const handle = usePublishedHandle();
+  const subdomain = usePublishedSubdomain();
   const record = useRecordClick();
   const items = block.items.filter((c) => c.name.trim());
   return (
@@ -366,7 +366,7 @@ function ClientsView({ p, section, block }: { p: Portfolio; section: Section; bl
                 href={href(c.url)}
                 target="_blank"
                 rel="noopener noreferrer"
-                onClick={() => record(handle, p.slug, section.id)}
+                onClick={() => record(subdomain, p.slug, section.id)}
                 className="fc-wall-name flex h-full min-h-[96px] items-center justify-between gap-3 px-5 py-6 no-underline"
               >
                 {name}
@@ -556,7 +556,7 @@ function FaqView({ block }: { block: FaqBlock }) {
  */
 function ContactView({ p, section, block }: { p: Portfolio; section: Section; block: ContactBlock }) {
   const privacy = usePublishedPrivacy();
-  const handle = usePublishedHandle();
+  const subdomain = usePublishedSubdomain();
   const record = useRecordClick();
   const [name, setName] = useState("");
   const [message, setMessage] = useState("");
@@ -575,7 +575,7 @@ function ContactView({ p, section, block }: { p: Portfolio; section: Section; bl
     e.preventDefault();
     const subject = `Hello from ${name.trim() || "your page"}`;
     const body = `${message.trim()}\n\n— ${name.trim()}`;
-    record(handle, p.slug, section.id);
+    record(subdomain, p.slug, section.id);
     window.location.href = `mailto:${block.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
     setOpened(true);
   }
@@ -591,7 +591,7 @@ function ContactView({ p, section, block }: { p: Portfolio; section: Section; bl
                 {d.url ? (
                   <a
                     href={d.url}
-                    onClick={() => record(handle, p.slug, section.id)}
+                    onClick={() => record(subdomain, p.slug, section.id)}
                     className="published-link inline-flex min-h-[40px] items-center gap-3 text-[16px]"
                     style={{ color: "var(--color-mark)" }}
                   >
@@ -616,7 +616,7 @@ function ContactView({ p, section, block }: { p: Portfolio; section: Section; bl
             href={href(block.ctaUrl)}
             target="_blank"
             rel="noopener noreferrer"
-            onClick={() => record(handle, p.slug, section.id)}
+            onClick={() => record(subdomain, p.slug, section.id)}
             className="btn btn-primary"
           >
             <LinkIcon id={iconFor({ url: block.ctaUrl })} />

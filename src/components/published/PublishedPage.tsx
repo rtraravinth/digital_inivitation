@@ -10,7 +10,7 @@ import type { Portfolio } from "@/lib/types";
 import {
   PrivacyProvider,
   PublishedBody,
-  PublishedHandleProvider,
+  PublishedSubdomainProvider,
   SectionDetail,
 } from "./themes";
 
@@ -22,12 +22,15 @@ import {
  * ?section= entry view.
  */
 export function PublishedPage({
-  handle,
+  subdomain,
+  ownHost,
   slug,
   portfolio: raw,
   privacy,
 }: {
-  handle: string;
+  subdomain: string;
+  /** Served on the owner's subdomain or custom domain, at `/<slug>`. */
+  ownHost: boolean;
   slug: string;
   portfolio: Portfolio;
   privacy: PublishedPrivacy;
@@ -42,8 +45,8 @@ export function PublishedPage({
   // StrictMode's double effect in development does not count twice — and the
   // owner's "count visits" switch is checked there, not here.
   useEffect(() => {
-    recordView(handle, slug);
-  }, [handle, slug]);
+    recordView(subdomain, slug);
+  }, [subdomain, slug]);
 
   // Artboard 1d: one entry on its own page, reached from any theme's title.
   const section = sectionId
@@ -52,7 +55,7 @@ export function PublishedPage({
 
   return (
     <PrivacyProvider value={privacy}>
-      <PublishedHandleProvider value={handle}>
+      <PublishedSubdomainProvider value={subdomain} ownHost={ownHost}>
         {/*
           One `LayoutGroup` across both views, which is what lets the caption
           lift actually lift: the plate in the run and the plate on the detail
@@ -68,7 +71,7 @@ export function PublishedPage({
             <PublishedBody p={portfolio} />
           )}
         </LayoutGroup>
-      </PublishedHandleProvider>
+      </PublishedSubdomainProvider>
     </PrivacyProvider>
   );
 }

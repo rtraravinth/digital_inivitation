@@ -35,11 +35,11 @@ export function Account() {
   const panelProps = { account, portfolios, analytics };
   const planName = PLANS.find((p) => p.id === account.plan)?.name ?? "Free";
   const live = portfolios.filter((p) => p.status === "live").length;
-  const handle = account.profile.handle;
+  const subdomain = account.profile.subdomain;
 
   // What is left to set up, from what the account actually has.
   const checklist: Array<{ id: GroupId; label: string; done: boolean }> = [
-    { id: "profile", label: "Choose a handle", done: !!handle },
+    { id: "profile", label: "Choose a subdomain", done: !!subdomain },
     { id: "profile", label: "Add a photo", done: !!account.profile.portrait },
   ];
   const done = checklist.filter((c) => c.done).length;
@@ -140,15 +140,15 @@ export function Account() {
                   <span className="truncate text-[20px] font-semibold tracking-[-0.02em]">
                     {account.profile.name || "Your name"}
                   </span>
-                  {handle ? (
-                    <span className="truncate font-mono text-[12.5px]">{displayUrl(liveUrl(handle, ""))}</span>
+                  {subdomain ? (
+                    <span className="truncate font-mono text-[12.5px]">{displayUrl(liveUrl(subdomain, ""))}</span>
                   ) : (
                     <button
                       type="button"
                       onClick={() => pick("profile")}
                       className="w-fit cursor-pointer text-left text-[13px] underline underline-offset-2"
                     >
-                      No handle yet — choose one
+                      No subdomain yet — choose one
                     </button>
                   )}
                   <span className="text-[12.5px] text-muted">{account.security.email ?? account.security.phone}</span>

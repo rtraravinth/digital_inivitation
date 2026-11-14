@@ -6,6 +6,10 @@ set -e
 
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
 
+# One root domain for both halves: the frontend's was fixed at build time,
+# and the API reads the same name unless told otherwise.
+export FACET_ROOT_DOMAIN="${FACET_ROOT_DOMAIN:-${NEXT_PUBLIC_ROOT_DOMAIN:-}}"
+
 cd "$ROOT/backend"
 python -m alembic upgrade head
 
@@ -15,7 +19,7 @@ python -m alembic upgrade head
 # with this address (verified) and the account is yours.
 if [ -n "$FACET_DEMO_EMAIL" ]; then
   if python -m app.cli create-user --email "$FACET_DEMO_EMAIL" \
-      --handle "${FACET_DEMO_HANDLE:-demo}" --name "Demo"; then
+      --subdomain "${FACET_DEMO_SUBDOMAIN:-demo}" --name "Demo"; then
     python -m app.cli seed --email "$FACET_DEMO_EMAIL" || echo "seed failed; the account exists without it"
   else
     echo "demo account not created (it probably exists already)"

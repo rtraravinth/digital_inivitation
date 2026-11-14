@@ -13,7 +13,7 @@ import typer
 import app.cli
 from app.cli import create_user
 
-VALID = {"email": "someone@example.com", "handle": "someone"}
+VALID = {"email": "someone@example.com", "subdomain": "someone"}
 
 
 def test_create_user_rejects_an_email_the_api_would_refuse():
@@ -28,23 +28,23 @@ def test_create_user_rejects_a_malformed_address():
         create_user(**{**VALID, "email": "not-an-email"}, name="R")
 
 
-def test_create_user_rejects_a_malformed_handle():
+def test_create_user_rejects_a_malformed_subdomain():
     with pytest.raises(typer.BadParameter):
-        create_user(**{**VALID, "handle": "Not A Handle"}, name="R")
+        create_user(**{**VALID, "subdomain": "Not A Subdomain"}, name="R")
 
 
-def test_create_user_passes_validation_and_forwards_the_handle(monkeypatch):
+def test_create_user_passes_validation_and_forwards_the_subdomain(monkeypatch):
     """The regression the other tests could not see.
 
     They all assert BadParameter, and for a while every call raised it: the
-    command validated through a model that required a handle, and never sent
+    command validated through a model that required a subdomain, and never sent
     one. A valid call has to get past validation and reach the
-    write — with the handle, or the account has no address to publish under.
+    write — with the subdomain, or the account has no address to publish under.
     """
     seen = {}
 
-    async def fake_create(email, name, handle):
-        seen.update(email=email, name=name, handle=handle)
+    async def fake_create(email, name, subdomain):
+        seen.update(email=email, name=name, subdomain=subdomain)
         return "an-id"
 
     monkeypatch.setattr(app.cli, "_create_user", fake_create)
@@ -52,4 +52,4 @@ def test_create_user_passes_validation_and_forwards_the_handle(monkeypatch):
 
     create_user(**VALID, name="R")
 
-    assert seen == {"email": "someone@example.com", "name": "R", "handle": "someone"}
+    assert seen == {"email": "someone@example.com", "name": "R", "subdomain": "someone"}

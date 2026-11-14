@@ -28,7 +28,7 @@ import { PublishedLock } from "../PublishedLock";
 type Draft = Pick<Portfolio, "theme" | "accent" | "groundHex" | "font" | "bodyFont">;
 
 export function ThemeGallery({ id }: { id: string }) {
-  const handle = useAccount().account.profile.handle;
+  const subdomain = useAccount().account.profile.subdomain;
   const { ready, getPortfolio, updatePortfolio } = usePortfolios();
   const [draft, setDraft] = useState<Partial<Draft> | null>(null);
   const [profession, setProfession] = useState<ProfessionId | null>(null);
@@ -219,7 +219,7 @@ export function ThemeGallery({ id }: { id: string }) {
           </div>
 
           <div className="h-[520px] flex-none p-4 sm:p-6 lg:h-auto lg:min-h-0 lg:flex-1">
-            <Canvas p={shown} handle={handle} device={device} />
+            <Canvas p={shown} subdomain={subdomain} device={device} />
           </div>
 
           <div className="flex flex-none flex-wrap items-center gap-2.5 px-5 py-3.5" style={{ background: "var(--color-bg)", borderTop: "1px solid var(--color-divider)" }}>

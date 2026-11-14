@@ -3,16 +3,19 @@
 from __future__ import annotations
 
 import uuid
+from datetime import UTC, datetime
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.errors import Conflict, NotFound
-from app.models import AccountProfile, Asset, User
+from app.core.dns_lookup import DnsLookup
+from app.core.errors import Conflict, NotFound, ValidationFailed
+from app.models import AccountProfile, AccountSettings, Asset, User
 from app.schemas.account import (
-    RESERVED_HANDLES,
+    RESERVED_SUBDOMAINS,
     AccountOut,
     DomainPatch,
+    DomainSetupOut,
     NotificationsPatch,
     PlanPatch,
     PrivacyPatch,
@@ -22,28 +25,31 @@ from app.schemas.account import (
     SecurityPatch,
 )
 from app.schemas.asset import asset_out
+from app.services import domains
 from app.services.asset import AssetService
 
 
-async def assert_handle_available(
-    session: AsyncSession, handle: str, *, exclude_user_id: uuid.UUID | None = None
+async def assert_subdomain_available(
+    session: AsyncSession, subdomain: str, *, exclude_user_id: uuid.UUID | None = None
 ) -> None:
-    """Raise unless ``handle`` is free to claim.
+    """Raise unless ``subdomain`` is free to claim.
 
     Registration and a later rename both land here, so the reserved list and
     the uniqueness rule cannot drift apart between them.
     """
-    if handle in RESERVED_HANDLES:
+    if subdomain in RESERVED_SUBDOMAINS:
         raise Conflict(
-            "That address is reserved.", code="handle_reserved", details={"handle": handle}
+            "That address is reserved.", code="subdomain_reserved", details={"subdomain": subdomain}
         )
 
-    query = select(AccountProfile).where(AccountProfile.handle == handle)
+    query = select(AccountProfile).where(AccountProfile.subdomain == subdomain)
     if exclude_user_id is not None:
         query = query.where(AccountProfile.user_id != exclude_user_id)
     if await session.scalar(query) is not None:
         raise Conflict(
-            "That handle is already taken.", code="handle_taken", details={"handle": handle}
+            "That subdomain is already taken.",
+            code="subdomain_taken",
+            details={"subdomain": subdomain},
         )
 
 
@@ -51,14 +57,14 @@ class AccountService:
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
 
-    async def get(self, user: User) -> AccountOut:
+    async def get(self, user: User, *, routing_ok: bool | None = None) -> AccountOut:
         profile = user.profile
         settings = user.settings
 
         return AccountOut(
             profile=ProfileOut(
                 name=profile.name,
-                handle=profile.handle,
+                subdomain=profile.subdomain,
                 current=profile.current,
                 about=profile.about,
                 tags=list(profile.tags or []),
@@ -73,6 +79,7 @@ class AccountService:
             ),
             plan=settings.plan,
             custom_domain=settings.custom_domain,
+            domain_setup=_domain_setup(user.id, settings, routing_ok),
             notifications=dict(settings.notifications or {}),
             privacy=dict(settings.privacy or {}),
         )
@@ -82,9 +89,9 @@ class AccountService:
     async def update_profile(self, user: User, patch: ProfilePatch) -> AccountOut:
         profile = user.profile
 
-        if patch.handle is not None and patch.handle != profile.handle:
-            await self._assert_handle_free(patch.handle, user.id)
-            profile.handle = patch.handle
+        if patch.subdomain is not None and patch.subdomain != profile.subdomain:
+            await self._assert_subdomain_free(patch.subdomain, user.id)
+            profile.subdomain = patch.subdomain
 
         for field in ("name", "current", "about"):
             value = getattr(patch, field)
@@ -112,8 +119,8 @@ class AccountService:
         await self.session.refresh(profile, ["portrait"] if portrait_changed else None)
         return await self.get(user)
 
-    async def _assert_handle_free(self, handle: str, user_id: uuid.UUID) -> None:
-        await assert_handle_available(self.session, handle, exclude_user_id=user_id)
+    async def _assert_subdomain_free(self, subdomain: str, user_id: uuid.UUID) -> None:
+        await assert_subdomain_available(self.session, subdomain, exclude_user_id=user_id)
 
     async def _assert_owns_asset(self, user: User, asset_id: uuid.UUID) -> Asset:
         asset = await self.session.scalar(
@@ -142,10 +149,50 @@ class AccountService:
         return await self.get(user)
 
     async def set_domain(self, user: User, patch: DomainPatch) -> AccountOut:
-        # Likewise stored and inert: serving a domain needs DNS and a host.
-        user.settings.custom_domain = patch.custom_domain
+        domain = patch.custom_domain
+        if domain and domains.is_ours(domain):
+            raise ValidationFailed(
+                "That is one of ours — your subdomain already serves your pages there.",
+                code="domain_reserved",
+                details={"customDomain": domain},
+            )
+        if domain != user.settings.custom_domain:
+            # A new domain is proved from scratch: its token differs, and the
+            # old proof says nothing about it.
+            user.settings.custom_domain = domain
+            user.settings.custom_domain_verified_at = None
         await self.session.flush()
         return await self.get(user)
+
+    async def verify_domain(self, user: User, lookup: DnsLookup) -> AccountOut:
+        """Look the records up, and verify the domain if its TXT record is there."""
+        settings = user.settings
+        domain = settings.custom_domain
+        if not domain or domains.records(user.id, domain) is None:
+            raise NotFound("There is no domain to check.", code="no_domain")
+
+        owned, routed = await domains.check(lookup, user.id, domain)
+        if owned:
+            holder = await self.session.scalar(
+                select(AccountSettings.user_id).where(
+                    AccountSettings.custom_domain == domain,
+                    AccountSettings.custom_domain_verified_at.is_not(None),
+                    AccountSettings.user_id != user.id,
+                )
+            )
+            if holder is not None:
+                raise Conflict(
+                    "Another account has already verified that domain.",
+                    code="domain_taken",
+                    details={"customDomain": domain},
+                )
+            if settings.custom_domain_verified_at is None:
+                settings.custom_domain_verified_at = datetime.now(UTC)
+        else:
+            # The proof is gone or never arrived; the domain stops serving.
+            settings.custom_domain_verified_at = None
+        await self.session.flush()
+        return await self.get(user, routing_ok=routed)
 
     async def update_notifications(self, user: User, patch: NotificationsPatch) -> AccountOut:
         user.settings.notifications = self._merge(
@@ -181,3 +228,19 @@ class AccountService:
         await self.session.delete(user)
         await self.session.flush()
         return keys
+
+
+def _domain_setup(
+    user_id: uuid.UUID, settings: AccountSettings, routing_ok: bool | None
+) -> DomainSetupOut | None:
+    domain = settings.custom_domain
+    records = domains.records(user_id, domain) if domain else None
+    if records is None:
+        return None
+    return DomainSetupOut(
+        domain=domain,
+        verified=settings.custom_domain_verified_at is not None,
+        verified_at=settings.custom_domain_verified_at,
+        records=records,
+        routing_ok=routing_ok,
+    )

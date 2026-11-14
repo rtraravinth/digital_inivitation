@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { classifyHost, subdomainOrigin } from "@/lib/hosts";
 
 /**
  * The Content Security Policy, with a fresh script nonce per request.
@@ -64,15 +65,64 @@ export function contentSecurityPolicy(nonce: string, dev: boolean): string {
     .join("; ");
 }
 
+/**
+ * Other names the app answers to as itself, beside the root: the host's own
+ * address (`facet.onrender.com`), say. Comma-separated, read at run time.
+ * Without this, once a root domain is set every unknown host is taken for a
+ * custom domain and its pages 404.
+ */
+const APP_HOSTS = (process.env.FACET_APP_HOSTS ?? "")
+  .split(",")
+  .map((host) => host.trim().toLowerCase())
+  .filter(Boolean);
+
+/** Set by this proxy alone: a client's own copy is removed first. */
+const HOST_HEADER = "x-facet-host";
+
+/**
+ * Where a request goes, by the host it arrived on (see `lib/hosts.ts`):
+ *
+ * - `rohan.facetfolio.com/founder` is served by `/p/rohan/founder`.
+ * - `rohan.com/founder` (a verified custom domain) by `/d/rohan.com/founder`,
+ *   which asks the API whose domain it is.
+ * - On the app's own host, `/p/rohan/founder` is redirected to the subdomain
+ *   once there is one, so a link shared before keeps working and lands on
+ *   the address the page now has.
+ */
+function route(request: NextRequest, headers: Headers): NextResponse {
+  const host = classifyHost(request.headers.get("host"), APP_HOSTS);
+  const { pathname, search } = request.nextUrl;
+
+  if (host.kind === "app") {
+    const old = /^\/p\/([^/]+)\/([^/]+)\/?$/.exec(pathname);
+    const origin = old ? subdomainOrigin(old[1]) : "";
+    if (old && origin) return NextResponse.redirect(`${origin}/${old[2]}${search}`, 308);
+    return NextResponse.next({ request: { headers } });
+  }
+
+  headers.set(HOST_HEADER, host.kind);
+  const base = host.kind === "subdomain" ? `/p/${host.subdomain}` : `/d/${host.domain}`;
+  const url = request.nextUrl.clone();
+  url.pathname = `${base}${pathname === "/" ? "" : pathname}`;
+  return NextResponse.rewrite(url, { request: { headers } });
+}
+
 export function proxy(request: NextRequest) {
+  const requestHeaders = new Headers(request.headers);
+  requestHeaders.delete(HOST_HEADER);
+
+  // A prefetch renders nothing a policy applies to, but it still has to be
+  // routed by host, or a link on a subdomain prefetches the app's 404.
+  const prefetch =
+    request.headers.has("next-router-prefetch") || request.headers.get("purpose") === "prefetch";
+  if (prefetch) return route(request, requestHeaders);
+
   const nonce = Buffer.from(crypto.randomUUID()).toString("base64");
   const policy = contentSecurityPolicy(nonce, process.env.NODE_ENV === "development");
-
-  const requestHeaders = new Headers(request.headers);
   requestHeaders.set("x-nonce", nonce);
   requestHeaders.set("Content-Security-Policy", policy);
 
-  const response = NextResponse.next({ request: { headers: requestHeaders } });
+  const response = route(request, requestHeaders);
   response.headers.set("Content-Security-Policy", policy);
   return response;
 }
@@ -80,13 +130,10 @@ export function proxy(request: NextRequest) {
 export const config = {
   matcher: [
     {
-      // Pages only: not the API (it sets its own), not static files, and not
-      // next/link prefetches, which render nothing a policy applies to.
+      // Pages only: not the API (it sets its own) and not static files.
+      // Prefetches come through so they are routed by host too; `proxy`
+      // skips the policy for them.
       source: "/((?!api|health|_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|txt|xml)$).*)",
-      missing: [
-        { type: "header", key: "next-router-prefetch" },
-        { type: "header", key: "purpose", value: "prefetch" },
-      ],
     },
   ],
 };

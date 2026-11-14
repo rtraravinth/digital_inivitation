@@ -1,6 +1,6 @@
 """Addresses, and the seeded content importing cleanly.
 
-An address is ``facet.page/<handle>/<slug>``. The handle in front is what
+An address is ``<subdomain>.facetfolio.com/<slug>``. The subdomain in front is what
 makes it unique, so a slug is one segment and only has to be free within the
 account that owns it — two people can both publish "investors".
 """
@@ -12,7 +12,7 @@ from pathlib import Path
 
 import pytest
 
-from tests.factories import OTHER_HANDLE, TEST_HANDLE
+from tests.factories import OTHER_SUBDOMAIN, TEST_SUBDOMAIN
 
 SEED_FILE = Path(__file__).resolve().parents[1] / "app" / "seed_data.json"
 
@@ -52,7 +52,7 @@ async def test_a_single_segment_slug_is_accepted(auth_client, slug):
         "double//slash",
         "-hyphen",
         "up/../out",
-        # Nesting is gone: the handle is the namespace now.
+        # Nesting is gone: the subdomain is the namespace now.
         "rohan/investors",
         "a-b/c-d/e-f",
     ],
@@ -66,7 +66,7 @@ async def test_a_malformed_slug_is_422(auth_client, slug):
 
 
 async def test_two_accounts_can_hold_the_same_slug(auth_client, other_auth_client, client):
-    """The whole point of the handle being in the address."""
+    """The whole point of the subdomain being in the address."""
     for owner in (auth_client, other_auth_client):
         created = (
             await owner.post(
@@ -78,8 +78,8 @@ async def test_two_accounts_can_hold_the_same_slug(auth_client, other_auth_clien
         await owner.post(f"/api/v1/portfolios/{created['id']}/publish")
 
     client.headers.pop("Authorization", None)
-    mine = await client.get(f"/api/v1/public/p/{TEST_HANDLE}/investors")
-    theirs = await client.get(f"/api/v1/public/p/{OTHER_HANDLE}/investors")
+    mine = await client.get(f"/api/v1/public/p/{TEST_SUBDOMAIN}/investors")
+    theirs = await client.get(f"/api/v1/public/p/{OTHER_SUBDOMAIN}/investors")
 
     assert mine.status_code == 200
     assert theirs.status_code == 200
@@ -95,19 +95,19 @@ async def test_the_same_slug_twice_in_one_account_is_409(auth_client):
     assert response.json()["error"]["code"] == "slug_taken"
 
 
-async def test_the_wrong_handle_does_not_reach_the_page(auth_client, client, published):
+async def test_the_wrong_subdomain_does_not_reach_the_page(auth_client, client, published):
     """A page is at one address, not at everybody's."""
     client.headers.pop("Authorization", None)
     assert (
-        await client.get(f"/api/v1/public/p/{TEST_HANDLE}/{published['slug']}")
+        await client.get(f"/api/v1/public/p/{TEST_SUBDOMAIN}/{published['slug']}")
     ).status_code == 200
     assert (
-        await client.get(f"/api/v1/public/p/{OTHER_HANDLE}/{published['slug']}")
+        await client.get(f"/api/v1/public/p/{OTHER_SUBDOMAIN}/{published['slug']}")
     ).status_code == 404
     assert (await client.get(f"/api/v1/public/p/nobody/{published['slug']}")).status_code == 404
 
 
-async def test_recording_a_view_needs_the_handle_too(auth_client, client):
+async def test_recording_a_view_needs_the_subdomain_too(auth_client, client):
     created = (
         await auth_client.post(
             "/api/v1/portfolios",
@@ -117,7 +117,7 @@ async def test_recording_a_view_needs_the_handle_too(auth_client, client):
     await auth_client.post(f"/api/v1/portfolios/{created['id']}/publish")
 
     response = await client.post(
-        f"/api/v1/public/p/{TEST_HANDLE}/investors/views",
+        f"/api/v1/public/p/{TEST_SUBDOMAIN}/investors/views",
         json={"referrer": "", "dedupeKey": "one"},
     )
     assert response.status_code == 202
@@ -166,7 +166,7 @@ async def test_the_seeds_live_pages_publish_and_serve(auth_client, client):
     assert detail["sections"][0]["title"] == "Northwell Kitchens"
     assert detail["header"]["numbers"][0]["value"] == "11"
 
-    published = await client.get(f"/api/v1/public/p/{TEST_HANDLE}/full")
+    published = await client.get(f"/api/v1/public/p/{TEST_SUBDOMAIN}/full")
     assert published.status_code == 200
     assert published.json()["header"]["name"] == "Rohan Mehta"
 
@@ -179,7 +179,7 @@ async def test_seeded_hidden_sections_stay_off_the_published_page(auth_client, c
         hidden = [s for s in portfolio["sections"] if s.get("hidden")]
         if not hidden:
             continue
-        response = await client.get(f"/api/v1/public/p/{TEST_HANDLE}/{portfolio['slug']}")
+        response = await client.get(f"/api/v1/public/p/{TEST_SUBDOMAIN}/{portfolio['slug']}")
         if response.status_code != 200:
             continue
         served = {s["title"] for s in response.json()["sections"]}

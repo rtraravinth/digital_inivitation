@@ -39,9 +39,9 @@ async def _age_rotations(db_session) -> None:
 # ── a new account ────────────────────────────────────────────────────────
 
 
-async def test_a_first_sign_in_with_a_handle_creates_the_account(client):
+async def test_a_first_sign_in_with_a_subdomain_creates_the_account(client):
     response = await sign_in(
-        client, firebase_token("New@Example.com"), name="Rohan Mehta", handle="rohan-new"
+        client, firebase_token("New@Example.com"), name="Rohan Mehta", subdomain="rohan-new"
     )
     assert response.status_code == 200
 
@@ -50,16 +50,16 @@ async def test_a_first_sign_in_with_a_handle_creates_the_account(client):
     assert body["token"]["tokenType"] == "bearer"
     assert body["user"]["email"] == "new@example.com"
     assert body["user"]["name"] == "Rohan Mehta"
-    assert body["user"]["handle"] == "rohan-new"
+    assert body["user"]["subdomain"] == "rohan-new"
     assert client.cookies.get("facet_refresh")
 
 
-async def test_a_first_sign_in_without_a_handle_asks_for_one(client, db_session):
+async def test_a_first_sign_in_without_a_subdomain_asks_for_one(client, db_session):
     response = await sign_in(client, firebase_token("asks@example.com", name="Asha Rao"))
     assert response.status_code == 422
 
     error = response.json()["error"]
-    assert error["code"] == "handle_required"
+    assert error["code"] == "subdomain_required"
     # The page pre-fills the name step from what Google or GitHub supplied.
     assert error["details"]["name"] == "Asha Rao"
     assert client.cookies.get("facet_refresh") is None
@@ -68,14 +68,14 @@ async def test_a_first_sign_in_without_a_handle_asks_for_one(client, db_session)
 
 async def test_the_name_falls_back_to_the_one_firebase_has(client):
     response = await sign_in(
-        client, firebase_token("named@example.com", name="From Google"), handle="named"
+        client, firebase_token("named@example.com", name="From Google"), subdomain="named"
     )
     assert response.json()["user"]["name"] == "From Google"
 
 
 async def test_an_unverified_email_cannot_make_an_account(client, db_session):
     response = await sign_in(
-        client, firebase_token("unverified@example.com", verified=False), handle="unverified"
+        client, firebase_token("unverified@example.com", verified=False), subdomain="unverified"
     )
     assert response.status_code == 403
     assert response.json()["error"]["code"] == "email_unverified"
@@ -86,7 +86,7 @@ async def test_an_unverified_email_cannot_make_an_account(client, db_session):
 
 async def test_a_phone_account_has_no_email(client):
     token = firebase_token(None, phone="+919845012345", provider="phone")
-    response = await sign_in(client, token, name="Phone Person", handle="phone-person")
+    response = await sign_in(client, token, name="Phone Person", subdomain="phone-person")
     assert response.status_code == 200
     assert response.json()["user"]["email"] is None
 
@@ -97,7 +97,9 @@ async def test_a_phone_account_has_no_email(client):
 
 
 async def test_the_refresh_token_is_never_in_the_response_body(client):
-    response = await sign_in(client, firebase_token("cookie@example.com"), handle="cookie-person")
+    response = await sign_in(
+        client, firebase_token("cookie@example.com"), subdomain="cookie-person"
+    )
     assert "refresh" not in response.text.lower()
 
     cookie_header = response.headers["set-cookie"].lower()
@@ -107,7 +109,7 @@ async def test_the_refresh_token_is_never_in_the_response_body(client):
 
 async def test_no_credential_is_stored(client, db_session):
     """Firebase holds every one. The tables have nowhere to put one."""
-    await sign_in(client, firebase_token("nothing@example.com"), handle="nothing-held")
+    await sign_in(client, firebase_token("nothing@example.com"), subdomain="nothing-held")
 
     for model in (User, AccountProfile, AccountSettings):
         columns = {column.name for column in model.__table__.columns}
@@ -123,11 +125,11 @@ async def test_signing_in_again_finds_the_same_account(client, registered):
     assert response.json()["user"]["id"] == registered["user"]["id"]
 
 
-async def test_a_handle_sent_by_an_existing_account_is_ignored(client, registered):
+async def test_a_subdomain_sent_by_an_existing_account_is_ignored(client, registered):
     response = await sign_in(
-        client, firebase_token(registered["user"]["email"]), handle="something-else"
+        client, firebase_token(registered["user"]["email"]), subdomain="something-else"
     )
-    assert response.json()["user"]["handle"] == "rohan"
+    assert response.json()["user"]["subdomain"] == "rohan"
 
 
 async def test_the_uid_wins_over_the_email(client, registered, db_session):
@@ -171,10 +173,10 @@ async def test_a_missing_token_is_422(client):
 # ── accounts made before Firebase ────────────────────────────────────────
 
 
-async def _legacy_account(db_session, email: str, handle: str) -> User:
+async def _legacy_account(db_session, email: str, subdomain: str) -> User:
     """An account as the migration leaves it: an address, no Firebase uid."""
     user = User(email=email, is_active=True)
-    user.profile = AccountProfile(name="Legacy", handle=handle, tags=[], links=[])
+    user.profile = AccountProfile(name="Legacy", subdomain=subdomain, tags=[], links=[])
     user.settings = AccountSettings()
     db_session.add(user)
     await db_session.flush()
@@ -211,7 +213,7 @@ async def test_an_unverified_email_cannot_take_an_address_in_use(client, registe
     response = await sign_in(
         client,
         firebase_token(registered["user"]["email"], uid="someone-else", verified=False),
-        handle="sneaky",
+        subdomain="sneaky",
     )
     assert response.status_code == 403
     user = await db_session.scalar(select(User).where(User.email == registered["user"]["email"]))
@@ -313,42 +315,44 @@ async def test_the_old_password_routes_are_gone(client):
         assert (await client.post(path, json={})).status_code in (404, 405), path
 
 
-# ── the handle claimed at sign-up ────────────────────────────────────────
+# ── the subdomain claimed at sign-up ────────────────────────────────────────
 # It is the base of every address the account publishes
-# (facet.com/<handle>/<slug>), so it is claimed with the account rather than
+# (<subdomain>.facetfolio.com/<slug>), so it is claimed with the account rather than
 # left null until someone visits /account.
 
 
-async def test_a_handle_is_lowercased_not_rejected(client):
+async def test_a_subdomain_is_lowercased_not_rejected(client):
     """ "Aravinth" is a typo, not a format error — addresses are lowercase."""
-    response = await sign_in(client, firebase_token("caps@example.com"), handle="  Aravinth  ")
+    response = await sign_in(client, firebase_token("caps@example.com"), subdomain="  Aravinth  ")
     assert response.status_code == 200
 
     bearer(client, response.json()["token"]["accessToken"])
-    assert (await client.get("/api/v1/account")).json()["profile"]["handle"] == "aravinth"
+    assert (await client.get("/api/v1/account")).json()["profile"]["subdomain"] == "aravinth"
 
 
-async def test_a_taken_handle_is_409(client, registered):
-    response = await sign_in(client, firebase_token("second@example.com"), handle="rohan")
+async def test_a_taken_subdomain_is_409(client, registered):
+    response = await sign_in(client, firebase_token("second@example.com"), subdomain="rohan")
     assert response.status_code == 409
-    assert response.json()["error"]["code"] == "handle_taken"
+    assert response.json()["error"]["code"] == "subdomain_taken"
 
 
-async def test_a_reserved_handle_is_409(client):
+async def test_a_reserved_subdomain_is_409(client):
     """An app route at that position can never also be somebody's address."""
     for reserved in ("account", "stats", "api", "www", "signin"):
-        response = await sign_in(client, firebase_token(f"{reserved}@example.com"), handle=reserved)
+        response = await sign_in(
+            client, firebase_token(f"{reserved}@example.com"), subdomain=reserved
+        )
         assert response.status_code == 409, reserved
-        assert response.json()["error"]["code"] == "handle_reserved", reserved
+        assert response.json()["error"]["code"] == "subdomain_reserved", reserved
 
 
-async def test_a_rejected_handle_leaves_no_account_behind(client, registered, db_session):
-    """The handle is checked before the user row, not by the unique index."""
-    await sign_in(client, firebase_token("leftover@example.com"), handle="rohan")
+async def test_a_rejected_subdomain_leaves_no_account_behind(client, registered, db_session):
+    """The subdomain is checked before the user row, not by the unique index."""
+    await sign_in(client, firebase_token("leftover@example.com"), subdomain="rohan")
     assert await db_session.scalar(select(User).where(User.email == "leftover@example.com")) is None
 
 
-async def test_a_bad_handle_shape_is_422(client):
+async def test_a_bad_subdomain_shape_is_422(client):
     for bad in ("a", "has space", "UPPER-ONLY-!", "-leading", "trailing-"):
-        response = await sign_in(client, firebase_token("shape@example.com"), handle=bad)
+        response = await sign_in(client, firebase_token("shape@example.com"), subdomain=bad)
         assert response.status_code == 422, bad

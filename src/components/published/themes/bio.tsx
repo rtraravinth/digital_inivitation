@@ -9,7 +9,7 @@ import {
   chaptersOf,
   headline,
   href,
-  usePublishedHandle,
+  usePublishedSubdomain,
   usePublishedPrivacy,
   useRecordClick,
   visibleSections,
@@ -45,7 +45,7 @@ function groups(p: Portfolio): Array<{ tab: string; entries: Entry[] }> {
 
 export function Bio({ p }: { p: Portfolio }) {
   const privacy = usePublishedPrivacy();
-  const handle = usePublishedHandle();
+  const subdomain = usePublishedSubdomain();
   const record = useRecordClick();
   const list = groups(p);
   const f = p.footer;
@@ -126,7 +126,7 @@ export function Bio({ p }: { p: Portfolio }) {
                   // The section's title says which "Website" this is when
                   // several sections each carry one.
                   sub={link.label && link.label !== section.title ? section.title : ""}
-                  onClick={() => record(handle, p.slug, section.id)}
+                  onClick={() => record(subdomain, p.slug, section.id)}
                 />
               ))}
             </section>

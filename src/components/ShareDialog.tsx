@@ -30,7 +30,7 @@ export function ShareDialog({
   initialId: string;
   onClose: () => void;
 }) {
-  const handle = useAccount().account.profile.handle;
+  const subdomain = useAccount().account.profile.subdomain;
   const [id, setId] = useState(initialId);
   const [note, setNote] = useState("");
   const [copied, setCopied] = useState(false);
@@ -39,7 +39,7 @@ export function ShareDialog({
   const p = shareable.find((x) => x.id === id) ?? shareable[0];
   if (!p) return null;
 
-  const url = handle ? liveUrl(handle, p.slug) : "";
+  const url = subdomain ? liveUrl(subdomain, p.slug) : "";
   const canShare = !!url;
   const signature = `${p.header.name || p.name}\n${p.header.current}\n${url}`;
   const nativeShare = typeof navigator !== "undefined" && typeof navigator.share === "function";
@@ -112,11 +112,11 @@ export function ShareDialog({
           </div>
         )}
 
-        {!handle ? (
+        {!subdomain ? (
           <Notice>
-            Your account has no handle, so your pages have no address yet.{" "}
+            Your account has no subdomain, so your pages have no address yet.{" "}
             <Link href="/account" className="font-medium underline underline-offset-2" style={{ color: "var(--color-ink)" }}>
-              Choose a handle
+              Choose a subdomain
             </Link>
           </Notice>
         ) : null}

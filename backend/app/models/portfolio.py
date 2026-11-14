@@ -73,7 +73,7 @@ class Portfolio(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         CheckConstraint(f"body_font IN ({sql_in(FONTS)})", name="body_font_is_known"),
         CheckConstraint(f"status IN ({sql_in(STATUSES)})", name="status_is_known"),
         Index("ix_portfolios_user_id_created_at", "user_id", "created_at"),
-        # The address is facet.page/<handle>/<slug>, so a slug only has to be
+        # The address is <subdomain>.facetfolio.com/<slug>, so a slug only has to be
         # unique within the account that owns it. Two people can both publish
         # a page called "freelancer".
         UniqueConstraint("user_id", "slug", name="uq_portfolios_user_id_slug"),
@@ -83,7 +83,7 @@ class Portfolio(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
     )
     name: Mapped[str] = mapped_column(String(200), nullable=False)
-    # One segment, scoped to the owner: the handle in front of it is what
+    # One segment, scoped to the owner: the subdomain in front of it is what
     # makes the address unique. No slashes — nesting lived here only because
     # there was nothing else in the path to namespace it.
     slug: Mapped[str] = mapped_column(String(120), nullable=False, index=True)

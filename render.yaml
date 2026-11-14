@@ -58,6 +58,25 @@ services:
         sync: false
       - key: NEXT_PUBLIC_FIREBASE_APP_ID
         sync: false
+      # The domain pages publish under: rohan.facetfolio.com/founder. Read
+      # at build time by the frontend and at start by the API. In Render, add
+      # both facetfolio.com and the wildcard *.facetfolio.com as custom
+      # domains (Settings → Custom Domains); a wildcard needs the DNS records
+      # Render lists for it, including its _acme-challenge CNAME.
+      - key: NEXT_PUBLIC_ROOT_DOMAIN
+        value: facetfolio.com
+      # This service's own onrender.com name (facet-xxxx.onrender.com), so it is still the app and not
+      # read as somebody's custom domain. Comma-separated if more than one.
+      - key: FACET_APP_HOSTS
+        sync: false
+      # Where an owner's custom domain points. The CNAME target for a
+      # www-style name; Render's load balancer address for a bare domain's A
+      # record. An owner's domain also has to be added to this service in
+      # Render before it gets an HTTPS certificate.
+      - key: FACET_DOMAIN_CNAME_TARGET
+        sync: false
+      - key: FACET_DOMAIN_APEX_IPS
+        value: '["216.24.57.1"]'
       # A demo account with the five seeded portfolios, created on first
       # start. It has no password: sign in through Firebase with this
       # address — it must be one whose inbox you can open, because Firebase

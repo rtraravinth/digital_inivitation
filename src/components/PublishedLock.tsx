@@ -19,10 +19,10 @@ import { previewPath, type Portfolio } from "@/lib/types";
  */
 export function PublishedLock({ portfolio }: { portfolio: Portfolio }) {
   const { updatePortfolio, storageError } = usePortfolios();
-  const handle = useAccount().account.profile.handle;
+  const subdomain = useAccount().account.profile.subdomain;
   const reduced = useReducedMotion();
   const [copied, setCopied] = useState(false);
-  const url = handle ? liveUrl(handle, portfolio.slug) : "";
+  const url = subdomain ? liveUrl(subdomain, portfolio.slug) : "";
 
   const unpublish = () => updatePortfolio(portfolio.id, (prev) => ({ ...prev, status: "draft" }));
 
@@ -72,7 +72,7 @@ export function PublishedLock({ portfolio }: { portfolio: Portfolio }) {
           >
             <TiltPanel max={3} className="overflow-hidden rounded-2xl">
               <div className="relative aspect-[16/7] overflow-hidden" style={{ borderBottom: "1px solid var(--color-divider)", background: "var(--color-surface)" }}>
-                <PagePreview p={portfolio} handle={handle} />
+                <PagePreview p={portfolio} subdomain={subdomain} />
               </div>
               <div className="p-6 sm:p-8">
                 <h1 className="m-0 text-[26px] leading-tight tracking-[-0.03em] sm:text-[30px]">
@@ -120,9 +120,9 @@ export function PublishedLock({ portfolio }: { portfolio: Portfolio }) {
                   </div>
                 ) : (
                   <p className="m-0 mt-5 rounded-xl px-3.5 py-2.5 text-[13.5px]" style={{ border: "1px solid var(--color-ink)" }}>
-                    Your account has no handle, so this page has no address anyone can open.{" "}
+                    Your account has no subdomain, so this page has no address anyone can open.{" "}
                     <Link href="/account" className="font-medium underline underline-offset-2" style={{ color: "var(--color-ink)" }}>
-                      Choose a handle
+                      Choose a subdomain
                     </Link>
                   </p>
                 )}

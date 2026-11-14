@@ -18,12 +18,14 @@ import {
   updatePrivacy,
   updateProfile,
   updateSecurity,
+  verifyDomain,
   type DeviceSession,
 } from "@/lib/account";
 import { resetAnalytics, type Analytics } from "@/lib/analytics";
 import { ApiError, messageFor } from "@/lib/api";
 import { readImageAsset } from "@/lib/assets";
 import { signOut } from "@/lib/session";
+import { subdomainFrame, subdomainProblem } from "@/lib/hosts";
 import { displayUrl, liveUrl } from "@/lib/slug";
 import { usePortfolios } from "@/lib/store";
 import {
@@ -34,6 +36,7 @@ import {
   assetSrc,
   type AccountProfile,
   type AccountSettings,
+  type DomainSetup,
   type Portfolio,
 } from "@/lib/types";
 
@@ -52,17 +55,6 @@ type PanelProps = {
 
 const EASE = [0.16, 1, 0.3, 1] as const;
 
-/** Mirrors HANDLE_PATTERN in backend/app/schemas/account.py. */
-const HANDLE = /^[a-z0-9][a-z0-9-]{1,30}[a-z0-9]$/;
-
-function handleProblem(value: string): string | null {
-  if (!value) return "Choose a handle — it is the start of every page address.";
-  if (value.length < 3) return "At least three characters.";
-  if (value.length > 32) return "At most 32 characters.";
-  if (/^-|-$/.test(value)) return "Can’t start or end with a hyphen.";
-  if (!HANDLE.test(value)) return "Lowercase letters, numbers and hyphens only.";
-  return null;
-}
 
 /* ── shared pieces ────────────────────────────────────────────────────── */
 
@@ -273,10 +265,10 @@ function ProfilePanel({ account }: PanelProps) {
     setSaved(false);
     setDraft({ ...p, ...patch });
   };
-  const handleError = dirty && p.handle !== account.profile.handle ? handleProblem(p.handle) : null;
+  const subdomainError = dirty && p.subdomain !== account.profile.subdomain ? subdomainProblem(p.subdomain) : null;
 
   // Waits for the server's answer. It used to clear the draft and say
-  // "saved" straight away, so a taken handle lost what was typed and showed
+  // "saved" straight away, so a taken subdomain lost what was typed and showed
   // success for a save that had failed.
   async function save() {
     setSaving(true);
@@ -330,21 +322,21 @@ function ProfilePanel({ account }: PanelProps) {
             <input id="ac-name" className="input" value={p.name} onChange={(e) => set({ name: e.target.value })} />
           </div>
           <div className="field">
-            <label htmlFor="ac-handle">Handle</label>
+            <label htmlFor="ac-subdomain">Subdomain</label>
             <input
-              id="ac-handle"
+              id="ac-subdomain"
               className="input font-mono"
-              value={p.handle}
-              aria-invalid={!!handleError || undefined}
-              aria-describedby="ac-handle-hint"
+              value={p.subdomain}
+              aria-invalid={!!subdomainError || undefined}
+              aria-describedby="ac-subdomain-hint"
               onChange={(e) =>
-                set({ handle: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "").slice(0, 32) })
+                set({ subdomain: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "").slice(0, 32) })
               }
             />
-            <p id="ac-handle-hint" className="m-0 mt-1.5 truncate text-[12px] text-muted">
-              {handleError ?? (
+            <p id="ac-subdomain-hint" className="m-0 mt-1.5 truncate text-[12px] text-muted">
+              {subdomainError ?? (
                 <>
-                  Pages live at <span className="font-mono">{displayUrl(liveUrl(p.handle || "your-handle", "page"))}</span>
+                  Pages live at <span className="font-mono">{displayUrl(liveUrl(p.subdomain || "your-subdomain", "page"))}</span>
                 </>
               )}
             </p>
@@ -397,7 +389,7 @@ function ProfilePanel({ account }: PanelProps) {
             <button
               type="button"
               className="btn"
-              disabled={saving || !!handleError}
+              disabled={saving || !!subdomainError}
               style={{ background: "var(--color-bg)", color: "var(--color-ink)", minHeight: 34 }}
               onClick={save}
             >
@@ -595,15 +587,16 @@ function SecurityPanel({ account }: PanelProps) {
 
 function AddressesPanel({ account, portfolios, analytics }: PanelProps) {
   const [copied, setCopied] = useState<string | null>(null);
-  const [draftHandle, setDraftHandle] = useState<string | null>(null);
+  const [draftSubdomain, setDraftSubdomain] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
-  const stored = account.profile.handle;
-  const handle = draftHandle ?? stored;
-  const changed = handle !== stored;
-  const problem = changed ? handleProblem(handle) : null;
+  const stored = account.profile.subdomain;
+  const subdomain = draftSubdomain ?? stored;
+  const changed = subdomain !== stored;
+  const problem = changed ? subdomainProblem(subdomain) : null;
   const live = portfolios.filter((p) => p.status === "live");
   const drafts = portfolios.filter((p) => p.status !== "live");
+  const frame = subdomainFrame();
 
   async function copy(slug: string) {
     try {
@@ -615,12 +608,12 @@ function AddressesPanel({ account, portfolios, analytics }: PanelProps) {
     }
   }
 
-  async function saveHandle() {
+  async function saveSubdomain() {
     setSaving(true);
     setError("");
     try {
-      await updateProfile({ handle });
-      setDraftHandle(null);
+      await updateProfile({ subdomain });
+      setDraftSubdomain(null);
     } catch (caught) {
       setError(messageFor(caught));
     } finally {
@@ -632,43 +625,50 @@ function AddressesPanel({ account, portfolios, analytics }: PanelProps) {
     <div>
       <PanelHeader
         title="Page addresses"
-        desc="Your handle is the start of every page address. Each portfolio adds its own name after it."
+        desc="Your subdomain is the start of every page address. Each portfolio adds its own name after it."
       />
       {error && <Message kind="error">{error}</Message>}
 
-      <Card title="Your handle">
+      <Card title="Your subdomain">
         <div className="flex flex-wrap items-start gap-2.5">
           <div className="field min-w-[220px] flex-1">
             <label htmlFor="ac-base" className="sr-only">
-              Handle
+              Subdomain
             </label>
             <div
               className="flex items-center overflow-hidden rounded-[var(--radius-md)]"
               style={{ border: "1px solid var(--color-divider)", background: "var(--color-surface)" }}
             >
-              <span className="flex-none py-2 pl-3 font-mono text-[13px]" style={{ color: "var(--color-neutral-600)" }}>
-                {displayUrl(liveUrl("", "")).replace(/\/p\/\/$/, "/p/")}
-              </span>
+              {frame.before && (
+                <span className="flex-none py-2 pl-3 font-mono text-[13px]" style={{ color: "var(--color-neutral-600)" }}>
+                  {frame.before}
+                </span>
+              )}
               <input
                 id="ac-base"
-                className="min-w-0 flex-1 bg-transparent py-2 pr-3 font-mono text-[14px] outline-none"
+                className={`min-w-0 flex-1 bg-transparent py-2 font-mono text-[14px] outline-none ${frame.before ? "" : "pl-3"} ${frame.after ? "" : "pr-3"}`}
                 style={{ color: "var(--color-ink)", border: 0 }}
-                value={handle}
-                placeholder="your-handle"
+                value={subdomain}
+                placeholder="your-subdomain"
                 aria-invalid={!!problem || undefined}
                 onChange={(e) =>
-                  setDraftHandle(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "").slice(0, 32))
+                  setDraftSubdomain(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "").slice(0, 32))
                 }
               />
+              {frame.after && (
+                <span className="flex-none py-2 pr-3 font-mono text-[13px]" style={{ color: "var(--color-neutral-600)" }}>
+                  {frame.after}
+                </span>
+              )}
             </div>
           </div>
           <button
             type="button"
             className="btn btn-primary"
             disabled={!changed || !!problem || saving}
-            onClick={saveHandle}
+            onClick={saveSubdomain}
           >
-            {saving ? "Saving…" : "Save handle"}
+            {saving ? "Saving…" : "Save subdomain"}
           </button>
         </div>
         <p className="m-0 mt-2 text-[12.5px] text-muted">
@@ -677,7 +677,7 @@ function AddressesPanel({ account, portfolios, analytics }: PanelProps) {
               ? "Not saved yet. Every live page moves to the new address, and links you have already shared stop working."
               : stored
                 ? "Every live page below uses this."
-                : "You have no handle yet, so your live pages can’t be opened. Choose one above.")}
+                : "You have no subdomain yet, so your live pages can’t be opened. Choose one above.")}
         </p>
       </Card>
 
@@ -712,7 +712,7 @@ function AddressesPanel({ account, portfolios, analytics }: PanelProps) {
                       </a>
                     ) : (
                       <span className="text-[12.5px] text-muted">
-                        {isLive ? "Needs a handle to have an address" : "Draft — not public until published"}
+                        {isLive ? "Needs a subdomain to have an address" : "Draft — not public until published"}
                       </span>
                     )}
                   </span>
@@ -739,21 +739,185 @@ function AddressesPanel({ account, portfolios, analytics }: PanelProps) {
         )}
       </Card>
 
-      <Card title="Your own domain" desc="Serve your pages from an address you own, like yourname.com.">
-        <ServerNotice what={NEEDS_SERVER.domain} />
-        <div className="field max-w-[360px]">
+      <DomainCard account={account} />
+    </div>
+  );
+}
+
+/**
+ * A domain the owner bought, pointed at their pages. Saving it shows the two
+ * records to add at their DNS provider — a TXT record that proves the domain
+ * is theirs and a CNAME (an A or ALIAS record at a bare domain) that points
+ * it here — and "Check DNS" looks both up. Pages are served on it once the
+ * TXT record is found; the routing record can follow later.
+ */
+function DomainCard({ account }: { account: AccountSettings }) {
+  const [draft, setDraft] = useState<string | null>(null);
+  const [busy, setBusy] = useState<"save" | "check" | null>(null);
+  const [error, setError] = useState("");
+  const [checked, setChecked] = useState<{ domain: string; routingOk: boolean | null; at: number } | null>(null);
+  const [copied, setCopied] = useState<string | null>(null);
+  const stored = account.customDomain;
+  const value = draft ?? stored;
+  const changed = value.trim().toLowerCase() !== stored;
+  const setup = account.domainSetup;
+  const routing = checked && setup && checked.domain === setup.domain ? checked : null;
+
+  async function save() {
+    setBusy("save");
+    setError("");
+    try {
+      await setCustomDomain(value);
+      setDraft(null);
+      setChecked(null);
+    } catch (caught) {
+      setError(messageFor(caught));
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function check() {
+    setBusy("check");
+    setError("");
+    try {
+      const result = await verifyDomain();
+      if (result) setChecked({ domain: result.domain, routingOk: result.routingOk, at: Date.now() });
+    } catch (caught) {
+      setError(messageFor(caught));
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function copy(text: string) {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(text);
+      window.setTimeout(() => setCopied(null), 1600);
+    } catch {
+      // Clipboard blocked — the value is on screen to copy by hand.
+    }
+  }
+
+  return (
+    <Card title="Your own domain" desc="Serve your pages from a domain you bought, like yourname.com or www.yourname.com.">
+      {error && <Message kind="error">{error}</Message>}
+      <div className="flex flex-wrap items-end gap-2.5">
+        <div className="field min-w-[220px] flex-1">
           <label htmlFor="ac-domain">Domain</label>
           <input
             id="ac-domain"
-            className="input"
+            className="input font-mono"
             placeholder="yourname.com"
-            defaultValue={account.customDomain}
-            onBlur={(e) => void setCustomDomain(e.target.value)}
+            value={value}
+            autoCapitalize="none"
+            spellCheck={false}
+            onChange={(e) => setDraft(e.target.value.replace(/\s/g, ""))}
           />
         </div>
-      </Card>
-    </div>
+        <button type="button" className="btn btn-primary" disabled={!changed || busy !== null} onClick={save}>
+          {busy === "save" ? "Saving…" : value.trim() || !stored ? "Save domain" : "Remove domain"}
+        </button>
+      </div>
+
+      {stored && !setup && !changed && (
+        <p className="m-0 mt-3 text-[13px] text-muted">
+          This server has no root domain configured, so there is nothing for {stored} to point at yet. The
+          domain is saved and its records will appear here once there is.
+        </p>
+      )}
+
+      {setup && !changed && (
+        <div className="mt-4">
+          <div className="mb-3 flex flex-wrap items-center gap-2">
+            <Pill on={setup.verified}>{setup.verified ? "Verified" : "Not verified yet"}</Pill>
+            {routing && (
+              <Pill on={!!routing.routingOk}>{routing.routingOk ? "Points here" : "Not pointing here yet"}</Pill>
+            )}
+            <button
+              type="button"
+              className="btn btn-secondary ml-auto"
+              style={{ minHeight: 32, padding: "0.35rem 0.8rem", fontSize: 13 }}
+              disabled={busy !== null}
+              onClick={check}
+            >
+              {busy === "check" ? "Checking…" : "Check DNS"}
+            </button>
+          </div>
+
+          <p className="m-0 mb-3 text-[13px] leading-relaxed text-muted">
+            Add these at the company you bought <span className="font-mono">{setup.domain}</span> from, in its DNS
+            settings. The TXT record proves the domain is yours; the {routeLabel(setup)} sends visitors here.
+            Changes can take from a few minutes to a day to show.
+          </p>
+
+          <div className="overflow-x-auto rounded-xl" style={{ border: "1px solid var(--color-divider)" }}>
+            <table className="w-full min-w-[520px] border-collapse text-left text-[13px]">
+              <thead>
+                <tr style={{ color: "var(--color-neutral-700)" }}>
+                  <th className="px-3 py-2 font-medium">Type</th>
+                  <th className="px-3 py-2 font-medium">Host / Name</th>
+                  <th className="px-3 py-2 font-medium">Value</th>
+                  <th className="px-3 py-2">
+                    <span className="sr-only">Copy</span>
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {setup.records.map((record) => (
+                  <tr key={`${record.type}-${record.name}-${record.value}`} style={{ borderTop: "1px solid var(--color-divider)" }}>
+                    <td className="px-3 py-2.5 align-top font-mono">{record.type}</td>
+                    <td className="px-3 py-2.5 align-top">
+                      <span className="font-mono">{record.host}</span>
+                      <span className="block text-[11.5px]" style={{ color: "var(--color-neutral-600)" }}>
+                        {record.purpose === "verify" ? "Proves it is yours" : "Points it here"}
+                      </span>
+                    </td>
+                    <td className="px-3 py-2.5 align-top font-mono break-all">{record.value}</td>
+                    <td className="px-3 py-2.5 text-right align-top">
+                      <button
+                        type="button"
+                        className="btn btn-ghost"
+                        style={{ minHeight: 28, padding: "0.25rem 0.55rem", fontSize: 12.5 }}
+                        aria-label={`Copy the ${record.type} value`}
+                        onClick={() => copy(record.value)}
+                      >
+                        <Icon d={copied === record.value ? ICON.check : ICON.copy} size={12} />
+                        {copied === record.value ? "Copied" : "Copy"}
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          <p className="m-0 mt-3 text-[12.5px] leading-relaxed text-muted">
+            {setup.verified
+              ? `Your live pages open at ${setup.domain}/<page> as well as on your subdomain${
+                  routing && !routing.routingOk ? ", once the routing record is in place" : ""
+                }.`
+              : `Most providers add ${registeredOf(setup)} to the Host for you; if yours wants the full name, it is the Host followed by .${registeredOf(setup)}.`}
+            {setup.records.some((r) => r.type === "ALIAS") &&
+              " ALIAS is called ANAME or CNAME flattening by some providers."}
+          </p>
+        </div>
+      )}
+    </Card>
   );
+}
+
+/** The domain the records' Host fields are relative to. */
+function registeredOf(setup: DomainSetup): string {
+  const verify = setup.records.find((r) => r.purpose === "verify");
+  if (!verify || verify.host === "@") return setup.domain;
+  return verify.name.slice(verify.host.length + 1);
+}
+
+function routeLabel(setup: DomainSetup): string {
+  const route = setup.records.find((r) => r.purpose === "route");
+  return route ? `${route.type} record` : "routing record";
 }
 
 /* ── 4. plan & billing ────────────────────────────────────────────────── */
@@ -1142,9 +1306,9 @@ export const GROUPS: Array<{
   sub: string;
   Panel: (props: PanelProps) => React.ReactElement;
 }> = [
-  { id: "profile", label: "Profile", sub: "Name, photo, handle, profession", Panel: ProfilePanel },
+  { id: "profile", label: "Profile", sub: "Name, photo, subdomain, profession", Panel: ProfilePanel },
   { id: "security", label: "Sign-in & security", sub: "Password, two-step, devices", Panel: SecurityPanel },
-  { id: "addresses", label: "Page addresses", sub: "Handle, links, your own domain", Panel: AddressesPanel },
+  { id: "addresses", label: "Page addresses", sub: "Subdomain, links, your own domain", Panel: AddressesPanel },
   { id: "plan", label: "Plan & billing", sub: "What you’re on", Panel: PlanPanel },
   { id: "notifications", label: "Notifications", sub: "What we’d email you about", Panel: NotificationsPanel },
   { id: "privacy", label: "Privacy & data", sub: "Visibility, export, delete", Panel: PrivacyPanel },
@@ -1152,7 +1316,7 @@ export const GROUPS: Array<{
 
 /** A short flag on the rail when a group wants attention. */
 export function groupFlag(id: GroupId, account: AccountSettings): string {
-  if (id === "profile" && !account.profile.handle) return "Needs a handle";
-  if (id === "addresses" && !account.profile.handle) return "No address";
+  if (id === "profile" && !account.profile.subdomain) return "Needs a subdomain";
+  if (id === "addresses" && !account.profile.subdomain) return "No address";
   return "";
 }

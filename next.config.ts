@@ -51,6 +51,9 @@ const nextConfig: NextConfig = {
   // octet wildcard — the documented pattern form is a subdomain glob, so the
   // addresses are listed out.
   allowedDevOrigins: [
+    // Published pages on their subdomain in development:
+    // rohan.localhost:3000 with NEXT_PUBLIC_ROOT_DOMAIN=localhost:3000.
+    "*.localhost",
     "192.168.0.5",
     "192.168.0.6",
     "192.168.0.7",

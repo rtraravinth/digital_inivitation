@@ -24,7 +24,9 @@ export type PublishedPrivacy = {
   showContact: boolean;
 };
 
-type Published = {
+export type Published = {
+  /** The owner's, which analytics posts name the page by. */
+  subdomain: string;
   portfolio: Portfolio;
   privacy: PublishedPrivacy;
 };
@@ -32,12 +34,12 @@ type Published = {
 type PublicPayload = Omit<Portfolio, "status" | "summary" | "meta"> & PublishedPrivacy;
 
 export async function fetchPublished(
-  handle: string,
+  subdomain: string,
   slug: string,
 ): Promise<Published | null> {
   let response: Response;
   try {
-    response = await fetch(`${SERVER_API_BASE}/api/v1/public/p/${encodeURIComponent(handle)}/${encodeURIComponent(slug)}`, {
+    response = await fetch(`${SERVER_API_BASE}/api/v1/public/p/${encodeURIComponent(subdomain)}/${encodeURIComponent(slug)}`, {
       // Always current: a page edited a moment ago must not be served stale.
       cache: "no-store",
     });
@@ -52,6 +54,7 @@ export async function fetchPublished(
   const payload = (await response.json()) as PublicPayload;
 
   return {
+    subdomain,
     // The public payload has no editor-only fields; fill them in so every
     // theme can keep taking a whole Portfolio.
     portfolio: normalize({
@@ -66,4 +69,23 @@ export async function fetchPublished(
       showContact: payload.showContact,
     },
   };
+}
+
+/**
+ * A published page on its owner's own domain. The API answers only for a
+ * domain whose owner has verified it, so pointing DNS at us is not enough
+ * to put a name in front of somebody else's pages.
+ */
+export async function fetchPublishedOnDomain(domain: string, slug: string): Promise<Published | null> {
+  let response: Response;
+  try {
+    response = await fetch(`${SERVER_API_BASE}/api/v1/public/domains/${encodeURIComponent(domain)}`, {
+      cache: "no-store",
+    });
+  } catch {
+    return null;
+  }
+  if (!response.ok) return null;
+  const { subdomain } = (await response.json()) as { subdomain: string };
+  return fetchPublished(subdomain, slug);
 }

@@ -5,7 +5,7 @@ import { createPortal } from "react-dom";
 import {
   PreviewProvider,
   PublishedBody,
-  PublishedHandleProvider,
+  PublishedSubdomainProvider,
 } from "../published/themes";
 import { displayUrl, liveUrl } from "@/lib/slug";
 import { type Portfolio } from "@/lib/types";
@@ -42,14 +42,14 @@ const FRAME_DOC =
  */
 export function Canvas({
   p,
-  handle,
+  subdomain,
   device,
   replay = 0,
   panX = true,
   chrome = true,
 }: {
   p: Portfolio;
-  handle: string;
+  subdomain: string;
   device: Device;
   replay?: number;
   /**
@@ -116,7 +116,7 @@ export function Canvas({
               >
                 {/* The address it will have once published — the real route,
                     not the facet.page vanity domain, which serves nothing. */}
-                {displayUrl(liveUrl(handle || "your-handle", p.slug))}
+                {displayUrl(liveUrl(subdomain || "your-subdomain", p.slug))}
               </span>
             </div>
           )}
@@ -130,12 +130,12 @@ export function Canvas({
             <CanvasFrame width={width} height={frameH / scale} scale={scale} panX={panX}>
               {/* A preview, and it has to say so: otherwise a click in here is
                   recorded as a real visitor's, and a section title links to
-                  /p/<handle>/<slug>, which does not resolve until the page is
+                  /p/<subdomain>/<slug>, which does not resolve until the page is
                   published. */}
               <PreviewProvider value>
-                <PublishedHandleProvider value={handle}>
+                <PublishedSubdomainProvider value={subdomain}>
                   <PublishedBody key={replay} p={p} />
-                </PublishedHandleProvider>
+                </PublishedSubdomainProvider>
               </PreviewProvider>
             </CanvasFrame>
           </div>

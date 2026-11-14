@@ -20,6 +20,8 @@ PREFLIGHT = {
         "http://192.168.0.5:3000",
         "http://10.1.2.3:3000",
         "http://172.20.0.4:3000",
+        # A published page on its subdomain in development.
+        "http://rohan.localhost:3000",
     ],
 )
 async def test_local_and_lan_origins_are_allowed_outside_production(client, origin):
@@ -38,6 +40,7 @@ async def test_local_and_lan_origins_are_allowed_outside_production(client, orig
         "http://192.168.0.5:8080",
         # A public address dressed up to start like a private one.
         "http://192.168.0.5.evil.example:3000",
+        "http://rohan.localhost.evil.example:3000",
     ],
 )
 async def test_other_origins_are_refused(client, origin):

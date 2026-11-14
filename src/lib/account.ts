@@ -7,12 +7,12 @@ import { defaultAccount, type AccountProfile, type AccountSettings } from "./typ
 /**
  * What the API actually sends, as opposed to what the UI holds.
  *
- * The two are the same shape but for `handle`: the API sends null until the
+ * The two are the same shape but for `subdomain`: the API sends null until the
  * account has one, while every reader here wants a string. Declaring that
  * difference is what stops the null being spread in unnoticed — see adopt().
  */
 type AccountPayload = Partial<Omit<AccountSettings, "profile">> & {
-  profile?: Partial<Omit<AccountProfile, "handle">> & { handle?: string | null };
+  profile?: Partial<Omit<AccountProfile, "subdomain">> & { subdomain?: string | null };
 };
 
 /* ══════════════════════════════════════════════════════════════════════════
@@ -42,20 +42,21 @@ function notify() {
 
 /**
  * The API's shape is the UI's shape, so this is a merge, not a translation —
- * with one exception. `handle` is `string | null` on the wire and empty-string
+ * with one exception. `subdomain` is `string | null` on the wire and empty-string
  * here, because an account that has never set one sends null: spreading that
  * straight in would put null into a controlled `<input value>`, which React
  * turns into an uncontrolled field, and would throw the first time anything
- * called `handle.trim()`. Coerce it once, here, rather than in every reader.
+ * called `subdomain.trim()`. Coerce it once, here, rather than in every reader.
  */
 function adopt(payload: AccountPayload) {
   const base = defaultAccount();
   const profile = { ...base.profile, ...(payload.profile ?? {}) };
   state = {
-    profile: { ...profile, handle: profile.handle ?? "" },
+    profile: { ...profile, subdomain: profile.subdomain ?? "" },
     security: { ...base.security, ...(payload.security ?? {}) },
     plan: payload.plan ?? base.plan,
     customDomain: payload.customDomain ?? base.customDomain,
+    domainSetup: payload.domainSetup === undefined ? base.domainSetup : payload.domainSetup,
     notifications: { ...base.notifications, ...(payload.notifications ?? {}) },
     privacy: { ...base.privacy, ...(payload.privacy ?? {}) },
   };
@@ -129,7 +130,7 @@ export async function updateProfile(patch: Partial<Profile>) {
   await save({ profile: { ...state.profile, ...patch } }, () =>
     api.patch<AccountPayload>("/account/profile", {
       name: patch.name,
-      handle: patch.handle || undefined,
+      subdomain: patch.subdomain || undefined,
       current: patch.current,
       about: patch.about,
       tags: patch.tags,
@@ -157,6 +158,20 @@ export async function setCustomDomain(customDomain: string) {
   await save({ customDomain }, () =>
     api.patch<AccountPayload>("/account/domain", { customDomain }),
   );
+}
+
+/**
+ * Look the domain's records up. The answer carries `routingOk`, which only a
+ * check knows, so it is returned as well as adopted.
+ */
+export async function verifyDomain() {
+  let setup: AccountSettings["domainSetup"] = null;
+  await save({}, async () => {
+    const payload = await api.post<AccountPayload>("/account/domain/verify");
+    setup = payload.domainSetup ?? null;
+    return payload;
+  });
+  return setup as AccountSettings["domainSetup"];
 }
 
 export async function updateNotifications(

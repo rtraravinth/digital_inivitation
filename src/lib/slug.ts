@@ -1,7 +1,9 @@
+import { subdomainOrigin } from "./hosts";
+
 /**
  * A page's address segment: lowercase letters, digits and inner hyphens, one
  * segment, 2–120 characters. Mirrors SLUG_PATTERN in
- * backend/app/schemas/portfolio.py — the handle in front of it is the
+ * backend/app/schemas/portfolio.py — the subdomain in front of it is the
  * namespace, so a slug never nests.
  */
 const SLUG = /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/;
@@ -22,13 +24,15 @@ export function slugify(value: string): string {
 
 /**
  * The address a visitor actually opens, as it reads in a browser bar:
- * this app's own host and the real published route. The `facet.page`
- * vanity domain does not serve anything yet, so it is not what a card
- * should hand out as the link.
+ * `<subdomain>.<root>/<slug>` once a root domain is configured
+ * (`NEXT_PUBLIC_ROOT_DOMAIN`, see `lib/hosts.ts`), and the app's own
+ * `/p/<subdomain>/<slug>` route until then.
  */
-export function liveUrl(handle: string, slug: string): string {
-  const origin = typeof window === "undefined" ? "" : window.location.origin;
-  return `${origin}/p/${handle}/${slug}`;
+export function liveUrl(subdomain: string, slug: string): string {
+  const origin = subdomainOrigin(subdomain);
+  if (origin) return `${origin}/${slug}`;
+  const here = typeof window === "undefined" ? "" : window.location.origin;
+  return `${here}/p/${subdomain}/${slug}`;
 }
 
 /** `liveUrl` without the protocol, for display. */

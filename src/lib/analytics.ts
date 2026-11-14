@@ -149,16 +149,16 @@ function dedupeKeyFor(slug: string): string {
 }
 
 /** Recording must never surface to a visitor, so failures are swallowed. */
-export function recordView(handle: string, slug: string) {
+export function recordView(subdomain: string, slug: string) {
   const referrer = typeof document === "undefined" ? "" : document.referrer;
-  const key = `${handle}/${slug}`;
+  const key = `${subdomain}/${slug}`;
   void api
-    .post(`/public/p/${handle}/${slug}/views`, { referrer, dedupeKey: dedupeKeyFor(key) })
+    .post(`/public/p/${subdomain}/${slug}/views`, { referrer, dedupeKey: dedupeKeyFor(key) })
     .catch(() => {});
 }
 
-export function recordClick(handle: string, slug: string, sectionId: string, url = "") {
-  void api.post(`/public/p/${handle}/${slug}/clicks`, { sectionId, url }).catch(() => {});
+export function recordClick(subdomain: string, slug: string, sectionId: string, url = "") {
+  void api.post(`/public/p/${subdomain}/${slug}/clicks`, { sectionId, url }).catch(() => {});
 }
 
 /** Delete recorded views and clicks: one portfolio's, or all of them. */

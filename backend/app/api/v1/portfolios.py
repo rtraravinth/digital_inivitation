@@ -56,7 +56,7 @@ async def list_portfolios(
 async def slug_available(
     session: SessionDep,
     user: CurrentUser,
-    slug: SlugField = Query(description="The address to check, without facet.page/<handle>/"),
+    slug: SlugField = Query(description="The address to check: the part after <subdomain>.<root>/"),
 ) -> SlugAvailableOut:
     available = await PortfolioService(session).slug_available(user.id, slug)
     return SlugAvailableOut(slug=slug, available=available)

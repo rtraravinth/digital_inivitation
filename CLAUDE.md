@@ -572,6 +572,15 @@ does most of the work from there. Rules the code depends on:
   JS re-checks at event time (`reducedNow`).
 - **Paper and no-JS see the finished page.** Anything that starts hidden has
   a print rule, a reduced-motion rule and the `<noscript>` in `layout.tsx`.
+- **Smooth scrolling is Lenis, at "full" only, in a top-level window only.**
+  `smoothScrollRef` on `ThemeRoot` (`fx.tsx`) starts one Lenis per window;
+  the builder canvas (an iframe) and reduced-motion visitors keep native
+  scrolling. Lenis still moves the document natively, so observers and
+  scroll listeners need nothing. Scroll the page programmatically through
+  `jumpTo` / `toTop` (they route through Lenis when it is running), never a
+  bare `scrollTo`. Its CSS is in `globals.css`, minus the rule that disables
+  pointer events on iframes. Mark a nested scroller `data-lenis-prevent` if
+  `allowNestedScroll` misses it.
 - **Motion owns its own transforms.** On an element with a Motion `style`
   transform, depth is Motion's `z`, not the `.fx-z` class — the inline
   transform overwrites the class.

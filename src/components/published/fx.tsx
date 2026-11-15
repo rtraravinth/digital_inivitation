@@ -7,6 +7,7 @@ import {
   useSpring,
   type MotionValue,
 } from "motion/react";
+import Lenis from "lenis";
 import { createContext, useCallback, useContext } from "react";
 import type { CSSProperties, ElementType, ReactNode } from "react";
 import type { Asset, MotionLevel, Portfolio, ThemeId } from "@/lib/types";
@@ -35,6 +36,10 @@ import { groundStyle } from "./shared";
    3. **Paper and no-JS see the finished page.** Everything that starts
       hidden has escapes for print (globals.css), reduced motion (same) and
       no JavaScript (the <noscript> in app/layout.tsx).
+
+   Smooth scrolling is Lenis, on the window, at "full" only — see
+   `smoothScrollRef`. It still scrolls the document natively, so every
+   scroll listener and observer here keeps working unchanged.
    ──────────────────────────────────────────────────────────────────────── */
 
 const MotionContext = createContext<MotionLevel>("full");
@@ -84,6 +89,7 @@ export function ThemeRoot({
   return (
     <MotionContext.Provider value={level}>
       <div
+        ref={level === "full" ? smoothScrollRef : undefined}
         data-fx-root={theme}
         data-motion={level}
         className={`fx-root relative ${className}`}
@@ -94,6 +100,44 @@ export function ThemeRoot({
       </div>
     </MotionContext.Provider>
   );
+}
+
+/* ── smooth scroll ────────────────────────────────────────────────────── */
+
+/** One Lenis per window, so two theme roots never drive one scroll twice. */
+const lenises = new WeakMap<Window, Lenis>();
+
+/**
+ * Smooths wheel scrolling on the published page with Lenis.
+ *
+ * Only in a top-level window: in the builder's canvas the page is an iframe
+ * scaled with a transform and scrolled by an inner element, and Lenis on that
+ * frame's window would fight the builder for the wheel. Only at "full", and
+ * never for a visitor who asked for reduced motion (checked here, at mount,
+ * and by Lenis itself). Touch keeps the platform's own scrolling
+ * (`syncTouch` stays off), and a nested scroller — a sideways tab row, a
+ * dialog — keeps its wheel (`allowNestedScroll`). A ref callback with a
+ * cleanup, like `revealRef`, so switching the level off destroys it.
+ */
+function smoothScrollRef(node: HTMLElement | null) {
+  const view = node?.ownerDocument.defaultView;
+  if (!view || view.top !== view || lenises.has(view) || reducedNow(node)) return;
+  const lenis = new Lenis({ autoRaf: true, allowNestedScroll: true });
+  lenises.set(view, lenis);
+  return () => {
+    lenis.destroy();
+    lenises.delete(view);
+  };
+}
+
+/** Scrolls `doc` to `top`, through Lenis when it owns that window's scroll. */
+function scrollDocTo(doc: Document, top: number, smooth: boolean) {
+  const lenis = doc.defaultView && lenises.get(doc.defaultView);
+  if (lenis) {
+    lenis.scrollTo(top, { immediate: !smooth });
+    return;
+  }
+  doc.scrollingElement?.scrollTo({ top, behavior: smooth ? "smooth" : "auto" });
 }
 
 /** Writes the pointer's position on the element into `--mx` / `--my`. */
@@ -541,18 +585,15 @@ export function jumpTo(e: React.MouseEvent<HTMLAnchorElement>, id: string, offse
   const scroller = doc.scrollingElement;
   if (!target || !scroller) return;
   e.preventDefault();
-  scroller.scrollTo({
-    top: Math.max(0, target.getBoundingClientRect().top + scroller.scrollTop - offset),
-    behavior: reducedNow(target) ? "auto" : "smooth",
-  });
+  scrollDocTo(
+    doc,
+    Math.max(0, target.getBoundingClientRect().top + scroller.scrollTop - offset),
+    !reducedNow(target),
+  );
 }
 
 /** Back to the top of this page's own document; see `jumpTo`. */
 export function toTop(e: React.MouseEvent<HTMLAnchorElement>) {
   e.preventDefault();
-  const doc = e.currentTarget.ownerDocument;
-  doc.scrollingElement?.scrollTo({
-    top: 0,
-    behavior: reducedNow(e.currentTarget) ? "auto" : "smooth",
-  });
+  scrollDocTo(e.currentTarget.ownerDocument, 0, !reducedNow(e.currentTarget));
 }

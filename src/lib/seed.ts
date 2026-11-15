@@ -1,5 +1,10 @@
+import { PICTURES, PORTRAIT } from "./seed-images";
 import {
   normalize,
+  type Asset,
+  type Block,
+  type ListLook,
+  type PageBlock,
   type Portfolio,
   type PortfolioHeader,
   type Resume,
@@ -7,8 +12,12 @@ import {
 } from "./types";
 
 /** Optional fields fall back to the defaults in normalize(). */
-type Opt = "images" | "file" | "quote" | "blocks" | "hidden" | "onResume" | "tab";
-type SeedSection = Omit<Section, Opt> & Partial<Pick<Section, Opt>>;
+type Opt = "images" | "quote" | "hidden" | "onResume" | "tab";
+/** A list component written without `items` takes the seed's resume list of
+ *  its kind — normalize() hands it over, as it does for older stored data. */
+type SeedListBlock = { id: string; type: PageBlock; title: string; look: ListLook; onResume: boolean };
+type SeedSection = Omit<Section, Opt | "blocks"> &
+  Partial<Pick<Section, Opt>> & { blocks?: Array<Block | SeedListBlock> };
 
 type HeaderOpt = "portrait" | "numbers" | "dates";
 type SeedHeader = Omit<PortfolioHeader, HeaderOpt> &
@@ -16,16 +25,22 @@ type SeedHeader = Omit<PortfolioHeader, HeaderOpt> &
 
 type SeedPortfolio = Omit<
   Portfolio,
-  "theme" | "accent" | "ground" | "groundHex" | "font" | "bodyFont" | "layout" | "resume" | "sections" | "header" | "footer"
+  "theme" | "accent" | "ground" | "groundHex" | "font" | "bodyFont" | "layout" | "resume" | "resumeStatus" | "sections" | "header" | "footer"
 > &
   Partial<
-    Pick<Portfolio, "theme" | "accent" | "ground" | "groundHex" | "font" | "bodyFont" | "layout" | "footer">
+    Pick<Portfolio, "theme" | "accent" | "ground" | "groundHex" | "font" | "bodyFont" | "layout" | "footer" | "resumeStatus">
   > & {
     /** Only the full page carries one; normalize() gives the rest the defaults. */
     resume?: Partial<Resume>;
     sections: SeedSection[];
     header: SeedHeader;
   };
+
+/** A sample upload. The import turns its data URL into a stored asset and
+ *  points every gallery that names `id` at it. */
+function pic(id: string, picture: keyof typeof PICTURES, name: string): Asset {
+  return { id, name, mime: "image/jpeg", size: 0, dataUrl: PICTURES[picture] };
+}
 
 /**
  * Seed content. Every line here is lifted from, or built to match, the
@@ -183,6 +198,7 @@ const RAW: SeedPortfolio[] = [
           {
             id: "s1b1",
             type: "timeline",
+            onResume: false,
             title: "How it grew",
             items: [
               { id: "s1t1", date: "2019", title: "One kitchen, two brands", text: "A rented facility in HSR Layout and a biryani menu we still run." },
@@ -219,6 +235,7 @@ const RAW: SeedPortfolio[] = [
           {
             id: "s3b2",
             type: "stats",
+            onResume: false,
             title: "",
             items: [
               { id: "s3n1", value: "82", label: "Issues" },
@@ -246,6 +263,7 @@ const RAW: SeedPortfolio[] = [
           {
             id: "s4b1",
             type: "services",
+            onResume: false,
             title: "What I offer",
             items: [
               { id: "s4v1", title: "Financial plan", text: "A written plan for your household: goals, insurance, investments and tax, reviewed with you in two sessions.", price: "₹45,000 one-time" },
@@ -256,6 +274,7 @@ const RAW: SeedPortfolio[] = [
           {
             id: "s4b2",
             type: "tabs",
+            onResume: false,
             title: "How it works",
             items: [
               { id: "s4a1", label: "First call", text: "Thirty minutes, free. We talk about where you are and whether I am the right adviser. Often I am not, and I will say so." },
@@ -266,6 +285,7 @@ const RAW: SeedPortfolio[] = [
           {
             id: "s4b3",
             type: "faq",
+            onResume: false,
             title: "Questions families ask",
             items: [
               { id: "s4f1", question: "Do you earn commissions?", answer: "No. I am fee-only: the fee is the whole of what I earn, so no product I suggest pays me anything." },
@@ -306,12 +326,12 @@ const RAW: SeedPortfolio[] = [
         title: "Background",
         description: "",
         links: [],
-        onResume: false,
+        onResume: true,
         blocks: [
-          { id: "s8b1", type: "education", title: "Education", look: "list" },
-          { id: "s8b2", type: "skills", title: "Skills", look: "chips" },
-          { id: "s8b3", type: "certifications", title: "Certifications", look: "list" },
-          { id: "s8b4", type: "languages", title: "Languages", look: "chips" },
+          { id: "s8b1", type: "education", onResume: true, title: "Education", look: "list" },
+          { id: "s8b2", type: "skills", onResume: true, title: "Skills", look: "chips" },
+          { id: "s8b3", type: "certifications", onResume: true, title: "Certifications", look: "list" },
+          { id: "s8b4", type: "languages", onResume: true, title: "Languages", look: "chips" },
         ],
       },
       // The roles are on the resume only: the page tells the businesses as
@@ -323,8 +343,8 @@ const RAW: SeedPortfolio[] = [
         description: "",
         links: [],
         hidden: true,
-        onResume: false,
-        blocks: [{ id: "s9b1", type: "experience", title: "", look: "theme" }],
+        onResume: true,
+        blocks: [{ id: "s9b1", type: "experience", onResume: true, title: "", look: "theme" }],
       },
       {
         id: "s7",
@@ -337,6 +357,7 @@ const RAW: SeedPortfolio[] = [
           {
             id: "s7b1",
             type: "contact",
+            onResume: false,
             title: "Get in touch",
             text: "Write a line about what you need and I will come back with a time.",
             email: "rohan@slowcompounding.in",
@@ -550,6 +571,360 @@ const RAW: SeedPortfolio[] = [
         links: [],
       },
     ],
+  },
+  // Every field the editor has, filled in, so the builder and the preview
+  // show what each one draws: header extras and portrait, cover pictures,
+  // all three gallery layouts, a quote, every component (each resume
+  // list in a different look), a hidden section and a full footer.
+  {
+    id: "showcase",
+    name: "Showcase — every component",
+    slug: "showcase",
+    status: "draft",
+    summary: "Sample data: every field and component the editor offers, with pictures.",
+    meta: "11 sections · sample",
+    theme: "aurora",
+    accent: "#c2410c",
+    font: "playfair-display",
+    bodyFont: "inter",
+    header: {
+      name: "Rohan Mehta",
+      current: "Founder, Northwell Kitchens · Adviser · Writer · Bengaluru",
+      description:
+        "I run two food businesses, advise sixty households on their money and write a fortnightly letter about it. This page is the sample: every part of the editor, filled in.",
+      tags: ["Founder", "Adviser", "Writer", "Trustee", "Cook"],
+      portrait: { id: "img-portrait", name: "rohan.jpg", mime: "image/jpeg", size: 0, dataUrl: PORTRAIT },
+      numbers: [
+        { id: "sn1", value: "11", label: "Brands" },
+        { id: "sn2", value: "42", label: "People" },
+        { id: "sn3", value: "14,200", label: "Subscribers" },
+        { id: "sn4", value: "60", label: "Households" },
+      ],
+      dates: [
+        { id: "sd1", year: "2015", text: "Joined Halcyon Capital" },
+        { id: "sd2", year: "2019", text: "Northwell Kitchens founded" },
+        { id: "sd3", year: "2021", text: "First issue of the letter" },
+        { id: "sd4", year: "2023", text: "Meridian Supply Co. spun out" },
+        { id: "sd5", year: "2026", text: "Eleventh brand launched" },
+      ],
+      links: [
+        { id: "sh1", label: "Email", url: "mailto:rohan@example.com" },
+        { id: "sh2", label: "Phone", url: "tel:+919845012345" },
+        { id: "sh3", label: "Website", url: "https://example.com" },
+        { id: "sh4", label: "GitHub", url: "https://github.com/example" },
+        { id: "sh5", label: "Instagram", url: "https://instagram.com/example" },
+        { id: "sh6", label: "YouTube", url: "https://youtube.com/@example" },
+        { id: "sh7", label: "Substack", url: "https://example.substack.com" },
+      ],
+    },
+    resume: {
+      email: "rohan@example.com",
+      phone: "+91 98450 12345",
+      location: "Bengaluru, India",
+      website: "example.com",
+      experience: [
+        {
+          id: "sx1",
+          role: "Founder & CEO",
+          company: "Northwell Kitchens",
+          location: "Bengaluru",
+          start: "Jan 2019",
+          end: "",
+          current: true,
+          bullets: [
+            "Grew a cloud kitchen to eleven brands, four facilities and 42 people",
+            "Cut food cost from 38% to 29% of revenue and reached profit in 2022",
+          ],
+        },
+        {
+          id: "sx2",
+          role: "Co-founder",
+          company: "Meridian Supply Co.",
+          location: "Bengaluru",
+          start: "Apr 2023",
+          end: "",
+          current: true,
+          bullets: ["Cold-chain logistics for thirty restaurants in its first year"],
+        },
+        {
+          id: "sx3",
+          role: "Associate, Consumer",
+          company: "Halcyon Capital",
+          location: "Mumbai",
+          start: "Jul 2015",
+          end: "Dec 2018",
+          current: false,
+          bullets: ["Diligence on 20+ consumer deals; led two seed investments"],
+        },
+      ],
+      education: [
+        { id: "se1", degree: "MBA, Finance", school: "Indian School of Business", location: "Hyderabad", start: "2014", end: "2015", detail: "Dean's list" },
+        { id: "se2", degree: "B.Com (Honours)", school: "Shri Ram College of Commerce", location: "Delhi", start: "2009", end: "2012", detail: "" },
+      ],
+      skills: [
+        { id: "sk1", name: "Operations", items: ["Unit economics", "Supply chain", "Hiring", "P&L"] },
+        { id: "sk2", name: "Finance", items: ["Financial planning", "Portfolio construction", "Tax"] },
+        { id: "sk3", name: "Kitchen", items: ["Menu costing", "Food safety", "Biryani"] },
+      ],
+      certifications: [
+        { id: "sc1", name: "SEBI Registered Investment Adviser", issuer: "SEBI", date: "2020", url: "https://example.com/ria" },
+        { id: "sc2", name: "Certified Financial Planner", issuer: "FPSB India", date: "2019", url: "" },
+        { id: "sc3", name: "Food Safety Supervisor", issuer: "FSSAI", date: "2019", url: "" },
+      ],
+      languages: [
+        { id: "sl1", name: "English", level: "Fluent" },
+        { id: "sl2", name: "Hindi", level: "Native" },
+        { id: "sl3", name: "Kannada", level: "Conversational" },
+      ],
+      awards: [
+        { id: "sa1", title: "Food Entrepreneur of the Year", issuer: "Bengaluru Restaurant Forum", date: "2024", detail: "For the training kitchen." },
+        { id: "sa2", title: "Best Personal Finance Newsletter", issuer: "Indian Newsletter Awards", date: "2023", detail: "" },
+      ],
+      style: {
+        template: "sidebar",
+        paper: "a4",
+        accent: "#c2410c",
+        headingFont: "playfair-display",
+        font: "inter",
+        size: "medium",
+        spacing: "standard",
+        photo: true,
+        columns: "auto",
+        backdrop: "none",
+        backdropColor: "",
+      },
+    },
+    sections: [
+      // Cover, quote, links, a mosaic gallery and a timeline.
+      {
+        id: "ss1",
+        title: "Northwell Kitchens",
+        description:
+          "A cloud-kitchen company running eleven brands out of four Bengaluru facilities.\nFounded 2019, profitable since 2022, forty-two people on payroll.",
+        links: [
+          { id: "ss1l1", label: "Company", url: "https://example.com/northwell", icon: "globe" },
+          { id: "ss1l2", label: "Press kit", url: "https://example.com/press", icon: "document" },
+          { id: "ss1l3", label: "Book a tasting", url: "https://example.com/book", icon: "calendar" },
+        ],
+        images: [
+          pic("img-ss1-cover", "kitchenPass", "pass.jpg"),
+          pic("img-ss1-g1", "biryani", "biryani.jpg"),
+          pic("img-ss1-g2", "spices", "spices.jpg"),
+          pic("img-ss1-g3", "facility", "facility.jpg"),
+          pic("img-ss1-g4", "team", "team.jpg"),
+        ],
+        quote: { text: "The best biryani that never had a dining room.", attribution: "A food critic, Deccan Herald" },
+        blocks: [
+          { id: "ss1b1", type: "gallery", onResume: false, title: "In the kitchens", layout: "mosaic", imageIds: ["img-ss1-g1", "img-ss1-g2", "img-ss1-g3", "img-ss1-g4"] },
+          {
+            id: "ss1b2",
+            type: "timeline",
+            onResume: false,
+            title: "How it grew",
+            items: [
+              { id: "ss1t1", date: "2019", title: "One kitchen, two brands", text: "A rented facility in HSR Layout." },
+              { id: "ss1t2", date: "2021", title: "Four facilities", text: "Expanded across the city without outside money." },
+              { id: "ss1t3", date: "2022", title: "Profitable", text: "Every brand pays for itself." },
+              { id: "ss1t4", date: "2026", title: "Eleven brands", text: "And a training kitchen of our own." },
+            ],
+          },
+        ],
+      },
+      // The two other gallery layouts.
+      {
+        id: "ss2",
+        title: "Photographs",
+        description: "The same pictures as a grid, then as a strip a visitor swipes along.",
+        links: [],
+        onResume: false,
+        images: [
+          pic("img-ss2-cover", "coldChain", "truck.jpg"),
+          pic("img-ss2-g1", "school", "school.jpg"),
+          pic("img-ss2-g2", "letter", "letter.jpg"),
+          pic("img-ss2-g3", "biryani", "biryani-2.jpg"),
+          pic("img-ss2-s1", "facility", "facility-2.jpg"),
+          pic("img-ss2-s2", "spices", "spices-2.jpg"),
+          pic("img-ss2-s3", "team", "team-2.jpg"),
+          pic("img-ss2-s4", "kitchenPass", "pass-2.jpg"),
+        ],
+        blocks: [
+          { id: "ss2b1", type: "gallery", onResume: false, title: "Grid", layout: "grid", imageIds: ["img-ss2-g1", "img-ss2-g2", "img-ss2-g3"] },
+          { id: "ss2b2", type: "gallery", onResume: false, title: "Strip", layout: "strip", imageIds: ["img-ss2-s1", "img-ss2-s2", "img-ss2-s3", "img-ss2-s4"] },
+        ],
+      },
+      // The resume's lists, one look each.
+      {
+        id: "ss3",
+        title: "Experience",
+        description: "",
+        links: [],
+        onResume: true,
+        blocks: [{ id: "ss3b1", type: "experience", onResume: true, title: "Roles", look: "timeline" }],
+      },
+      {
+        id: "ss4",
+        title: "Education and credentials",
+        description: "",
+        links: [],
+        onResume: true,
+        blocks: [
+          { id: "ss4b1", type: "education", onResume: true, title: "Education", look: "grid" },
+          { id: "ss4b2", type: "certifications", onResume: true, title: "Certifications", look: "list" },
+          { id: "ss4b3", type: "awards", onResume: true, title: "Awards", look: "spotlight" },
+        ],
+      },
+      {
+        id: "ss5",
+        title: "Skills and languages",
+        description: "",
+        links: [],
+        onResume: true,
+        blocks: [
+          { id: "ss5b1", type: "skills", onResume: true, title: "Skills", look: "chips" },
+          { id: "ss5b2", type: "languages", onResume: true, title: "Languages", look: "carousel" },
+        ],
+      },
+      // Services, numbers, tabs and questions.
+      {
+        id: "ss6",
+        title: "Advisory practice",
+        description:
+          "SEBI-registered, fee-only adviser to sixty households. No commissions and no product sales.",
+        images: [pic("img-ss6-cover", "letter", "letter-cover.jpg")],
+        links: [{ id: "ss6l1", label: "How it works", url: "https://example.com/advisory", icon: "document" }],
+        blocks: [
+          {
+            id: "ss6b1",
+            type: "services",
+            onResume: false,
+            title: "What I offer",
+            items: [
+              { id: "ss6v1", title: "Financial plan", text: "A written plan for your household, in two sessions.", price: "₹45,000 one-time" },
+              { id: "ss6v2", title: "Ongoing advice", text: "Quarterly reviews and a line for the questions in between.", price: "₹90,000 a year" },
+              { id: "ss6v3", title: "Second opinion", text: "One session on something you already hold.", price: "₹8,000" },
+            ],
+          },
+          {
+            id: "ss6b2",
+            type: "stats",
+            onResume: false,
+            title: "The practice in numbers",
+            items: [
+              { id: "ss6n1", value: "60", label: "Households" },
+              { id: "ss6n2", value: "0", label: "Commissions" },
+              { id: "ss6n3", value: "4", label: "New families a year" },
+            ],
+          },
+          {
+            id: "ss6b3",
+            type: "tabs",
+            onResume: false,
+            title: "How it works",
+            items: [
+              { id: "ss6a1", label: "First call", text: "Thirty minutes, free, to see whether I am the right adviser." },
+              { id: "ss6a2", label: "The plan", text: "Two sessions and a written plan within three weeks." },
+              { id: "ss6a3", label: "After", text: "You implement; I never hold your money. Reviews every quarter." },
+            ],
+          },
+          {
+            id: "ss6b4",
+            type: "faq",
+            onResume: false,
+            title: "Questions",
+            items: [
+              { id: "ss6f1", question: "Do you earn commissions?", answer: "No. The fee is the whole of what I earn." },
+              { id: "ss6f2", question: "Do you work outside Bengaluru?", answer: "Yes, most sessions are on video." },
+              { id: "ss6f3", question: "Is there a minimum?", answer: "No minimum portfolio size." },
+            ],
+          },
+        ],
+      },
+      // Testimonials and clients.
+      {
+        id: "ss7",
+        title: "What people say",
+        description: "Families, restaurants and editors I have worked with.",
+        links: [],
+        onResume: false,
+        blocks: [
+          {
+            id: "ss7b1",
+            type: "testimonials",
+            onResume: false,
+            title: "Kind words",
+            items: [
+              { id: "ss7q1", quote: "He told us not to buy the policy our bank was pushing. That saved us lakhs.", name: "Priya S.", role: "Advisory client" },
+              { id: "ss7q2", quote: "Meridian made cold storage something a twelve-table restaurant can afford.", name: "Arjun K.", role: "Owner, Tiffin House" },
+              { id: "ss7q3", quote: "The only newsletter about money my parents finish.", name: "Meera N.", role: "Subscriber" },
+            ],
+          },
+          {
+            id: "ss7b2",
+            type: "clients",
+            onResume: false,
+            title: "Worked with",
+            items: [
+              { id: "ss7c1", name: "Tiffin House", url: "https://example.com/tiffin" },
+              { id: "ss7c2", name: "Halcyon Capital", url: "" },
+              { id: "ss7c3", name: "Sanjeevani Trust", url: "https://example.com/trust" },
+              { id: "ss7c4", name: "Deccan Herald", url: "" },
+              { id: "ss7c5", name: "Swiggy", url: "" },
+              { id: "ss7c6", name: "Zomato", url: "" },
+            ],
+          },
+        ],
+      },
+      // A plain section: no components, just the section fields.
+      {
+        id: "ss8",
+        title: "Trustee, Sanjeevani Schools Trust",
+        description: "On the board of a trust running three low-fee schools in north Karnataka. I chair the finance committee.",
+        images: [pic("img-ss8-cover", "school", "school-cover.jpg")],
+        links: [{ id: "ss8l1", label: "Trust", url: "https://example.com/trust", icon: "globe" }],
+      },
+      // On the resume, off the page.
+      {
+        id: "ss9",
+        title: "Draft: a section kept off the page",
+        description: "Hidden sections stay in the editor and off the published page. This one still prints on the resume.",
+        links: [],
+        hidden: true,
+      },
+      {
+        id: "ss10",
+        title: "Work with me",
+        description: "Advisory, speaking or a conversation about the businesses. I answer within two working days.",
+        links: [],
+        onResume: false,
+        blocks: [
+          {
+            id: "ss10b1",
+            type: "contact",
+            onResume: false,
+            title: "Get in touch",
+            text: "Write a line about what you need and I will come back with a time.",
+            email: "rohan@example.com",
+            phone: "+91 98450 12345",
+            location: "Indiranagar, Bengaluru",
+            ctaLabel: "Book an intro call",
+            ctaUrl: "https://example.com/book",
+            form: true,
+          },
+        ],
+      },
+    ],
+    footer: {
+      headline: "Let’s talk about your money, or your kitchen.",
+      text: "Four new advisory families a year, and a standing coffee for anyone building a food business.",
+      ctaLabel: "Email Rohan",
+      ctaUrl: "mailto:rohan@example.com",
+      links: [
+        { id: "sf1", label: "The letter", url: "https://example.substack.com" },
+        { id: "sf2", label: "Instagram", url: "https://instagram.com/example" },
+      ],
+      note: "© 2026 Rohan Mehta · Sample data",
+      showHeaderLinks: true,
+    },
   },
 ];
 

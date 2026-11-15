@@ -18,7 +18,7 @@ import {
 } from "./themes";
 
 /**
- * The owner's own preview, at /preview/<id>.
+ * The owner's own preview, at /preview/page/<id>.
  *
  * `/p/<subdomain>/<slug>` only exists while a portfolio is live — the API
  * answers 404 for a draft on purpose — so pointing the app's Preview buttons

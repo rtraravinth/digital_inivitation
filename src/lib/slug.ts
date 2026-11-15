@@ -35,6 +35,11 @@ export function liveUrl(subdomain: string, slug: string): string {
   return `${here}/p/${subdomain}/${slug}`;
 }
 
+/** Where a published resume lives: the page's address plus `/resume`. */
+export function resumeUrl(subdomain: string, slug: string): string {
+  return `${liveUrl(subdomain, slug)}/resume`;
+}
+
 /** `liveUrl` without the protocol, for display. */
 export function displayUrl(url: string): string {
   return url.replace(/^https?:\/\//, "");

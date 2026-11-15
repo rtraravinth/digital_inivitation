@@ -2,20 +2,20 @@
 
 import { AnimatePresence, motion } from "motion/react";
 import Link from "next/link";
-import { useState } from "react";
+import { useId, useState } from "react";
 import { QrCode } from "./QrCode";
 import { ICON, Icon, Modal } from "./ui";
 import { useAccount } from "@/lib/account";
 import { LinkIcon, iconFor } from "@/lib/icons";
-import { displayUrl, liveUrl } from "@/lib/slug";
-import type { Portfolio } from "@/lib/types";
+import { displayUrl, liveUrl, resumeUrl } from "@/lib/slug";
+import { isFrozen, type Portfolio } from "@/lib/types";
 
 /**
  * Sharing one page: its address, a code a phone can scan, and the places
  * people actually paste it. Rendered inside an `<AnimatePresence>`.
  *
- * Only live pages are offered: a draft's address answers 404 until it is
- * published, so there is nothing to send.
+ * Only what is live is offered — the page, the resume, or both: a draft's
+ * address answers 404 until it is published, so there is nothing to send.
  *
  * Every link here is the page's real address — the route that serves it.
  * It used to be built from the facet.page vanity domain, which serves
@@ -34,12 +34,17 @@ export function ShareDialog({
   const [id, setId] = useState(initialId);
   const [note, setNote] = useState("");
   const [copied, setCopied] = useState(false);
+  const [which, setWhich] = useState<"page" | "resume">("page");
+  const uid = useId();
 
-  const shareable = portfolios.filter((x) => x.status === "live");
+  const shareable = portfolios.filter(isFrozen);
   const p = shareable.find((x) => x.id === id) ?? shareable[0];
   if (!p) return null;
 
-  const url = subdomain ? liveUrl(subdomain, p.slug) : "";
+  // Whichever of the two addresses is live; the picker only appears for both.
+  const both = p.status === "live" && p.resumeStatus === "live";
+  const target = both ? which : p.status === "live" ? "page" : "resume";
+  const url = subdomain ? (target === "resume" ? resumeUrl(subdomain, p.slug) : liveUrl(subdomain, p.slug)) : "";
   const canShare = !!url;
   const signature = `${p.header.name || p.name}\n${p.header.current}\n${url}`;
   const nativeShare = typeof navigator !== "undefined" && typeof navigator.share === "function";
@@ -97,17 +102,27 @@ export function ShareDialog({
   ];
 
   return (
-    <Modal title="Share your page" description="Send people straight to it." onClose={onClose} width={520}>
+    <Modal title={target === "resume" ? "Share your resume" : "Share your page"} description="Send people straight to it." onClose={onClose} width={520}>
       <div className="flex flex-col gap-4">
         {shareable.length > 1 && (
           <div className="field">
-            <label htmlFor="share-page">Page</label>
-            <select id="share-page" className="input" value={p.id} onChange={(e) => setId(e.target.value)}>
+            <label htmlFor={`${uid}-page`}>Portfolio</label>
+            <select id={`${uid}-page`} className="input" value={p.id} onChange={(e) => setId(e.target.value)}>
               {shareable.map((x) => (
                 <option key={x.id} value={x.id}>
                   {x.name}
                 </option>
               ))}
+            </select>
+          </div>
+        )}
+
+        {both && (
+          <div className="field">
+            <label htmlFor={`${uid}-which`}>Address</label>
+            <select id={`${uid}-which`} className="input" value={which} onChange={(e) => setWhich(e.target.value as "page" | "resume")}>
+              <option value="page">Page</option>
+              <option value="resume">Resume</option>
             </select>
           </div>
         )}
@@ -166,7 +181,7 @@ export function ShareDialog({
             >
               {/* The code paints its own white quiet zone; a second white
                   backing here hid its download button on a dark ground. */}
-              <QrCode text={url} size={132} downloadName={`facet-${p.slug}.png`} downloadVariant="attached" />
+              <QrCode text={url} size={132} downloadName={`facet-${p.slug}${target === "resume" ? "-resume" : ""}.png`} downloadVariant="attached" />
               <span className="text-center text-[13px] leading-relaxed text-muted sm:text-left">
                 <span className="mb-1 block text-[14px] font-medium" style={{ color: "var(--color-ink)" }}>
                   Scan to open

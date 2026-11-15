@@ -10,7 +10,7 @@ import type { Resume, ResumeBackdrop } from "./types";
    Two kinds, because a printed resume is several pages but one sheet:
    - `page` layers repeat (a pattern, an edge stripe, a paper tint).
    - `corner` layers are placed once, at the top of the first page.
-   In print all of them go on the page itself — `/resume/[id]` puts them on
+   In print all of them go on the page itself — `/preview/resume/[id]` puts them on
    `html` — so a pattern reaches every page's edges, margins included, and
    a corner sits flush with the paper's top rather than below its margin.
    ──────────────────────────────────────────────────────────────────────── */

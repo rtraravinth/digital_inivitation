@@ -6,7 +6,18 @@ import { ICON, Icon } from "../ui";
 import { Glyph } from "@/lib/glyphs";
 import { ApiError, api } from "@/lib/api";
 import { flushPendingSaves, newId, usePortfolios } from "@/lib/store";
-import type { Portfolio } from "@/lib/types";
+import {
+  BLOCK_TYPES,
+  emptyBlock,
+  isFrozen,
+  isListBlock,
+  isPageBlock,
+  printsOnResume,
+  type Block,
+  type PageBlock,
+  type Portfolio,
+  type ResumeListBlock,
+} from "@/lib/types";
 
 /* ── ATS check ─────────────────────────────────────────────────────────────
    The resume builder's third inspector tab. Paste (or drop) a job
@@ -264,7 +275,7 @@ function Result({
   onEdit: () => void;
 }) {
   const reduced = useReducedMotion();
-  const live = p.status === "live";
+  const live = isFrozen(p);
   const actions = report.suggestions.filter((s) => s.kind !== "tip");
   const tips = report.suggestions.filter((s) => s.kind === "tip");
   const changed = done.size > 0;
@@ -386,7 +397,7 @@ function Result({
           <Heading>Suggestions · {report.suggestions.length}</Heading>
           {live && actions.length > 0 && (
             <p className="m-0 mb-2.5 text-[12px] leading-snug text-muted">
-              This page is live, so its content is frozen. Unpublish it to apply a suggestion.
+              This portfolio is live, so its content is frozen. Unpublish it to apply a suggestion.
             </p>
           )}
           <ul className="m-0 flex list-none flex-col gap-2 p-0">
@@ -468,31 +479,64 @@ function SuggestionCard({ p, s, done, disabled, onDone }: { p: Portfolio; s: Sug
  * uses, so it saves, and shows in the sheet beside the panel, at once.
  */
 function useApply(p: Portfolio) {
-  const { updateResume, updatePortfolio, addSectionAsync, updateSection } = usePortfolios();
+  const { updatePortfolio, addSectionAsync, updateSection } = usePortfolios();
+
+  const printing = (list: PageBlock) =>
+    p.sections.find((sec) => sec.onResume && sec.blocks.some((b) => b.type === list && printsOnResume(b)));
+
+  /**
+   * Make a list print, and optionally change its entries on the way. A list
+   * component holds its own entries, so this works on one component: the
+   * first that already prints, else the first of its kind (preferring one
+   * with entries), switched on along with its section; with none, a section
+   * is added for it, kept off the page so it reaches the resume and nothing
+   * else.
+   */
+  const printList = async (list: PageBlock, edit: (b: ResumeListBlock) => ResumeListBlock = (b) => b): Promise<boolean> => {
+    const ofKind = (b: Block): b is ResumeListBlock => isListBlock(b) && b.type === list;
+    const holder =
+      printing(list) ??
+      p.sections.find((sec) => sec.blocks.some((b) => ofKind(b) && b.items.length > 0)) ??
+      p.sections.find((sec) => sec.blocks.some(ofKind));
+    if (holder) {
+      const target =
+        holder.blocks.find((b) => ofKind(b) && printsOnResume(b) && holder.onResume) ??
+        holder.blocks.find((b) => ofKind(b) && b.items.length > 0) ??
+        holder.blocks.find(ofKind);
+      updateSection(p.id, holder.id, (sec) => ({
+        ...sec,
+        onResume: true,
+        blocks: sec.blocks.map((b) => (b.id === target?.id && ofKind(b) ? { ...edit(b), onResume: true } : b)),
+      }));
+      return true;
+    }
+    const added = await addSectionAsync(p.id);
+    if (!added) return false;
+    const fresh = emptyBlock(list, newId(), newId()) as ResumeListBlock;
+    updateSection(p.id, added, (sec) => ({
+      ...sec,
+      title: BLOCK_TYPES.find((t) => t.id === list)?.name ?? list,
+      hidden: true,
+      onResume: true,
+      blocks: [{ ...edit(fresh), onResume: true }],
+    }));
+    return true;
+  };
+
+  /** One skill added to a Skills component's first group, once. */
+  const withSkill = (skill: string) => (b: ResumeListBlock): ResumeListBlock => {
+    if (b.type !== "skills") return b;
+    const has = b.items.some((g) => g.items.some((i) => i.trim().toLowerCase() === skill.toLowerCase()));
+    if (has) return b;
+    const [first, ...rest] = b.items;
+    const items = first ? [{ ...first, items: [...first.items, skill] }, ...rest] : [{ id: newId(), name: "", items: [skill] }];
+    return { ...b, items };
+  };
 
   return async (s: Suggestion): Promise<boolean> => {
     switch (s.kind) {
       case "add_skill": {
-        updateResume(p.id, (r) => {
-          const [first, ...rest] = r.skills;
-          const has = r.skills.some((g) => g.items.some((i) => i.trim().toLowerCase() === s.value.toLowerCase()));
-          const skills = has ? r.skills : first ? [{ ...first, items: [...first.items, s.value] }, ...rest] : [{ id: newId(), name: "", items: [s.value] }];
-          return { ...r, skills, hidden: r.hidden.filter((b) => b !== "skills") };
-        });
-        // A list prints once a section holds it. With none, add one that is
-        // kept off the page, so the skill reaches the resume and nothing else.
-        if (!p.sections.some((sec) => sec.blocks.some((b) => b.type === "skills"))) {
-          const added = await addSectionAsync(p.id);
-          if (!added) return false;
-          updateSection(p.id, added, (sec) => ({
-            ...sec,
-            title: "Skills",
-            hidden: true,
-            onResume: false,
-            blocks: [{ id: newId(), type: "skills", title: "", look: "theme" }],
-          }));
-        }
-        return true;
+        return printList("skills", withSkill(s.value));
       }
       case "use_title":
         updatePortfolio(p.id, (prev) => {
@@ -502,8 +546,7 @@ function useApply(p: Portfolio) {
         });
         return true;
       case "show_block":
-        updateResume(p.id, (r) => ({ ...r, hidden: r.hidden.filter((b) => b !== s.value) }));
-        return true;
+        return isPageBlock(s.value) ? printList(s.value) : false;
       default:
         return false;
     }

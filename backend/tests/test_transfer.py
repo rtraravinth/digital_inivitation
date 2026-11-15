@@ -8,6 +8,8 @@ import io
 import pytest
 from PIL import Image
 
+from tests.test_seed_and_slugs import seed_payload
+
 
 def legacy_data_url() -> str:
     buffer = io.BytesIO()
@@ -141,6 +143,91 @@ async def test_a_legacy_export_with_a_data_uri_becomes_a_real_asset(auth_client)
 
     # And the bytes are actually there.
     assert (await auth_client.get(image["url"])).status_code == 200
+
+
+async def test_a_gallery_follows_its_pictures_to_their_new_ids(auth_client):
+    """Pictures from data URIs are stored under new ids; a gallery naming the
+    payload's ids must be pointed at those, or it would draw nothing."""
+    payload = legacy_export()
+    section = payload[0]["sections"][0]
+    picture = section.pop("image")
+    section["images"] = [
+        {**picture, "id": "cover"},
+        {**picture, "id": "first", "dataUrl": legacy_data_url()},
+    ]
+    # The same bytes twice would be one picture; make the second different.
+    buffer = io.BytesIO()
+    Image.new("RGB", (250, 250), (200, 10, 10)).save(buffer, format="PNG")
+    section["images"][1]["dataUrl"] = (
+        "data:image/png;base64," + base64.b64encode(buffer.getvalue()).decode()
+    )
+    section["blocks"] = [
+        {"id": "g", "type": "gallery", "title": "", "layout": "grid", "imageIds": ["first", "gone"]}
+    ]
+
+    response = await auth_client.post(
+        "/api/v1/import", json={"mode": "merge", "portfolios": payload}
+    )
+    assert response.status_code == 200
+
+    imported = next(
+        p for p in (await auth_client.get("/api/v1/portfolios")).json() if p["slug"] == "legacy-x"
+    )
+    full = (await auth_client.get(f"/api/v1/portfolios/{imported['id']}")).json()
+    stored = full["sections"][0]
+    assert len(stored["images"]) == 2
+    assert stored["blocks"][0]["imageIds"] == [stored["images"][1]["id"]]
+
+
+async def test_the_showcase_seed_imports_every_picture_and_component(auth_client):
+    seed = seed_payload()
+    showcase = [p for p in seed if p["slug"] == "showcase"]
+    response = await auth_client.post(
+        "/api/v1/import", json={"mode": "merge", "portfolios": showcase}
+    )
+    assert response.status_code == 200
+
+    imported = next(
+        p for p in (await auth_client.get("/api/v1/portfolios")).json() if p["slug"] == "showcase"
+    )
+    full = (await auth_client.get(f"/api/v1/portfolios/{imported['id']}")).json()
+    assert full["header"]["portrait"] is not None
+    sections = {s["title"]: s for s in full["sections"]}
+    assert len(sections) == len(showcase[0]["sections"])
+
+    kitchens = sections["Northwell Kitchens"]
+    # A section offers no file to download any more; an export that still
+    # carries one imports without it.
+    assert "file" not in kitchens
+    held = {image["id"] for image in kitchens["images"]}
+    for title in ("Northwell Kitchens", "Photographs"):
+        for block in sections[title]["blocks"]:
+            if block["type"] == "gallery":
+                assert block["imageIds"]
+                assert set(block["imageIds"]) <= {i["id"] for i in sections[title]["images"]}
+    assert len(held) == 5
+
+    kinds = {b["type"] for s in full["sections"] for b in s["blocks"]}
+    assert kinds == {
+        "text",
+        "links",
+        "quote",
+        "gallery",
+        "timeline",
+        "experience",
+        "education",
+        "certifications",
+        "awards",
+        "skills",
+        "languages",
+        "services",
+        "stats",
+        "tabs",
+        "faq",
+        "testimonials",
+        "clients",
+        "contact",
+    }
 
 
 async def test_a_legacy_export_keeps_its_content(auth_client):
@@ -401,10 +488,31 @@ async def test_an_older_exports_page_lists_become_sections(auth_client):
     # Resume order, ahead of the page's own; awards was on but empty, and
     # languages had entries but was never on the page.
     assert [s["title"] for s in detail["sections"]] == ["Experience", "Skills", "A project"]
+    # The section is how the list reaches the resume, so it is on the resume,
+    # with its list's "Print on your resume" checked.
     assert detail["sections"][0]["blocks"] == [
-        {"id": "list-experience", "type": "experience", "title": "", "look": "timeline"}
+        {
+            "id": "list-experience",
+            "type": "experience",
+            "title": "",
+            "look": "timeline",
+            "onResume": True,
+            # The entries it used to draw from the resume are its own now.
+            "items": [
+                {
+                    "id": "e",
+                    "role": "Founder",
+                    "company": "Northwell",
+                    "location": "",
+                    "start": "",
+                    "end": "",
+                    "current": False,
+                    "bullets": [],
+                }
+            ],
+        }
     ]
-    assert detail["sections"][0]["onResume"] is False
+    assert detail["sections"][0]["onResume"] is True
     assert "pageBlocks" not in detail["resume"]
 
 

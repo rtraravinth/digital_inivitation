@@ -344,7 +344,7 @@ function StackCard({
           {section.description && (
             <p className="whitespace-pre-line text-muted m-0 text-[16px] leading-[1.7]">{section.description}</p>
           )}
-          <SectionAside p={p} section={section} />
+          <SectionAside section={section} />
           <SectionLinks p={p} section={section} />
         </div>
         <div className="relative min-h-[220px] p-3 md:p-4">

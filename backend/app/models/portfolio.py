@@ -25,6 +25,7 @@ from sqlalchemy import (
     String,
     Text,
     UniqueConstraint,
+    text,
 )
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -40,6 +41,7 @@ from app.models.enums import (
     DEFAULT_TRACKING,
     FONTS,
     GROUNDS,
+    RESUME_STATUSES,
     STATUSES,
     THEMES,
     sql_in,
@@ -72,6 +74,9 @@ class Portfolio(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         CheckConstraint(f"font IN ({sql_in(FONTS)})", name="font_is_known"),
         CheckConstraint(f"body_font IN ({sql_in(FONTS)})", name="body_font_is_known"),
         CheckConstraint(f"status IN ({sql_in(STATUSES)})", name="status_is_known"),
+        CheckConstraint(
+            f"resume_status IN ({sql_in(RESUME_STATUSES)})", name="resume_status_is_known"
+        ),
         Index("ix_portfolios_user_id_created_at", "user_id", "created_at"),
         # The address is <subdomain>.facetfolio.com/<slug>, so a slug only has to be
         # unique within the account that owns it. Two people can both publish
@@ -88,6 +93,10 @@ class Portfolio(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     # there was nothing else in the path to namespace it.
     slug: Mapped[str] = mapped_column(String(120), nullable=False, index=True)
     status: Mapped[str] = mapped_column(String(16), nullable=False, default="empty")
+    # Whether the resume is published, apart from the page's own `status`.
+    resume_status: Mapped[str] = mapped_column(
+        String(16), nullable=False, default="draft", server_default=text("'draft'")
+    )
     summary: Mapped[str] = mapped_column(Text, nullable=False, default="")
 
     theme: Mapped[str] = mapped_column(String(24), nullable=False, default=DEFAULT_THEME)
@@ -211,12 +220,7 @@ class Section(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         Boolean, nullable=False, default=True, server_default="true"
     )
 
-    file_asset_id: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("assets.id", ondelete="SET NULL"), nullable=True
-    )
-
     portfolio: Mapped[Portfolio] = relationship(back_populates="sections")
-    file: Mapped[Asset | None] = relationship(foreign_keys=[file_asset_id], lazy="selectin")
     #: The section's pictures, in order. A table rather than a JSONB list of
     #: ids: every upload reference is a foreign key, so asset release and the
     #: public asset route keep asking one kind of question.

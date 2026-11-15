@@ -148,6 +148,24 @@ async def unpublish(portfolio: OwnedPortfolio, session: SessionDep) -> Portfolio
     return service.to_out(await service.unpublish(portfolio))
 
 
+@router.post(
+    "/{portfolio_id}/resume/publish", response_model=PortfolioOut, summary="Publish the resume"
+)
+async def publish_resume(portfolio: OwnedPortfolio, session: SessionDep) -> PortfolioOut:
+    service = PortfolioService(session)
+    return service.to_out(await service.publish_resume(portfolio))
+
+
+@router.post(
+    "/{portfolio_id}/resume/unpublish",
+    response_model=PortfolioOut,
+    summary="Unpublish the resume",
+)
+async def unpublish_resume(portfolio: OwnedPortfolio, session: SessionDep) -> PortfolioOut:
+    service = PortfolioService(session)
+    return service.to_out(await service.unpublish_resume(portfolio))
+
+
 @router.delete(
     "/{portfolio_id}", status_code=status.HTTP_204_NO_CONTENT, summary="Delete a portfolio"
 )

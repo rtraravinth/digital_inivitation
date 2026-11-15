@@ -10,6 +10,7 @@ from __future__ import annotations
 import base64
 import binascii
 import re
+import uuid
 from typing import Any
 
 from pydantic import BaseModel, TypeAdapter, ValidationError
@@ -25,6 +26,7 @@ from app.models.enums import (
     FONTS,
     GROUNDS,
     LEGACY_THEMES,
+    RESUME_STATUSES,
     SECTION_BLOCKS_MAX,
     SECTION_IMAGES_MAX,
     SECTIONS_MAX,
@@ -36,7 +38,7 @@ from app.models.enums import (
 from app.models.portfolio import default_layout
 from app.schemas.account import LinkItem
 from app.schemas.asset import asset_out
-from app.schemas.blocks import Block
+from app.schemas.blocks import Block, fix_resume_switches
 from app.schemas.portfolio import ACCENT_PATTERN, Footer, Layout
 from app.schemas.resume import resume_from_stored
 from app.schemas.section import DateEntry, Quote, Stat
@@ -70,6 +72,7 @@ class TransferService:
             "name": portfolio.name,
             "slug": portfolio.slug,
             "status": portfolio.status,
+            "resumeStatus": portfolio.resume_status,
             "summary": portfolio.summary,
             "theme": portfolio.theme,
             "accent": portfolio.accent,
@@ -101,7 +104,6 @@ class TransferService:
                     "hidden": section.hidden,
                     "onResume": section.on_resume,
                     "images": [_asset_dict(image.asset) for image in section.images],
-                    "file": _asset_dict(section.file),
                     "blocks": list(section.blocks or []),
                 }
                 for section in portfolio.sections
@@ -165,6 +167,9 @@ class TransferService:
             # Always a draft: publishing is its own step with its own checks,
             # and a file must not be a way around it.
             status=_one_of(raw.get("status"), STATUSES, "draft") if trusted else "draft",
+            resume_status=(
+                _one_of(raw.get("resumeStatus"), RESUME_STATUSES, "draft") if trusted else "draft"
+            ),
             summary=_text(raw.get("summary"), 2000),
             # An export from an older build names a retired theme; it lands on
             # the one that replaced it rather than on the default.
@@ -182,7 +187,9 @@ class TransferService:
             layout=_layout_of(raw.get("layout")),
             # An export from before resumes existed has none; an invalid one
             # lands on the defaults rather than failing the whole import.
-            resume=resume_from_stored(raw.get("resume")).model_dump(by_alias=True),
+            # The lists live in the list components now; an older export's
+            # shared lists are handed to its components below, then dropped.
+            resume=_without_lists(resume_from_stored(raw.get("resume")).model_dump(by_alias=True)),
             footer=_footer_of(raw.get("footer")),
         )
 
@@ -197,44 +204,54 @@ class TransferService:
             portrait_asset_id=await self._restore_asset(user, header_raw.get("portrait")),
         )
 
-        portfolio.sections = [
-            Section(
-                position=index,
-                title=_text(section.get("title"), 500),
-                description=_text(section.get("description"), 20_000),
-                tab=_tab_of(section),
-                links=_valid(section.get("links"), LinkItem, 60),
-                quote=_quote_of(section.get("quote")),
-                hidden=bool(section.get("hidden")),
-                on_resume=bool(section.get("onResume", True)),
-                file_asset_id=await self._restore_asset(user, section.get("file")),
-                blocks=_blocks_of(section),
-                images=[
-                    SectionImage(asset_id=asset_id, position=position)
-                    for position, asset_id in enumerate(await self._restore_images(user, section))
-                ],
+        portfolio.sections = []
+        hidden = portfolio.resume.get("hidden") or []
+        old_lists = resume_from_stored(raw.get("resume")).model_dump(by_alias=True)
+        for index, section in enumerate(sections_raw[:SECTIONS_MAX]):
+            restored = await self._restore_images(user, section)
+            on_resume, blocks = fix_resume_switches(
+                bool(section.get("onResume", True)),
+                _blocks_of(_with_list_entries(section, old_lists)),
+                hidden,
             )
-            for index, section in enumerate(sections_raw[:SECTIONS_MAX])
-        ]
+            portfolio.sections.append(
+                Section(
+                    position=index,
+                    title=_text(section.get("title"), 500),
+                    description=_text(section.get("description"), 20_000),
+                    tab=_tab_of(section),
+                    links=_valid(section.get("links"), LinkItem, 60),
+                    quote=_quote_of(section.get("quote")),
+                    hidden=bool(section.get("hidden")),
+                    on_resume=on_resume,
+                    blocks=_regallery(blocks, restored),
+                    images=[
+                        SectionImage(asset_id=asset_id, position=position)
+                        for position, (_, asset_id) in enumerate(restored)
+                    ],
+                )
+            )
 
         self.session.add(portfolio)
         await self.session.flush()
         return portfolio
 
-    async def _restore_images(self, user: User, section: dict[str, Any]) -> list:
+    async def _restore_images(self, user: User, section: dict[str, Any]) -> list[tuple[str, Any]]:
         """A section's pictures, from ``images`` or an older export's single
-        ``image``. Unreadable ones drop out; repeats are kept once."""
+        ``image``, each as (the id the payload gave it, the stored asset's
+        id). Unreadable ones drop out; repeats are kept once."""
         raw = section.get("images")
         if not isinstance(raw, list):
             raw = [section.get("image")]
-        restored = []
+        restored: list[tuple[str, Any]] = []
         for item in raw:
             if len(restored) >= SECTION_IMAGES_MAX:
                 # Stop before decoding and storing pictures that would be cut.
                 break
             asset_id = await self._restore_asset(user, item)
-            if asset_id is not None and asset_id not in restored:
-                restored.append(asset_id)
+            if asset_id is not None and all(asset_id != kept for _, kept in restored):
+                given = item.get("id") if isinstance(item, dict) else None
+                restored.append((str(given or asset_id), asset_id))
         return restored
 
     async def _restore_asset(self, user: User, raw: Any):
@@ -247,7 +264,7 @@ class TransferService:
         if not isinstance(raw, dict):
             return None
 
-        asset_id = raw.get("id")
+        asset_id = _uuid_or_none(raw.get("id"))
         if asset_id:
             owned = await self.session.scalar(
                 select(Asset).where(Asset.id == asset_id, Asset.user_id == user.id)
@@ -343,16 +360,67 @@ def _page_block_sections(resume: Any) -> list[dict[str, Any]]:
     ]
 
 
+_LIST_KINDS = ("experience", "education", "skills", "certifications", "languages", "awards")
+
+
+def _without_lists(resume: dict[str, Any]) -> dict[str, Any]:
+    """A stored resume with its shared lists emptied: entries live in the
+    list components (migration ``e8b4d1a7c3f2``)."""
+    return {**resume, **{kind: [] for kind in _LIST_KINDS}}
+
+
+def _with_list_entries(section: dict[str, Any], lists: dict[str, Any]) -> dict[str, Any]:
+    """An older export's list components, given the entries they used to
+    place: before each component held its own, it drew the resume's one
+    list of its kind. A component that already carries ``items`` keeps them."""
+    blocks = section.get("blocks")
+    if not isinstance(blocks, list):
+        return section
+    filled = [
+        {**b, "items": lists.get(b["type"]) or []}
+        if isinstance(b, dict) and b.get("type") in _LIST_KINDS and "items" not in b
+        else b
+        for b in blocks
+    ]
+    return {**section, "blocks": filled}
+
+
 def _blocks_of(section: dict[str, Any]) -> list[dict[str, Any]]:
     """The components that validate. One malformed component is dropped
     rather than failing the import of everything around it."""
     kept = []
     for raw in section.get("blocks") or []:
         try:
-            kept.append(_BLOCK.validate_python(raw).model_dump(by_alias=True))
+            kept.append(_BLOCK.validate_python(raw).model_dump(by_alias=True, exclude_none=True))
         except ValidationError:
             continue
     return kept[:SECTION_BLOCKS_MAX]
+
+
+def _uuid_or_none(raw: Any) -> uuid.UUID | None:
+    """An asset id worth looking up. A payload may name its pictures with
+    any string (the seed does, so its galleries can name them); only a UUID
+    can be a stored asset, and the database refuses to compare anything else."""
+    try:
+        return uuid.UUID(str(raw)) if raw else None
+    except ValueError:
+        return None
+
+
+def _regallery(
+    blocks: list[dict[str, Any]], restored: list[tuple[str, Any]]
+) -> list[dict[str, Any]]:
+    """Point each gallery at the pictures as stored.
+
+    A gallery names pictures by id, and a picture decoded from a data URI is
+    stored under a new one, so the names in the payload would draw nothing.
+    A name with no restored picture is dropped, as the editor would.
+    """
+    renamed = {given: str(stored) for given, stored in restored}
+    for block in blocks:
+        if block.get("type") == "gallery":
+            block["imageIds"] = [renamed[i] for i in block.get("imageIds", []) if i in renamed]
+    return blocks
 
 
 def _footer_of(raw: Any) -> dict[str, Any]:

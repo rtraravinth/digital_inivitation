@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from app.schemas.blocks import fix_resume_switches
 from app.services.ats import ResumeText, check, extract_terms, job_title, required_years
 
 JD = """Senior Product Designer
@@ -104,11 +105,14 @@ async def _with_resume(auth_client, portfolio, skills=("Figma",)):
     section = portfolio["sections"][0]
     await auth_client.patch(
         f"/api/v1/portfolios/{portfolio['id']}/sections/{section['id']}",
-        json={"blocks": [{"id": "sk", "type": "skills"}]},
+        json={
+            "blocks": [
+                {"id": "sk", "type": "skills", "items": [{"id": "g", "items": list(skills)}]}
+            ]
+        },
     )
     await auth_client.put(
-        f"/api/v1/portfolios/{portfolio['id']}/resume",
-        json={"email": "a@example.com", "skills": [{"id": "g", "name": "", "items": list(skills)}]},
+        f"/api/v1/portfolios/{portfolio['id']}/resume", json={"email": "a@example.com"}
     )
 
 
@@ -133,6 +137,56 @@ async def test_a_list_not_placed_in_a_section_is_not_read(auth_client, portfolio
     url = f"/api/v1/portfolios/{portfolio['id']}/resume/ats-check"
     body = (await auth_client.post(url, json={"jobDescription": JD})).json()
     assert "Figma" not in [m["term"] for m in body["matched"]]
+
+
+async def test_a_list_whose_component_is_unchecked_is_not_read(auth_client, portfolio):
+    """Only components with "Print on your resume" checked print, and an
+    unchecked list with entries is suggested for printing."""
+    section = portfolio["sections"][0]
+    await auth_client.patch(
+        f"/api/v1/portfolios/{portfolio['id']}/sections/{section['id']}",
+        json={
+            "blocks": [
+                {
+                    "id": "sk",
+                    "type": "skills",
+                    "onResume": False,
+                    "items": [{"id": "g", "items": ["Figma"]}],
+                }
+            ]
+        },
+    )
+    url = f"/api/v1/portfolios/{portfolio['id']}/resume/ats-check"
+    body = (await auth_client.post(url, json={"jobDescription": JD})).json()
+    assert "Figma" not in [m["term"] for m in body["matched"]]
+    assert any(s["kind"] == "show_block" and s["value"] == "skills" for s in body["suggestions"])
+
+
+async def test_a_section_off_the_resume_prints_nothing_under_it(auth_client, portfolio):
+    section = portfolio["sections"][0]
+    await auth_client.patch(
+        f"/api/v1/portfolios/{portfolio['id']}/sections/{section['id']}",
+        json={"onResume": False, "blocks": [{"id": "sk", "type": "skills", "onResume": True}]},
+    )
+    await auth_client.put(
+        f"/api/v1/portfolios/{portfolio['id']}/resume",
+        json={"skills": [{"id": "g", "name": "", "items": ["Figma"]}]},
+    )
+    url = f"/api/v1/portfolios/{portfolio['id']}/resume/ats-check"
+    body = (await auth_client.post(url, json={"jobDescription": JD})).json()
+    assert "Figma" not in [m["term"] for m in body["matched"]]
+
+
+def test_an_old_section_holding_a_list_keeps_printing_it():
+    """A list printed whatever its section's switch said; the fix keeps it so."""
+    blocks = [{"id": "t", "type": "text"}, {"id": "e", "type": "experience"}]
+    on, fixed = fix_resume_switches(False, blocks, ["skills"])
+    assert on is True
+    assert [b["onResume"] for b in fixed] == [False, True]
+    assert fix_resume_switches(False, [{"id": "t", "type": "text"}], []) == (
+        False,
+        [{"id": "t", "type": "text"}],
+    )
 
 
 async def test_a_short_description_is_refused(auth_client, portfolio):

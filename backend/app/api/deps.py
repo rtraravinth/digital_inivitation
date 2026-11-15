@@ -20,6 +20,7 @@ from app.core.security import current_session_id, decode_access_token
 from app.db.session import get_session
 from app.models import AuthSession, Portfolio, User
 from app.services.auth import DeviceInfo
+from app.services.portfolio import is_frozen
 
 SessionDep = Annotated[AsyncSession, Depends(get_session)]
 
@@ -147,9 +148,9 @@ async def get_editable_portfolio(portfolio: OwnedPortfolio) -> Portfolio:
     unpublish ask for ``OwnedPortfolio`` instead, or there would be no way
     back out.
     """
-    if portfolio.status == "live":
+    if is_frozen(portfolio):
         raise Conflict(
-            "Unpublish this page before you edit or delete it.",
+            "Unpublish this page and resume before you edit them.",
             code="portfolio_published",
         )
     return portfolio

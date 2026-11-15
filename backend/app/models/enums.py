@@ -75,6 +75,10 @@ FONTS: Final[tuple[str, ...]] = (
 PortfolioStatus = Literal["live", "draft", "empty"]
 STATUSES: Final[tuple[str, ...]] = ("live", "draft", "empty")
 
+#: A resume is published on its own, apart from the page, so it has no "empty".
+ResumeStatus = Literal["live", "draft"]
+RESUME_STATUSES: Final[tuple[str, ...]] = ("live", "draft")
+
 RoleNav = Literal["tabs", "rail", "scroll", "lens"]
 Density = Literal["airy", "standard", "dense"]
 TypeScale = Literal["compact", "default", "display"]
@@ -128,7 +132,9 @@ def sql_in(values: tuple[str, ...]) -> str:
 #: How many images one section may carry, and how many components. Generous
 #: for a portfolio entry; there to stop a runaway client, not to ration anyone.
 SECTION_IMAGES_MAX: Final[int] = 12
-SECTION_BLOCKS_MAX: Final[int] = 12
+#: Fifteen: the twelve there always were, plus the three that place a
+#: section's own fields (text, links, quote).
+SECTION_BLOCKS_MAX: Final[int] = 15
 BLOCK_ITEMS_MAX: Final[int] = 40
 
 #: How many portfolios one account may hold, and sections one portfolio may

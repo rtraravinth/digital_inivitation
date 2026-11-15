@@ -207,12 +207,20 @@ function updatePortfolio(id: string, recipe: (p: Portfolio) => Portfolio) {
 
   schedule(`portfolio:${id}`, () =>
     persist(async () => {
-      // A live portfolio refuses every edit, so the order of these calls is
-      // load-bearing: unpublish first to open the page up, publish last so
-      // the edits in the same batch land while it is still a draft.
-      if (before.status === "live" && after.status !== "live") {
-        replace(await api.post<Portfolio>(`/portfolios/${id}/unpublish`));
-      }
+      // A live page or a live resume refuses every edit, so the order of these
+      // calls is load-bearing: unpublish first to open the portfolio up,
+      // publish last so the edits in the same batch land while it is a draft.
+      // Each is judged on its own, and one that is live before and after with
+      // edits between is unpublished and published again, because the edits
+      // would 409 against it otherwise. Bouncing a live page or resume this
+      // way resets `published_at` and briefly 404s it for visitors. No current
+      // UI reaches this path: every editing surface shows `PublishedLock`
+      // while the portfolio is frozen.
+      const edited = coreChanged(before, after) || JSON.stringify(before.header) !== JSON.stringify(after.header);
+      const pageDown = before.status === "live" && (after.status !== "live" || edited);
+      const resumeDown = before.resumeStatus === "live" && (after.resumeStatus !== "live" || edited);
+      if (pageDown) replace(await api.post<Portfolio>(`/portfolios/${id}/unpublish`));
+      if (resumeDown) replace(await api.post<Portfolio>(`/portfolios/${id}/resume/unpublish`));
 
       if (coreChanged(before, after)) {
         replace(
@@ -249,8 +257,11 @@ function updatePortfolio(id: string, recipe: (p: Portfolio) => Portfolio) {
         );
       }
 
-      if (before.status !== "live" && after.status === "live") {
+      if (after.status === "live" && (before.status !== "live" || pageDown)) {
         replace(await api.post<Portfolio>(`/portfolios/${id}/publish`));
+      }
+      if (after.resumeStatus === "live" && (before.resumeStatus !== "live" || resumeDown)) {
+        replace(await api.post<Portfolio>(`/portfolios/${id}/resume/publish`));
       }
     }),
   );
@@ -265,8 +276,8 @@ function updatePortfolio(id: string, recipe: (p: Portfolio) => Portfolio) {
 function updateResume(id: string, recipe: (r: Resume) => Resume) {
   setState(mapPortfolio(id, (p) => ({ ...p, resume: recipe(p.resume) })));
 
-  schedule(`resume:${id}`, () =>
-    persist(async () => {
+  schedule(`resume:${id}`, () => {
+    const run = persist(async () => {
       const current = state.find((p) => p.id === id);
       if (!current) return;
       const saved = normalize(await api.put<Portfolio>(`/portfolios/${id}/resume`, current.resume));
@@ -274,8 +285,28 @@ function updateResume(id: string, recipe: (r: Resume) => Resume) {
       // what was sent, and a newer local edit may already be waiting.
       state = state.map((p) => (p.id === id ? { ...p, meta: saved.meta, updatedAt: saved.updatedAt } : p));
       notify();
-    }),
-  );
+    });
+    // Kept so `settleResumeSaves` can wait for a write already on its way.
+    const open = resumeWrites.get(id) ?? new Set<Promise<void>>();
+    resumeWrites.set(id, open);
+    open.add(run);
+    void run.finally(() => open.delete(run));
+    return run;
+  });
+}
+
+const resumeWrites = new Map<string, Set<Promise<void>>>();
+
+/**
+ * Wait until every resume write for this portfolio has settled — queued ones
+ * are sent, ones already in flight are awaited. `persist` swallows failures
+ * (it reloads from the server), so the caller learns of one from `failed`
+ * and from `portfolio`, which is then what the server holds.
+ */
+export async function settleResumeSaves(id: string): Promise<{ failed: boolean; portfolio: Portfolio | undefined }> {
+  await flushPendingSaves();
+  await Promise.all([...(resumeWrites.get(id) ?? [])]);
+  return { failed: syncError !== null, portfolio: state.find((p) => p.id === id) };
 }
 
 function coreChanged(before: Portfolio, after: Portfolio): boolean {
@@ -315,7 +346,6 @@ function sectionPayload(section: Section) {
     onResume: section.onResume,
     // Uploads without an id are still on their way up and are not sent.
     imageAssetIds: section.images.flatMap((a) => (a.id ? [a.id] : [])),
-    ...assetFields(section.file, "fileAssetId", "clearFile"),
     blocks: section.blocks,
   };
 }

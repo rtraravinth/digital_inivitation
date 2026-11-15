@@ -115,8 +115,10 @@ async def test_a_live_portfolio_refuses_edits_that_reach_the_page(auth_client, p
     assert response.json()["error"]["code"] == "portfolio_published"
 
 
-def _list(kind: str, look: str = "list") -> dict:
-    return {"id": f"c-{kind}", "type": kind, "title": "", "look": look}
+def _list(kind: str, look: str = "list", items: list | None = None) -> dict:
+    """A list component, holding the full resume's entries of its kind."""
+    entries = FULL_RESUME[kind] if items is None else items
+    return {"id": f"c-{kind}", "type": kind, "title": "", "look": look, "items": entries}
 
 
 async def _place(auth_client, portfolio, index: int, kinds: list[str], **patch) -> None:
@@ -133,7 +135,7 @@ async def test_a_resume_list_is_a_component(auth_client, portfolio):
     section = portfolio["sections"][0]
     response = await auth_client.patch(
         f"/api/v1/portfolios/{portfolio['id']}/sections/{section['id']}",
-        json={"blocks": [_list("experience", "timeline"), {"id": "s", "type": "skills"}]},
+        json={"blocks": [_list("experience", "timeline", []), {"id": "s", "type": "skills"}]},
     )
     assert response.status_code == 200, response.text
     blocks = response.json()["blocks"]
@@ -142,16 +144,31 @@ async def test_a_resume_list_is_a_component(auth_client, portfolio):
         "type": "experience",
         "title": "",
         "look": "timeline",
+        "items": [],
     }
-    # The look has a default, and the component carries no entries of its own.
-    assert blocks[1] == {"id": "s", "type": "skills", "title": "", "look": "theme"}
+    # The look has a default, and a new component starts with no entries.
+    assert blocks[1] == {"id": "s", "type": "skills", "title": "", "look": "theme", "items": []}
 
 
-async def test_a_resume_list_component_holds_no_entries(auth_client, portfolio):
+async def test_each_list_component_holds_its_own_entries(auth_client, portfolio):
+    """Two Experience components are two lists, not two views of one."""
+    section = portfolio["sections"][0]
+    first = {"id": "a", "type": "experience", "items": [{"id": "r1", "role": "Founder"}]}
+    second = {"id": "b", "type": "experience", "items": [{"id": "r2", "role": "Adviser"}]}
+    response = await auth_client.patch(
+        f"/api/v1/portfolios/{portfolio['id']}/sections/{section['id']}",
+        json={"blocks": [first, second]},
+    )
+    assert response.status_code == 200, response.text
+    roles = [[i["role"] for i in b["items"]] for b in response.json()["blocks"]]
+    assert roles == [["Founder"], ["Adviser"]]
+
+
+async def test_a_list_component_refuses_another_kinds_entries(auth_client, portfolio):
     section = portfolio["sections"][0]
     response = await auth_client.patch(
         f"/api/v1/portfolios/{portfolio['id']}/sections/{section['id']}",
-        json={"blocks": [{**_list("experience"), "items": FULL_RESUME["experience"]}]},
+        json={"blocks": [_list("experience", items=FULL_RESUME["education"])]},
     )
     assert response.status_code == 422
 
@@ -162,12 +179,12 @@ async def test_the_public_page_gets_only_the_lists_placed_on_it(client, auth_cli
 
     response = await client.get(f"/api/v1/public/p/{TEST_SUBDOMAIN}/{live['slug']}")
     assert response.status_code == 200
+    blocks = response.json()["sections"][0]["blocks"]
+    assert blocks[0]["items"][0]["company"] == "Northwell Kitchens"
+    assert blocks[1]["items"][0]["items"] == ["P&L", "Hiring"]
+    # The lists travel in their components; the resume's own never do.
     resume = response.json()["resume"]
-    assert resume["experience"][0]["company"] == "Northwell Kitchens"
-    assert resume["skills"][0]["items"] == ["P&L", "Hiring"]
-    # Kept to the resume, so absent from the page.
-    assert resume["languages"] == []
-    assert resume["certifications"] == []
+    assert all(entries == [] for entries in resume.values())
     # Contact details and the template never leave the account.
     assert "email" not in resume
     assert "style" not in resume
@@ -273,6 +290,7 @@ async def test_a_copy_takes_the_resume_along(auth_client, portfolio):
 
 async def test_export_and_import_carry_the_resume(auth_client, portfolio):
     await auth_client.put(f"/api/v1/portfolios/{portfolio['id']}/resume", json=FULL_RESUME)
+    await _place(auth_client, portfolio, 0, ["languages"])
 
     exported = (await auth_client.get("/api/v1/export")).json()
     assert exported[0]["resume"]["email"] == "rohan@example.com"
@@ -282,7 +300,10 @@ async def test_export_and_import_carry_the_resume(auth_client, portfolio):
     )
     assert imported.status_code in (200, 201)
     rows = (await auth_client.get("/api/v1/portfolios?expand=sections")).json()
-    assert rows[0]["resume"]["languages"][0]["name"] == "Hindi"
+    [block] = rows[0]["sections"][0]["blocks"]
+    assert block["items"][0]["name"] == "Hindi"
+    # The entries are the component's; the resume's own lists are emptied.
+    assert rows[0]["resume"]["languages"] == []
 
 
 async def test_an_import_with_a_broken_resume_lands_on_the_defaults(auth_client, portfolio):

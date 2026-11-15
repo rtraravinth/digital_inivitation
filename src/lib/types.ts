@@ -43,13 +43,18 @@ export function assetSrc(asset: Asset | null | undefined): string | undefined {
 export type Quote = { text: string; attribution: string };
 
 /* ── components ───────────────────────────────────────────────────────────
-   A section is a heading — section title, title, description, links, one
-   cover picture — and everything under that is a component: the shapes a
-   visitor recognises from public portfolio pages. Mirrors
+   A section is a title, and everything under it is a component: the shapes
+   a visitor recognises from public portfolio pages. Mirrors
    app/schemas/blocks.py. None of them holds an upload: a testimonial shows
    initials, a client is a wordmark, and a gallery only *names* pictures the
    section already holds (`imageIds` into `section.images`), so every upload
-   reference stays a section picture, a file or the portrait.
+   reference stays a section picture or the portrait.
+
+   Text, Links and Quote place the section's own fields — its description
+   and cover, its links, its pull quote — the way a resume list component
+   places a list: the values stay on the section, where every theme, the
+   resume and the ATS check read them, and the component is how the editor
+   offers them. A section holds at most one of each (`FIELD_BLOCKS`).
    ──────────────────────────────────────────────────────────────────────── */
 
 export type TimelineItem = { id: string; date: string; title: string; text: string };
@@ -60,7 +65,21 @@ export type StatItem = { id: string; value: string; label: string };
 export type ServiceItem = { id: string; title: string; text: string; price: string };
 export type FaqItem = { id: string; question: string; answer: string };
 
-type BlockBase = { id: string; title: string };
+type BlockBase = {
+  id: string;
+  title: string;
+  /** "Print on your resume": whether this component prints under its
+   *  section's title on the resume. A gallery never does — the resume is
+   *  text an ATS reads, never pictures (`printsOnResume()`). */
+  onResume: boolean;
+};
+/** Places the section's description and cover picture. */
+export type TextBlock = BlockBase & { type: "text" };
+/** Places the section's links. */
+export type LinksBlock = BlockBase & { type: "links" };
+/** Places the section's pull quote. */
+export type QuoteBlock = BlockBase & { type: "quote" };
+export type FieldBlock = TextBlock | LinksBlock | QuoteBlock;
 export type TimelineBlock = BlockBase & { type: "timeline"; items: TimelineItem[] };
 export type TestimonialsBlock = BlockBase & { type: "testimonials"; items: TestimonialItem[] };
 export type ClientsBlock = BlockBase & { type: "clients"; items: ClientItem[] };
@@ -110,9 +129,17 @@ export type ListLook = SectionStyle;
  * author likes, each placement in its own look; every one draws the same
  * list, because the resume has one.
  */
-export type ResumeListBlock = BlockBase & { type: PageBlock; look: ListLook };
+type ListBlockOf<K extends PageBlock, T> = BlockBase & { type: K; look: ListLook; items: T[] };
+export type ResumeListBlock =
+  | ListBlockOf<"experience", ExperienceItem>
+  | ListBlockOf<"education", EducationItem>
+  | ListBlockOf<"skills", SkillGroup>
+  | ListBlockOf<"certifications", Certification>
+  | ListBlockOf<"languages", Language>
+  | ListBlockOf<"awards", Award>;
 
 export type Block =
+  | FieldBlock
   | ResumeListBlock
   | GalleryBlock
   | TimelineBlock
@@ -132,6 +159,9 @@ export type BlockType = Block["type"];
  * Experience component is no different in kind from a Timeline.
  */
 export const BLOCK_TYPES: Array<{ id: BlockType; name: string; desc: string }> = [
+  { id: "text", name: "Text", desc: "A few sentences about it, and a cover picture." },
+  { id: "links", name: "Links", desc: "Where to read more: a site, a press kit, a booking page." },
+  { id: "quote", name: "Quote", desc: "One line someone said, set as a pull quote." },
   { id: "experience", name: "Experience", desc: "Your roles, with their dates and what you did." },
   { id: "education", name: "Education", desc: "Degrees, schools and the years." },
   { id: "skills", name: "Skills", desc: "What you are good at, grouped if there are many." },
@@ -151,19 +181,76 @@ export const BLOCK_TYPES: Array<{ id: BlockType; name: string; desc: string }> =
 
 /** Mirrors SECTION_IMAGES_MAX / SECTION_BLOCKS_MAX on the API. */
 export const SECTION_IMAGES_MAX = 12;
-export const SECTION_BLOCKS_MAX = 12;
+export const SECTION_BLOCKS_MAX = 15;
+
+/** The components that place one of the section's own fields. One each. */
+const FIELD_BLOCKS: BlockType[] = ["text", "links", "quote"];
+
+export function isFieldBlock(b: Block): b is FieldBlock {
+  return FIELD_BLOCKS.includes(b.type);
+}
+
+/** Whether `type` can be added to `section`: a field component only once. */
+export function canAddComponent(section: Pick<Section, "blocks">, type: BlockType): boolean {
+  return !FIELD_BLOCKS.includes(type) || !section.blocks.some((b) => b.type === type);
+}
+
+/** The section with a field component gone, and the field it placed emptied
+ *  — removing the Text component removes the description and the cover. */
+export function withoutComponent(s: Section, id: string): Section {
+  const gone = s.blocks.find((b) => b.id === id);
+  const blocks = s.blocks.filter((b) => b.id !== id);
+  switch (gone?.type) {
+    case "text": {
+      const cover = coverOf(s);
+      return { ...s, blocks, description: "", images: s.images.filter((a) => a !== cover) };
+    }
+    case "links":
+      return { ...s, blocks, links: [] };
+    case "quote":
+      return { ...s, blocks, quote: null };
+    case "gallery": {
+      const theirs = new Set(gone.imageIds);
+      return { ...s, blocks, images: s.images.filter((a) => !a.id || !theirs.has(a.id)) };
+    }
+    default:
+      return { ...s, blocks };
+  }
+}
 
 /** A fresh component of a type, with one empty item so the form has a row. */
+/** Whether a kind of component can print on the resume at all. Pictures
+ *  cannot: the resume is real text, in reading order, for an ATS. */
+export function canPrintOnResume(type: BlockType): boolean {
+  return type !== "gallery";
+}
+
+/** What "Print on your resume" starts as: on for the words a resume is made
+ *  of (the section's text and links, the resume's own lists), off for the
+ *  rest, which a page shows and a resume rarely wants. */
+function defaultOnResume(type: BlockType): boolean {
+  return type === "text" || type === "links" || (PAGE_BLOCKS as string[]).includes(type);
+}
+
+/** Whether a component prints under its section's title on the resume. */
+export function printsOnResume(b: Block): boolean {
+  return canPrintOnResume(b.type) && b.onResume;
+}
+
 export function emptyBlock(type: BlockType, id: string, itemId: string): Block {
-  const base = { id, title: "" };
+  const base = { id, title: "", onResume: defaultOnResume(type) };
   switch (type) {
+    case "text":
+    case "links":
+    case "quote":
+      return { ...base, type };
     case "experience":
     case "education":
     case "skills":
     case "certifications":
     case "languages":
     case "awards":
-      return { ...base, type, look: "theme" };
+      return { ...base, type, look: "theme", items: [] } as Block;
     case "gallery":
       return { ...base, type, layout: "mosaic", imageIds: [] };
     case "timeline":
@@ -188,9 +275,12 @@ export function emptyBlock(type: BlockType, id: string, itemId: string): Block {
 /** Whether a component has anything a visitor would see. Empty ones stay in
  *  the editor and off the page, the same as an empty section field. A
  *  resume list's entries are not in the component, so it answers for them
- *  only when handed the resume. */
-export function componentHasContent(b: Block, resume?: Resume): boolean {
-  if (isListBlock(b)) return resume ? resume[b.type].length > 0 : true;
+ *  only when handed the resume; a field component's are the section's. */
+export function componentHasContent(b: Block, resume?: Resume, section?: Section): boolean {
+  if (isListBlock(b)) return b.items.length > 0;
+  if (b.type === "text") return section ? Boolean(section.description.trim() || coverOf(section)) : true;
+  if (b.type === "links") return section ? section.links.length > 0 : true;
+  if (b.type === "quote") return section ? Boolean(section.quote?.text.trim()) : true;
   if (b.type === "gallery") return b.imageIds.length > 0;
   if (b.type === "contact") return Boolean(b.email || b.phone || b.location || b.ctaUrl || b.text);
   const items = b.items as Array<Record<string, string>>;
@@ -239,9 +329,10 @@ export function tabOf(section: Pick<Section, "title">): string {
 }
 
 /**
- * Every section is the same fields — title, description, links and a cover
- * picture — so there is nothing to learn twice. Components and the rest
- * below that are opt-in.
+ * Every section is the same fields — title, description, links, a cover
+ * picture and a pull quote — so there is nothing to learn twice. Only the
+ * title is always there in the editor: the rest are offered as components
+ * (Text, Links, Quote) beside every other kind.
  *
  * `tab` is the wire format's name for the section's menu label. It is not a
  * field anyone fills in: it is the title, derived by `tabOf()`. It used to
@@ -260,7 +351,6 @@ export type Section = {
   /** Every picture the section holds: its cover and its galleries'. Read
    *  them through `coverOf()` and `galleryImages()`, never by index. */
   images: Asset[];
-  file: Asset | null;
   quote: Quote | null;
   /** Timeline, testimonials, clients, tabs… under the section's own fields. */
   blocks: Block[];
@@ -799,6 +889,8 @@ export type Portfolio = {
   /** The page address, without the facet.page/ prefix. */
   slug: string;
   status: PortfolioStatus;
+  /** Whether the resume is published at `<page>/resume`, apart from the page. */
+  resumeStatus: PortfolioStatus;
   summary: string;
   meta: string;
   /** When the server last saved it, ISO 8601. Absent on seed and stored-locally data. */
@@ -871,6 +963,7 @@ export function normalize(p: Portfolio): Portfolio {
       motion: layout.motion ?? "full",
       sectionStyle: isSectionStyle(layout.sectionStyle) ? layout.sectionStyle : "theme",
     },
+    resumeStatus: p.resumeStatus ?? "draft",
     resume: normalizeResume(p.resume),
     header: {
       ...emptyHeader(),
@@ -879,22 +972,48 @@ export function normalize(p: Portfolio): Portfolio {
       dates: p.header?.dates ?? [],
     },
     footer: { ...emptyFooter(), ...(p.footer ?? {}), links: p.footer?.links ?? [] },
-    sections: (p.sections ?? []).map((s) => sectionOf(s)),
+    sections: (p.sections ?? []).map((s) => sectionOf(s, p.resume?.hidden ?? [], p.resume)),
   };
 }
 
 /** One section from any build: a single `image` from before pictures were a
  *  list becomes the cover, and pictures stored before galleries were a
  *  component — when everything after the first was "the gallery" — get the
- *  gallery that says so. Its id is derived, so reading twice agrees. */
-function sectionOf(raw: Section & { image?: Asset | null }): Section {
-  const { image, ...s } = raw;
+ *  gallery that says so. A description, cover, links or quote stored before
+ *  those were components gets the component that places it. Every derived
+ *  id is fixed, so reading twice agrees. A `file` from before downloads were
+ *  removed is dropped. */
+function sectionOf(
+  raw: Section & { image?: Asset | null; file?: unknown },
+  hiddenLists: readonly string[] = [],
+  oldLists?: Partial<Resume>,
+): Section {
+  const { image, file, ...s } = raw;
+  void file;
   const images = s.images ?? (image ? [image] : []);
-  let blocks = (s.blocks ?? []).map((b) => (b.type === "gallery" ? { ...b, layout: b.layout ?? "mosaic", imageIds: b.imageIds ?? [] } : b));
+  // "Print on your resume" from before it was each component's: a list
+  // printed unless its list was switched off for the resume as a whole.
+  const printed = (b: Block) =>
+    typeof b.onResume === "boolean" ? b.onResume : isListBlock(b) ? !hiddenLists.includes(b.type) : defaultOnResume(b.type);
+  let blocks = (s.blocks ?? []).map((b) => {
+    // A list component from before each held its own entries drew the
+    // resume's one list of its kind; it is given those (migration
+    // e8b4d1a7c3f2 did the same to stored rows).
+    const items = isListBlock(b) && !Array.isArray(b.items) ? (oldLists?.[b.type] ?? []) : undefined;
+    const withFlag = { ...b, ...(items ? { items } : {}), onResume: printed(b) } as Block;
+    return withFlag.type === "gallery" ? { ...withFlag, layout: withFlag.layout ?? "mosaic", imageIds: withFlag.imageIds ?? [] } : withFlag;
+  });
   const loose = images.slice(1).flatMap((a) => (a.id ? [a.id] : []));
   if (loose.length > 0 && blocks.length < SECTION_BLOCKS_MAX && !blocks.some((b) => b.type === "gallery")) {
-    blocks = [{ id: `gallery-${s.id}`, type: "gallery", title: "", layout: "mosaic", imageIds: loose }, ...blocks];
+    blocks = [{ id: `gallery-${s.id}`, type: "gallery", title: "", onResume: false, layout: "mosaic", imageIds: loose }, ...blocks];
   }
+  const has = (type: BlockType) => blocks.some((b) => b.type === type);
+  const placed = { ...s, images, blocks };
+  if (!has("text") && ((s.description ?? "").trim() || coverOf(placed))) {
+    blocks = [{ id: `text-${s.id}`, type: "text", title: "", onResume: true }, ...blocks];
+  }
+  if (!has("links") && (s.links ?? []).length > 0) blocks = [...blocks, { id: `links-${s.id}`, type: "links", title: "", onResume: true }];
+  if (!has("quote") && s.quote?.text?.trim()) blocks = [...blocks, { id: `quote-${s.id}`, type: "quote", title: "", onResume: false }];
   return {
       ...emptySection(s.id),
       ...s,
@@ -929,7 +1048,6 @@ function emptySection(id: string): Section {
     tab: DEFAULT_TAB,
     links: [],
     images: [],
-    file: null,
     quote: null,
     blocks: [],
     hidden: false,
@@ -954,6 +1072,11 @@ export function pagePath(subdomain: string, slug: string): string {
   return `/p/${subdomain}/${slug}`;
 }
 
+/** True while the page or the resume is published: section writes answer 409 `portfolio_published`. */
+export function isFrozen(p: Portfolio): boolean {
+  return p.status === "live" || p.resumeStatus === "live";
+}
+
 /**
  * The owner's own preview of a portfolio, published or not.
  *
@@ -962,7 +1085,7 @@ export function pagePath(subdomain: string, slug: string): string {
  * previews rather than 404s.
  */
 export function previewPath(id: string): string {
-  return `/preview/${id}`;
+  return `/preview/page/${id}`;
 }
 
 export type AccountProfile = {
@@ -1281,6 +1404,10 @@ export const LIST_DEFAULT_STYLE: Record<PageBlock, Exclude<SectionStyle, "theme"
 /** Looks stored before a list was drawn by the section styles. */
 const LEGACY_LOOK: Record<string, SectionStyle> = { cards: "grid", tags: "chips" };
 
+export function isPageBlock(v: string): v is PageBlock {
+  return (PAGE_BLOCKS as string[]).includes(v);
+}
+
 export function isListBlock(b: Block): b is ResumeListBlock {
   return (PAGE_BLOCKS as string[]).includes(b.type);
 }
@@ -1342,12 +1469,21 @@ export type ResumeStyle = {
   backdropColor: string;
 };
 
+/** Which contact details a published resume shows. Unticked ones never leave the account. */
+export type PublicContact = {
+  email: boolean;
+  phone: boolean;
+  location: boolean;
+  website: boolean;
+};
+
 export type Resume = {
-  /** Resume-only: printed on the resume, never sent to a visitor. */
+  /** Printed on the resume; sent to a visitor only where `publicContact` allows. */
   email: string;
   phone: string;
   location: string;
   website: string;
+  publicContact: PublicContact;
   experience: ExperienceItem[];
   education: EducationItem[];
   skills: SkillGroup[];
@@ -1383,6 +1519,7 @@ function defaultResume(): Resume {
     phone: "",
     location: "",
     website: "",
+    publicContact: { email: true, phone: true, location: true, website: true },
     experience: [],
     education: [],
     skills: [],
@@ -1415,6 +1552,7 @@ function normalizeResume(raw: Partial<Resume> | null | undefined): Resume {
   for (const b of RESUME_BLOCKS) if (!order.includes(b)) order.push(b);
   return {
     ...r,
+    publicContact: { ...base.publicContact, ...(r.publicContact ?? {}) },
     experience: (r.experience ?? []).map((e) => ({ ...e, bullets: e.bullets ?? [], current: !!e.current })),
     education: r.education ?? [],
     skills: (r.skills ?? []).map((g) => ({ ...g, items: g.items ?? [] })),

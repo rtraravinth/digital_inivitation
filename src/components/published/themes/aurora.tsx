@@ -395,7 +395,7 @@ function Card({
             <p className="whitespace-pre-line text-muted m-0 text-[15px] leading-[1.6]">{section.description}</p>
           )}
           <div className="mt-auto flex flex-col items-start gap-3 pt-1">
-            <SectionAside p={p} section={section} />
+            <SectionAside section={section} />
             <SectionLinks p={p} section={section} />
           </div>
         </div>

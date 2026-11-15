@@ -13,12 +13,13 @@ import {
   ThemeControl,
   TypeControl,
 } from "./controls";
+import { PublishDialog } from "../PublishDialog";
 import { PublishedLock } from "../PublishedLock";
 import { ResumeStudio } from "../resume/ResumeStudio";
 import { ICON, Icon, IconButton, Segmented, StatusPill } from "../ui";
 import { Glyph } from "@/lib/glyphs";
 import { usePortfolios } from "@/lib/store";
-import { THEMES, previewPath, type Portfolio } from "@/lib/types";
+import { THEMES, isFrozen, previewPath, type Portfolio } from "@/lib/types";
 import { useAccount } from "@/lib/account";
 
 /* ── the builder ──────────────────────────────────────────────────────────
@@ -65,6 +66,7 @@ export function Builder({ id }: { id: string }) {
   const [tab, setTab] = useState<InspectorTab>("look");
   const [sheet, setSheet] = useState<SheetTab>("look");
   const [replay, setReplay] = useState(0);
+  const [publishing, setPublishing] = useState(false);
   const router = useRouter();
   // One portfolio, two looks: the page it publishes and the resume it
   // downloads. In the address so the editor and the print page link back.
@@ -100,16 +102,15 @@ export function Builder({ id }: { id: string }) {
     );
   }
 
-  // The resume is not on the published page, so it stays open while the
-  // page is live.
-  if (mode === "resume") {
-    return <ResumeStudio p={portfolio} modeSwitch={modeSwitch} storageError={storageError} />;
+  // Published — page or resume — is finished: both sides of the builder step
+  // aside for the published screen, as the editor does, until it is
+  // unpublished. Restyling a live resume would change what was released.
+  if (isFrozen(portfolio)) {
+    return <PublishedLock portfolio={portfolio} />;
   }
 
-  // A live page is frozen — the API refuses every write to it — so this
-  // screen steps aside for Preview and Unpublish.
-  if (portfolio.status === "live") {
-    return <PublishedLock portfolio={portfolio} />;
+  if (mode === "resume") {
+    return <ResumeStudio p={portfolio} modeSwitch={modeSwitch} storageError={storageError} />;
   }
 
   const p: Portfolio = portfolio;
@@ -189,16 +190,12 @@ export function Builder({ id }: { id: string }) {
               <Icon d={ICON.eye} size={14} />
               <span className="hidden sm:inline">Preview</span>
             </a>
-            <button
-              type="button"
-              className="btn btn-primary"
-              style={{ marginTop: 0, minHeight: 34 }}
-              onClick={() => onChange((prev) => ({ ...prev, status: "live" }))}
-            >
+            <button type="button" className="btn btn-primary" style={{ marginTop: 0, minHeight: 34 }} onClick={() => setPublishing(true)}>
               Publish
             </button>
           </span>
         </header>
+        <AnimatePresence>{publishing && <PublishDialog key="publish" p={p} onClose={() => setPublishing(false)} />}</AnimatePresence>
 
         <AnimatePresence>
           {storageError && (

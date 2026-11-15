@@ -4,27 +4,41 @@ import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import Link from "next/link";
 import { useState } from "react";
 import { PagePreview } from "./PagePreview";
+import { PublishDialog } from "./PublishDialog";
 import { ICON, Icon, StatusPill, TiltPanel } from "./ui";
 import { Glyph } from "@/lib/glyphs";
 import { useAccount } from "@/lib/account";
-import { displayUrl, liveUrl } from "@/lib/slug";
+import { previewHref, resumePrintPath } from "@/lib/resume";
+import { displayUrl, liveUrl, resumeUrl } from "@/lib/slug";
 import { usePortfolios } from "@/lib/store";
-import { previewPath, type Portfolio } from "@/lib/types";
+import type { Portfolio } from "@/lib/types";
 
 /**
- * What every editing screen shows in place of itself while the portfolio is
- * live. The page a visitor is reading is frozen: the API answers 409 to any
- * write, so offering the controls would only produce error banners. Preview,
- * the live address and Unpublish are what still make sense here.
+ * What every editing screen shows in place of itself while the page or the
+ * resume is live. What a visitor is reading is frozen: the API answers 409 to
+ * any section write, so offering the controls would only produce error
+ * banners. Each thing has its own row — address, Copy link, Unpublish — and
+ * a row that is not live offers to publish it.
  */
 export function PublishedLock({ portfolio }: { portfolio: Portfolio }) {
   const { updatePortfolio, storageError } = usePortfolios();
   const subdomain = useAccount().account.profile.subdomain;
   const reduced = useReducedMotion();
-  const [copied, setCopied] = useState(false);
-  const url = subdomain ? liveUrl(subdomain, portfolio.slug) : "";
+  const [dialog, setDialog] = useState<null | "contact" | "publish-resume">(null);
+  const pageLive = portfolio.status === "live";
+  const resumeLive = portfolio.resumeStatus === "live";
+  const r = portfolio.resume;
+  const pc = r.publicContact;
+  // What a visitor to the resume sees: a detail only counts if it is there.
+  const shown = [
+    pc.email && r.email.trim() && "Email",
+    pc.phone && r.phone.trim() && "Phone",
+    pc.location && r.location.trim() && "Location",
+    pc.website && "Website and links",
+  ].filter((x): x is string => !!x);
 
-  const unpublish = () => updatePortfolio(portfolio.id, (prev) => ({ ...prev, status: "draft" }));
+  const unpublish = () =>
+    updatePortfolio(portfolio.id, (prev) => ({ ...prev, status: "draft", resumeStatus: "draft" }));
 
   return (
     <>
@@ -45,7 +59,8 @@ export function PublishedLock({ portfolio }: { portfolio: Portfolio }) {
           </Link>
           <span className="hidden h-5 w-px sm:block" style={{ background: "var(--color-divider)" }} />
           <span className="min-w-0 truncate text-[14.5px] font-semibold tracking-[-0.01em]">{portfolio.name}</span>
-          <StatusPill live />
+          {pageLive && <StatusPill live label="Page live" />}
+          {resumeLive && <StatusPill live label="Resume live" />}
         </header>
 
         <main className="mx-auto w-full max-w-[880px] flex-1 px-4 pt-10 pb-20 sm:px-6 sm:pt-14">
@@ -76,62 +91,70 @@ export function PublishedLock({ portfolio }: { portfolio: Portfolio }) {
               </div>
               <div className="p-6 sm:p-8">
                 <h1 className="m-0 text-[26px] leading-tight tracking-[-0.03em] sm:text-[30px]">
-                  This page is live
+                  This portfolio is live
                 </h1>
                 <p className="m-0 mt-2 max-w-[60ch] text-[14.5px] leading-relaxed text-muted">
-                  Anyone with the link can read it, so it can’t be edited while it’s live.
-                  Unpublish it to make changes, then publish again — the address stays the same.
+                  Anyone with the link can read what is live, so the content can’t be edited meanwhile.
+                  Unpublish to make changes, then publish again — the addresses stay the same.
                 </p>
 
-                {url ? (
-                  <div
-                    className="mt-5 flex min-w-0 items-center gap-2 rounded-xl px-3.5 py-2.5"
-                    style={{ background: "var(--color-surface)", border: "1px solid var(--color-divider)" }}
-                  >
-                    <a
-                      href={url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex min-w-0 flex-1 items-center gap-1.5 font-mono text-[13px] underline-offset-2 hover:underline"
-                      style={{ color: "var(--color-ink)" }}
-                    >
-                      <span className="truncate">{displayUrl(url)}</span>
-                      <span className="flex-none">
-                        <Icon d={ICON.out} size={12} />
-                      </span>
-                    </a>
-                    <button
-                      type="button"
-                      className="btn btn-ghost"
-                      style={{ marginTop: 0, minHeight: 30, padding: "0.3rem 0.6rem", fontSize: 13 }}
-                      onClick={async () => {
-                        try {
-                          await navigator.clipboard.writeText(url);
-                          setCopied(true);
-                          window.setTimeout(() => setCopied(false), 1400);
-                        } catch {
-                          // Clipboard refused — the link is right there to select.
-                        }
-                      }}
-                    >
-                      <Icon d={copied ? ICON.check : ICON.copy} size={13} />
-                      {copied ? "Copied" : "Copy link"}
-                    </button>
-                  </div>
-                ) : (
+                {!subdomain && (
                   <p className="m-0 mt-5 rounded-xl px-3.5 py-2.5 text-[13.5px]" style={{ border: "1px solid var(--color-ink)" }}>
-                    Your account has no subdomain, so this page has no address anyone can open.{" "}
+                    Your account has no subdomain, so nothing here has an address anyone can open.{" "}
                     <Link href="/account" className="font-medium underline underline-offset-2" style={{ color: "var(--color-ink)" }}>
                       Choose a subdomain
                     </Link>
                   </p>
                 )}
 
+                <div className="mt-5 flex flex-col gap-3">
+                  <Row
+                    name="Page"
+                    live={pageLive}
+                    url={subdomain ? liveUrl(subdomain, portfolio.slug) : ""}
+                    publishLabel="Publish page"
+                    onPublish={() => updatePortfolio(portfolio.id, (prev) => ({ ...prev, status: "live" }))}
+                    onUnpublish={() => updatePortfolio(portfolio.id, (prev) => ({ ...prev, status: "draft" }))}
+                  />
+                  <Row
+                    name="Resume"
+                    live={resumeLive}
+                    url={subdomain ? resumeUrl(subdomain, portfolio.slug) : ""}
+                    publishLabel="Publish resume"
+                    onPublish={() => setDialog("publish-resume")}
+                    onUnpublish={() => updatePortfolio(portfolio.id, (prev) => ({ ...prev, resumeStatus: "draft" }))}
+                  >
+                    <a
+                      href={resumePrintPath(portfolio.id)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="btn btn-ghost"
+                      style={SMALL}
+                    >
+                      Download PDF
+                    </a>
+                    <div className="flex basis-full flex-wrap items-center gap-x-3 gap-y-1 text-[13px]">
+                      <span className="min-w-0 flex-1">
+                        <span className="text-muted">Contact details · </span>
+                        {shown.length ? shown.join(", ") : "none shown"}
+                      </span>
+                      <button
+                        type="button"
+                        className="cursor-pointer font-medium underline underline-offset-2"
+                        style={{ color: "var(--color-ink)" }}
+                        onClick={() => setDialog("contact")}
+                      >
+                        Edit
+                      </button>
+                    </div>
+                  </Row>
+                </div>
+
                 <div className="mt-6 flex flex-wrap gap-2">
                   <button type="button" className="btn btn-primary" onClick={unpublish}>
                     Unpublish to edit
                   </button>
-                  <a href={previewPath(portfolio.id)} target="_blank" rel="noopener noreferrer" className="btn btn-secondary">
+                  <a href={previewHref(portfolio)} target="_blank" rel="noopener noreferrer" className="btn btn-secondary">
                     <Icon d={ICON.eye} size={14} />
                     Preview
                   </a>
@@ -139,25 +162,107 @@ export function PublishedLock({ portfolio }: { portfolio: Portfolio }) {
                     Views and clicks
                   </Link>
                 </div>
-
-                {/* The resume's look never reaches the page, so the freeze leaves it open. */}
-                <div
-                  className="mt-5 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl px-3.5 py-3 text-[13px]"
-                  style={{ background: "var(--color-surface)", border: "1px solid var(--color-divider)" }}
-                >
-                  <span className="min-w-0 flex-1">Resume templates and style stay open while the page is live.</span>
-                  <a href={`/resume/${portfolio.id}?print=1`} target="_blank" rel="noopener noreferrer" className="font-medium underline underline-offset-2" style={{ color: "var(--color-ink)" }}>
-                    Resume PDF
-                  </a>
-                  <Link href={`/builder/${portfolio.id}?mode=resume`} className="font-medium underline underline-offset-2" style={{ color: "var(--color-ink)" }}>
-                    Resume templates
-                  </Link>
-                </div>
               </div>
             </TiltPanel>
           </motion.div>
         </main>
       </div>
+      <AnimatePresence>
+        {dialog && (
+          <PublishDialog
+            key={dialog}
+            p={portfolio}
+            contactOnly={dialog === "contact"}
+            only={dialog === "publish-resume" ? "resume" : undefined}
+            onClose={() => setDialog(null)}
+          />
+        )}
+      </AnimatePresence>
     </>
+  );
+}
+
+const SMALL = { marginTop: 0, minHeight: 30, padding: "0.3rem 0.6rem", fontSize: 13 } as const;
+
+/**
+ * One public thing and its address. Live: the address, Copy link and its own
+ * Unpublish, then whatever else belongs to it (`children`). Not live: the
+ * one button that publishes it.
+ */
+function Row({
+  name,
+  live,
+  url,
+  publishLabel,
+  onPublish,
+  onUnpublish,
+  children,
+}: {
+  name: string;
+  live: boolean;
+  url: string;
+  publishLabel: string;
+  onPublish: () => void;
+  onUnpublish: () => void;
+  children?: React.ReactNode;
+}) {
+  const [copied, setCopied] = useState(false);
+  return (
+    <div
+      className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-2.5 rounded-xl px-3.5 py-2.5"
+      style={{ background: "var(--color-surface)", border: "1px solid var(--color-divider)" }}
+    >
+      <span className="w-[64px] flex-none text-[13px] font-medium">{name}</span>
+      {live ? (
+        <>
+          {url ? (
+            <a
+              href={url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex min-w-0 flex-1 basis-[160px] items-center gap-1.5 font-mono text-[13px] underline-offset-2 hover:underline"
+              style={{ color: "var(--color-ink)" }}
+            >
+              <span className="truncate">{displayUrl(url)}</span>
+              <span className="flex-none">
+                <Icon d={ICON.out} size={12} />
+              </span>
+            </a>
+          ) : (
+            <span className="min-w-0 flex-1 text-[13px] text-muted">No address yet</span>
+          )}
+          {url && (
+            <button
+              type="button"
+              className="btn btn-ghost"
+              style={SMALL}
+              onClick={async () => {
+                try {
+                  await navigator.clipboard.writeText(url);
+                  setCopied(true);
+                  window.setTimeout(() => setCopied(false), 1400);
+                } catch {
+                  // Clipboard refused — the link is right there to select.
+                }
+              }}
+            >
+              <Icon d={copied ? ICON.check : ICON.copy} size={13} />
+              {copied ? "Copied" : "Copy link"}
+            </button>
+          )}
+          {children}
+          <button type="button" className="btn btn-secondary" style={SMALL} onClick={onUnpublish}>
+            Unpublish
+          </button>
+        </>
+      ) : (
+        <>
+          <span className="min-w-0 flex-1 text-[13px] text-muted">Not public</span>
+          <button type="button" className="btn btn-secondary" style={SMALL} onClick={onPublish}>
+            {publishLabel}
+          </button>
+        </>
+      )}
+    </div>
   );
 }

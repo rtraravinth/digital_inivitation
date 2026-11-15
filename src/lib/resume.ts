@@ -1,8 +1,11 @@
 import {
   FONTS,
+  componentHasContent,
   isListBlock,
+  printsOnResume,
+  type Block,
+  type ResumeListBlock,
   type FontId,
-  type PageBlock,
   type Paper,
   type Portfolio,
   type Resume,
@@ -12,6 +15,7 @@ import {
   type ResumeSpacing,
   type ResumeTemplateId,
   type Section,
+  previewPath,
 } from "./types";
 
 /* ── resume catalogue and helpers ─────────────────────────────────────────
@@ -505,7 +509,7 @@ export function sheetParts(resume: Resume) {
  * The paper's own ground. White, except under a solid column, where the
  * accent runs from the paper's edge to halfway across the gutter. It is a
  * gradient on the sheet rather than a background on the column so it covers
- * the full height of every page — and `/resume/[id]` paints the same
+ * the full height of every page — and `/preview/resume/[id]` paints the same
  * gradient on the printed page itself, or the column would stop where its
  * text does.
  */
@@ -529,7 +533,7 @@ export function initialsOf(name: string): string {
 
 export const RESUME_ACCENTS = ["#111111", "#1d3f8a", "#0f766e", "#1f3a32", "#5b2545", "#b5261e", "#8a6f1f", "#334155"];
 
-export const BLOCK_LABEL: Record<ResumeBlock, string> = {
+const BLOCK_LABEL: Record<ResumeBlock, string> = {
   summary: "Summary",
   experience: "Experience",
   education: "Education",
@@ -541,7 +545,7 @@ export const BLOCK_LABEL: Record<ResumeBlock, string> = {
 };
 
 /** Blocks a two-column template sets in its narrow column. */
-export const SIDE_BLOCKS = new Set<ResumeBlock>(["skills", "certifications", "languages", "awards"]);
+const SIDE_BLOCKS = new Set<ResumeBlock>(["skills", "certifications", "languages", "awards"]);
 
 export const PAPERS: Record<Paper, { name: string; w: number; h: number; css: string }> = {
   a4: { name: "A4", w: 210, h: 297, css: "A4" },
@@ -624,36 +628,6 @@ export function contactItems(p: Portfolio): ContactItem[] {
   return items;
 }
 
-type ProjectItem = { id: string; title: string; tab: string; description: string; url: string };
-
-/** What the resume calls the page's own sections. */
-const PROJECTS_HEADING = "Projects";
-
-/**
- * The page's own sections switched on for the resume, as entries under one
- * heading. Still a list of groups, because that is the shape the sheet
- * draws; there is one group now that a section is filed under nothing but
- * its own title.
- */
-export function sectionGroups(p: Portfolio): Array<{ tab: string; items: ProjectItem[] }> {
-  const items: ProjectItem[] = [];
-  for (const s of p.sections) {
-    if (!s.onResume || !(s.title.trim() || s.description.trim())) continue;
-    // A section that is only a title over its components has nothing for
-    // the resume: it prints no component but its own lists, and those it
-    // prints itself. The bare title would be an entry with nothing under it.
-    if (!s.description.trim() && s.links.length === 0 && s.blocks.length > 0) continue;
-    items.push({
-      id: s.id,
-      title: s.title.trim(),
-      tab: PROJECTS_HEADING,
-      description: s.description.trim(),
-      url: s.links[0]?.url ?? "",
-    });
-  }
-  return items.length > 0 ? [{ tab: PROJECTS_HEADING, items }] : [];
-}
-
 /** The header is the resume's top: no second copy to keep in step. */
 export function headlineOf(p: Portfolio): string {
   return p.header.current.trim();
@@ -663,44 +637,45 @@ export function summaryOf(p: Portfolio): string {
   return p.header.description.trim();
 }
 
-/** Whether a block has anything to print — an empty heading is worse than none. */
-export function blockHasContent(p: Portfolio, block: ResumeBlock): boolean {
-  const r = p.resume;
-  switch (block) {
-    case "summary":
-      return !!summaryOf(p);
-    case "experience":
-      return r.experience.some((e) => e.role.trim() || e.company.trim());
-    case "education":
-      return r.education.some((e) => e.degree.trim() || e.school.trim());
-    case "projects":
-      return sectionGroups(p).length > 0;
-    case "skills":
-      return r.skills.some((g) => g.items.some((i) => i.trim()));
-    case "certifications":
-      return r.certifications.some((c) => c.name.trim());
-    case "languages":
-      return r.languages.some((l) => l.name.trim());
-    case "awards":
-      return r.awards.some((a) => a.title.trim());
-  }
+/** Whether the header's About prints as the resume's summary. */
+export function summaryShown(p: Portfolio): boolean {
+  return !!summaryOf(p) && !p.resume.hidden.includes("summary");
 }
+
+/** Whether a component has words for the resume — a cover picture is not. */
+function hasWords(p: Portfolio, s: Section, b: Block): boolean {
+  if (b.type === "text") return !!s.description.trim();
+  if (isListBlock(b)) return listEntries(b).length > 0;
+  return componentHasContent(b, p.resume, s);
+}
+
+/** One section as the resume prints it: its title, and the components under
+ *  it with "Print on your resume" checked that have something to print. */
+export type ResumePart = { section: Section; blocks: Block[] };
 
 /**
- * Whether the portfolio uses a block at all: the summary and the sections
- * once there is something to print, and a resume list once a component
- * places it in a section — a section that is off the page counts, which is
- * how a list is kept to the resume. A list nobody has added is not part of
- * this portfolio, whatever entries an earlier build left in it.
+ * The resume, section by section, in the page's order. It is the page's
+ * own sections — nothing on the resume is a section of its own. A section
+ * prints while its Resume switch is on; under its title go only the
+ * components with "Print on your resume" checked, and with none checked it
+ * prints its title alone. A section with no title and nothing checked has
+ * nothing to print.
  */
-export function blockInUse(p: Portfolio, block: ResumeBlock): boolean {
-  if (block === "summary" || block === "projects") return blockHasContent(p, block);
-  return p.sections.some((s) => s.blocks.some((b) => b.type === block));
+export function resumeParts(p: Portfolio): ResumePart[] {
+  const parts: ResumePart[] = [];
+  for (const s of p.sections) {
+    if (!s.onResume) continue;
+    const blocks = s.blocks.filter((b) => printsOnResume(b) && hasWords(p, s, b));
+    if (!s.title.trim() && blocks.length === 0) continue;
+    parts.push({ section: s, blocks });
+  }
+  return parts;
 }
 
-/** The blocks this sheet prints, in order. */
-export function visibleBlocks(p: Portfolio): ResumeBlock[] {
-  return p.resume.order.filter((b) => !p.resume.hidden.includes(b) && blockInUse(p, b) && blockHasContent(p, b));
+/** Whether a two-column template sets this part in its narrow column: when
+ *  everything it prints is one of the short lists (`SIDE_BLOCKS`). */
+export function isSidePart(part: ResumePart): boolean {
+  return part.blocks.length > 0 && part.blocks.every((b) => SIDE_BLOCKS.has(b.type as ResumeBlock));
 }
 
 /* ── the resume's lists on the page ─────────────────────────────────────
@@ -727,11 +702,11 @@ type ListEntry = {
 const line = (...parts: string[]) => parts.map((s) => s.trim()).filter(Boolean).join(" · ");
 const entry = (e: Partial<ListEntry> & { id: string; title: string }): ListEntry => ({ sub: "", date: "", lines: [], tags: [], url: "", ...e });
 
-/** One list's entries as the page draws them; blank rows drop out. */
-function listEntries(resume: Resume, list: PageBlock): ListEntry[] {
-  switch (list) {
+/** One list component's entries as the page draws them; blank rows drop out. */
+function listEntries(block: ResumeListBlock): ListEntry[] {
+  switch (block.type) {
     case "experience":
-      return resume.experience
+      return block.items
         .filter((e) => e.role.trim() || e.company.trim())
         .map((e) =>
           entry({
@@ -743,7 +718,7 @@ function listEntries(resume: Resume, list: PageBlock): ListEntry[] {
           }),
         );
     case "education":
-      return resume.education
+      return block.items
         .filter((e) => e.degree.trim() || e.school.trim())
         .map((e) =>
           entry({
@@ -755,19 +730,19 @@ function listEntries(resume: Resume, list: PageBlock): ListEntry[] {
           }),
         );
     case "skills":
-      return resume.skills
+      return block.items
         .map((g) => entry({ id: g.id, title: g.name.trim(), tags: g.items.map((i) => i.trim()).filter(Boolean) }))
         .filter((g) => g.tags.length > 0);
     case "certifications":
-      return resume.certifications
+      return block.items
         .filter((c) => c.name.trim())
         .map((c) => entry({ id: c.id, title: c.name.trim(), sub: c.issuer.trim(), date: c.date.trim(), url: c.url.trim() }));
     case "languages":
-      return resume.languages
+      return block.items
         .filter((l) => l.name.trim())
         .map((l) => entry({ id: l.id, title: l.name.trim(), sub: l.level.trim() }));
     case "awards":
-      return resume.awards
+      return block.items
         .filter((a) => a.title.trim())
         .map((a) =>
           entry({ id: a.id, title: a.title.trim(), sub: a.issuer.trim(), date: a.date.trim(), lines: a.detail.trim() ? [a.detail.trim()] : [] }),
@@ -786,8 +761,9 @@ function listEntries(resume: Resume, list: PageBlock): ListEntry[] {
  * Skills are one stand-in per group, its items as a separated line, and the
  * languages are one stand-in holding all of them: both read as chips.
  */
-export function listSections(resume: Resume, list: PageBlock): Section[] {
-  const entries = listEntries(resume, list);
+export function listSections(block: ResumeListBlock): Section[] {
+  const list = block.type;
+  const entries = listEntries(block);
   const stand = (id: string, title: string, description: string, url = ""): Section => ({
     id: `resume-${list}-${id}`,
     title,
@@ -795,7 +771,6 @@ export function listSections(resume: Resume, list: PageBlock): Section[] {
     tab: BLOCK_LABEL[list],
     links: url ? [{ id: `resume-${list}-${id}-link`, label: "Credential", url }] : [],
     images: [],
-    file: null,
     quote: null,
     blocks: [],
     hidden: false,
@@ -819,12 +794,12 @@ export function listSections(resume: Resume, list: PageBlock): Section[] {
  * editor, which keeps an empty component so it can be filled. Idempotent.
  */
 export function withPlacedLists(p: Portfolio): Portfolio {
-  const empty = (s: Section) => s.blocks.some((b) => isListBlock(b) && listEntries(p.resume, b.type).length === 0);
+  const empty = (s: Section) => s.blocks.some((b) => isListBlock(b) && listEntries(b).length === 0);
   if (!p.sections.some(empty)) return p;
   return {
     ...p,
     sections: p.sections.map((s) =>
-      empty(s) ? { ...s, blocks: s.blocks.filter((b) => !isListBlock(b) || listEntries(p.resume, b.type).length > 0) } : s,
+      empty(s) ? { ...s, blocks: s.blocks.filter((b) => !isListBlock(b) || listEntries(b).length > 0) } : s,
     ),
   };
 }
@@ -835,5 +810,11 @@ export function resumeFileName(p: Portfolio): string {
 }
 
 export function resumePrintPath(id: string, auto = true): string {
-  return `/resume/${id}${auto ? "?print=1" : ""}`;
+  return `/preview/resume/${id}${auto ? "?print=1" : ""}`;
+}
+
+/** Where "Preview" goes: the resume when it is the only thing published,
+ *  since the page's address does not answer, otherwise the page. */
+export function previewHref(p: Portfolio): string {
+  return p.status !== "live" && p.resumeStatus === "live" ? resumePrintPath(p.id, false) : previewPath(p.id);
 }

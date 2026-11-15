@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { UploadButton } from "./UploadButton";
 import { Glyph } from "@/lib/glyphs";
-import { formatBytes, readFileAsset, readImageAsset } from "@/lib/assets";
+import { formatBytes, readImageAsset } from "@/lib/assets";
 import { newId } from "@/lib/store";
 import { assetSrc, type Asset, type PortfolioHeader, type Section } from "@/lib/types";
 
@@ -211,113 +211,6 @@ export function PortfolioExtras({
 
       <NumberRows header={header} onChange={onChange} />
       <DateRows header={header} onChange={onChange} />
-    </div>
-  );
-}
-
-/**
- * The two extras that belong to one section: a file and a pull quote.
- * Pictures have their own field and the rest are components; numbers and
- * the page-wide timeline are the header's — see `PortfolioExtras`.
- */
-export function SectionExtras({
-  section,
-  onChange,
-}: {
-  section: Section;
-  onChange: Change;
-}) {
-  const [error, setError] = useState("");
-
-  return (
-    <div className="border-divider border-t pt-3">
-      <div className="mono-label mb-2">Attach (optional)</div>
-
-      <div className="mb-3 flex flex-wrap gap-2">
-        <UploadButton
-          label={section.file ? "Replace file" : "A file to download"}
-          accept=".pdf,.doc,.docx,.txt,.csv,.md"
-          onError={setError}
-          onPick={async (file) => {
-            const asset = await readFileAsset(file);
-            onChange((s) => ({ ...s, file: asset }));
-          }}
-        />
-        <button
-          type="button"
-          className="btn btn-secondary"
-          disabled={Boolean(section.quote)}
-          onClick={() => onChange((s) => ({ ...s, quote: { text: "", attribution: "" } }))}
-        >
-          A pull quote
-        </button>
-      </div>
-
-      {error && (
-        <p
-          className="mb-3 text-[12px]"
-          style={{ color: "var(--color-accent-700)" }}
-          role="alert"
-        >
-          {error}
-        </p>
-      )}
-
-      {section.file && (
-        <div className="field mb-3">
-          <label>File — offered as a download on the published page</label>
-          <AssetChip
-            asset={section.file}
-            onRemove={() => onChange((s) => ({ ...s, file: null }))}
-          />
-        </div>
-      )}
-
-      {section.quote && (
-        <div className="field">
-          <label htmlFor={`quote-${section.id}`}>Quote — set as a pull quote</label>
-          <div className="flex flex-col gap-1.5">
-            <textarea
-              id={`quote-${section.id}`}
-              className="input"
-              style={{ minHeight: 60 }}
-              placeholder="What someone said"
-              value={section.quote.text}
-              onChange={(e) =>
-                onChange((s) => ({
-                  ...s,
-                  quote: {
-                    text: e.target.value,
-                    attribution: s.quote?.attribution ?? "",
-                  },
-                }))
-              }
-            />
-            <div className="flex items-start gap-1.5">
-              <input
-                className="input"
-                placeholder="Who said it"
-                aria-label="Attribution"
-                value={section.quote.attribution}
-                onChange={(e) =>
-                  onChange((s) => ({
-                    ...s,
-                    quote: { text: s.quote?.text ?? "", attribution: e.target.value },
-                  }))
-                }
-              />
-              <button
-                type="button"
-                className="btn btn-secondary btn-icon"
-                aria-label="Remove quote"
-                onClick={() => onChange((s) => ({ ...s, quote: null }))}
-              >
-                <Glyph id="close" size={15} />
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

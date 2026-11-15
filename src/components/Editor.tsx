@@ -4,12 +4,13 @@ import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import Link from "next/link";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { LinkEditor } from "./LinkEditor";
-import { PortfolioExtras, PortraitField, SectionExtras } from "./SectionExtras";
+import { PortfolioExtras, PortraitField } from "./SectionExtras";
+import { PublishDialog } from "./PublishDialog";
 import { PublishedLock } from "./PublishedLock";
 import { TagEditor } from "./TagEditor";
 import { ResumeContactFields } from "./resume/ResumeContent";
 import { Card, Placeholder } from "./editor/card";
-import { COMPONENT_ICON, ComponentChip, ComponentPanel, ComponentPicker, CoverField, componentName, componentSummary, newComponent } from "./editor/components";
+import { COMPONENT_ICON, ComponentChip, ComponentPanel, ComponentPicker, componentName, componentSummary, newComponent } from "./editor/components";
 import { ICON, Icon, IconButton, LookToggles, StatusPill } from "./ui";
 import { Glyph } from "@/lib/glyphs";
 import { LinkIcon, iconFor } from "@/lib/icons";
@@ -18,6 +19,7 @@ import {
   BLOCK_TYPES,
   assetSrc,
   coverOf,
+  isFrozen,
   previewPath,
   type LinkItem,
   type Portfolio,
@@ -65,6 +67,7 @@ export function Editor({ id }: { id: string }) {
   } = usePortfolios();
   const reduced = useReducedMotion();
   const [open, setOpen] = useState<string | null>(null);
+  const [publishing, setPublishing] = useState(false);
   /** Refs, not state: focusing a new section must not cost a render of its own. */
   const justAdded = useRef<string | null>(null);
   const wasOpen = useRef<string | null>(null);
@@ -114,10 +117,11 @@ export function Editor({ id }: { id: string }) {
     );
   }
 
-  // A live page is frozen — the API refuses every write to it — so this
-  // screen steps aside for Preview and Unpublish. The structured blocks can
-  // be on the page, so they are frozen with it.
-  if (portfolio.status === "live") {
+  // A portfolio with its page or its resume live is frozen — the API
+  // refuses every section write to it — so this screen steps aside for
+  // Preview and Unpublish. The structured blocks can be on the page, so they
+  // are frozen with it.
+  if (isFrozen(portfolio)) {
     return <PublishedLock portfolio={portfolio} />;
   }
 
@@ -187,12 +191,14 @@ export function Editor({ id }: { id: string }) {
               type="button"
               className="btn btn-primary"
               style={{ marginTop: 0, minHeight: 34 }}
-              onClick={() => updatePortfolio(p.id, (prev) => ({ ...prev, status: "live" }))}
+              onClick={() => setPublishing(true)}
             >
               Publish
             </button>
           </span>
         </header>
+
+        <AnimatePresence>{publishing && <PublishDialog key="publish" p={p} onClose={() => setPublishing(false)} />}</AnimatePresence>
 
         <main className="mx-auto w-full max-w-[1180px] flex-1 px-4 pt-8 pb-24 sm:px-6 sm:pt-10">
           <AnimatePresence>
@@ -727,7 +733,6 @@ function SectionCard({
   onDelete: () => void;
 }) {
   const [confirming, setConfirming] = useState(false);
-  const extras = [s.file && "File", s.quote?.text && "Quote"].filter(Boolean) as string[];
   const cover = coverOf(s);
 
   return (
@@ -774,28 +779,19 @@ function SectionCard({
               <div className="text-[19px] leading-snug font-semibold tracking-[-0.015em]">
                 {s.title || <Placeholder>Title</Placeholder>}
               </div>
-              <p className="m-0 mt-1.5 line-clamp-3 max-w-[64ch] text-[14px] leading-relaxed text-muted">
-                {s.description || <Placeholder>What it is, in a few sentences</Placeholder>}
-              </p>
+              {s.description && (
+                <p className="m-0 mt-1.5 line-clamp-3 max-w-[64ch] text-[14px] leading-relaxed text-muted">{s.description}</p>
+              )}
             </div>
           </div>
           {s.blocks.length > 0 && (
             <ul className="m-0 mt-3 flex list-none flex-wrap gap-1.5 p-0">
               {s.blocks.map((b) => (
                 <li key={b.id} className="inline-flex">
-                  <ComponentChip icon={COMPONENT_ICON[b.type]} name={componentName(b.type)} summary={componentSummary(b, resume)} />
+                  <ComponentChip icon={COMPONENT_ICON[b.type]} name={componentName(b.type)} summary={componentSummary(b, resume, s)} />
                 </li>
               ))}
             </ul>
-          )}
-          {extras.length > 0 && (
-            <div className="mt-3 flex flex-wrap items-center gap-1.5">
-              {extras.map((x) => (
-                <span key={x} className="tag tag-neutral">
-                  {x}
-                </span>
-              ))}
-            </div>
           )}
           <LinkList links={s.links} />
         </>
@@ -816,30 +812,11 @@ function SectionCard({
             The section’s name: its heading on your page and its place on the page’s menu.
           </p>
         </div>
-        <div className="field">
-          <label htmlFor={`desc-${s.id}`}>Description</label>
-          <textarea
-            id={`desc-${s.id}`}
-            className="input"
-            rows={4}
-            placeholder="What it is, in a few sentences"
-            value={s.description}
-            onChange={(e) => onChange((x) => ({ ...x, description: e.target.value }))}
-          />
-        </div>
       </div>
-
-      <Grouped title="Cover picture" hint="One picture the page leads this section with. For a set of pictures, add a Gallery component below.">
-        <CoverField section={s} onChange={onChange} />
-      </Grouped>
-
-      <Grouped title="Links">
-        <LinkEditor links={s.links} onChange={(links) => onChange((x) => ({ ...x, links }))} />
-      </Grouped>
 
       <Grouped
         title="Components"
-        hint="Everything else this section shows on your page, in this order. How each one looks is picked in the builder."
+        hint="What this section shows under its title: text and a cover, links, a quote, a gallery, a list. How each one looks is picked in the builder."
       >
         {s.blocks.length > 0 && (
           <div className="flex flex-col gap-3">
@@ -859,13 +836,8 @@ function SectionCard({
             </AnimatePresence>
           </div>
         )}
-        <ComponentPicker count={s.blocks.length} onAdd={(type) => onChange((x) => ({ ...x, blocks: [...x.blocks, newComponent(type)] }))} />
+        <ComponentPicker section={s} onAdd={(type) => onChange((x) => ({ ...x, blocks: [...x.blocks, newComponent(type)] }))} />
       </Grouped>
-
-      {/* Draws its own rule and "Attach (optional)" label. */}
-      <div className="mt-5">
-        <SectionExtras section={s} onChange={onChange} />
-      </div>
 
       <div className="mt-6 flex flex-wrap items-center gap-2">
         <AnimatePresence mode="wait" initial={false}>

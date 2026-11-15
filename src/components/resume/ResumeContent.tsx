@@ -13,7 +13,7 @@ import type {
   EducationItem,
   ExperienceItem,
   Language,
-  PageBlock,
+  ResumeListBlock,
   Portfolio,
   Resume,
   SkillGroup,
@@ -22,12 +22,11 @@ import type {
 /* ── the resume's facts in the editor ────────────────────────────────────
    The rows behind the six list components — roles with dates, schools,
    skills — and the resume's contact line. A list component in a section
-   (editor/components.tsx) shows `ResumeListRows` as its body, so the entries
-   are typed where the list sits on the page; the header card shows
-   `ResumeContactFields`. Neither stores anything in a section: both write
-   `p.resume`, structured, because a resume template and a later ATS check
-   have to read a role and its dates without parsing prose. Entries open in
-   place and save as they are typed.
+   (editor/components.tsx) shows `ResumeListRows` as its body and keeps the
+   entries itself, structured, because a resume template and the ATS check
+   read a role and its dates without parsing prose. The header card shows
+   `ResumeContactFields`, which writes `p.resume`. Entries open in place and
+   save as they are typed.
    ──────────────────────────────────────────────────────────────────────── */
 
 const EASE = [0.16, 1, 0.3, 1] as const;
@@ -43,7 +42,7 @@ function useResume(p: Portfolio) {
 }
 
 /** What one row of each list is called. */
-const LIST_NOUN: Record<PageBlock, [string, string]> = {
+const LIST_NOUN: Record<ResumeListBlock["type"], [string, string]> = {
   experience: ["role", "roles"],
   education: ["entry", "entries"],
   skills: ["group", "groups"],
@@ -53,9 +52,9 @@ const LIST_NOUN: Record<PageBlock, [string, string]> = {
 };
 
 /** "4 roles", "Empty" — what a closed card says about a list. */
-export function listSummary(resume: Resume, list: PageBlock): string {
-  const n = resume[list].length;
-  return n === 0 ? "Empty" : `${n} ${n === 1 ? LIST_NOUN[list][0] : LIST_NOUN[list][1]}`;
+export function listSummary(block: ResumeListBlock): string {
+  const n = block.items.length;
+  return n === 0 ? "Empty" : `${n} ${n === 1 ? LIST_NOUN[block.type][0] : LIST_NOUN[block.type][1]}`;
 }
 
 /** Email, phone, place and site — printed on the resume, never on the page. */
@@ -81,46 +80,18 @@ export function ResumeContactFields({ p }: { p: Portfolio }) {
 }
 
 /**
- * One list's rows, and whether the resume prints it. The body of a list
- * component: what is typed here is the resume's own data, so it is the same
- * list wherever the component sits and whether or not the page shows it.
+ * One list component's rows. The entries are the component's own: a second
+ * Experience component is a second list, not a view of the first. Whether
+ * it prints is the component's "Print on your resume", in its panel.
  */
-export function ResumeListRows({ p, block }: { p: Portfolio; block: PageBlock }) {
-  const { change, set } = useResume(p);
-  const r = p.resume;
-  const onResume = !r.hidden.includes(block);
-  const common = {
-    footer: (
-      <label className="flex cursor-pointer items-start gap-3 text-[13.5px]">
-        <input
-          type="checkbox"
-          className="mt-0.5 h-4 w-4 flex-none accent-[var(--color-ink)]"
-          checked={onResume}
-          onChange={() =>
-            change((prev) => ({
-              ...prev,
-              hidden: prev.hidden.includes(block) ? prev.hidden.filter((b) => b !== block) : [...prev.hidden, block],
-            }))
-          }
-        />
-        <span>
-          <span className="font-medium">Print on your resume</span>
-          <span className="block text-[12.5px] text-muted">
-            The resume sets this list in its own template, whatever look the page gives it.
-          </span>
-        </span>
-      </label>
-    ),
-  };
-
-  switch (block) {
+export function ResumeListRows({ block, onChange }: { block: ResumeListBlock; onChange: (next: ResumeListBlock) => void }) {
+  switch (block.type) {
     case "experience":
       return (
         <ListCard<ExperienceItem>
-          {...common}
           hint="Most recent first. Start each point with what you did, end it with the result."
-          items={r.experience}
-          onItems={(experience) => set("experience", experience)}
+          items={block.items}
+          onItems={(items) => onChange({ ...block, items })}
           make={() => ({ id: newId(), role: "", company: "", location: "", start: "", end: "", current: false, bullets: [] })}
           addLabel="Add a role"
           max={40}
@@ -163,9 +134,8 @@ export function ResumeListRows({ p, block }: { p: Portfolio; block: PageBlock })
     case "education":
       return (
         <ListCard<EducationItem>
-          {...common}
-          items={r.education}
-          onItems={(education) => set("education", education)}
+          items={block.items}
+          onItems={(items) => onChange({ ...block, items })}
           make={() => ({ id: newId(), degree: "", school: "", location: "", start: "", end: "", detail: "" })}
           addLabel="Add education"
           max={20}
@@ -190,10 +160,9 @@ export function ResumeListRows({ p, block }: { p: Portfolio; block: PageBlock })
     case "skills":
       return (
         <ListCard<SkillGroup>
-          {...common}
           hint="Group them if you have many — “Design”, “Tools”. One unnamed group is fine too."
-          items={r.skills}
-          onItems={(skills) => set("skills", skills)}
+          items={block.items}
+          onItems={(items) => onChange({ ...block, items })}
           make={() => ({ id: newId(), name: "", items: [] })}
           addLabel="Add a skill group"
           max={20}
@@ -213,9 +182,8 @@ export function ResumeListRows({ p, block }: { p: Portfolio; block: PageBlock })
     case "certifications":
       return (
         <ListCard<Certification>
-          {...common}
-          items={r.certifications}
-          onItems={(certifications) => set("certifications", certifications)}
+          items={block.items}
+          onItems={(items) => onChange({ ...block, items })}
           make={() => ({ id: newId(), name: "", issuer: "", date: "", url: "" })}
           addLabel="Add a certification"
           max={40}
@@ -234,9 +202,8 @@ export function ResumeListRows({ p, block }: { p: Portfolio; block: PageBlock })
     case "languages":
       return (
         <ListCard<Language>
-          {...common}
-          items={r.languages}
-          onItems={(languages) => set("languages", languages)}
+          items={block.items}
+          onItems={(items) => onChange({ ...block, items })}
           make={() => ({ id: newId(), name: "", level: "" })}
           addLabel="Add a language"
           max={20}
@@ -264,9 +231,8 @@ export function ResumeListRows({ p, block }: { p: Portfolio; block: PageBlock })
     case "awards":
       return (
         <ListCard<Award>
-          {...common}
-          items={r.awards}
-          onItems={(awards) => set("awards", awards)}
+          items={block.items}
+          onItems={(items) => onChange({ ...block, items })}
           make={() => ({ id: newId(), title: "", issuer: "", date: "", detail: "" })}
           addLabel="Add an award"
           max={40}
@@ -298,7 +264,6 @@ function Field({ label, span, children }: { label: string; span?: boolean; child
 
 function ListCard<T extends { id: string }>({
   hint,
-  footer,
   items,
   onItems,
   make,
@@ -308,7 +273,6 @@ function ListCard<T extends { id: string }>({
   render,
 }: {
   hint?: string;
-  footer: ReactNode;
   items: T[];
   onItems: (items: T[]) => void;
   make: () => T;
@@ -319,8 +283,18 @@ function ListCard<T extends { id: string }>({
 }) {
   const reduced = useReducedMotion();
   const [open, setOpen] = useState<string | null>(null);
+  // An empty list opens on one blank entry rather than a lone "Add" button:
+  // a list component is added to be filled. The entry is stored on the first
+  // keystroke, so adding a component and leaving it writes nothing.
+  const [draft] = useState(make);
 
   const edit = (itemId: string) => (patch: Partial<T>) => onItems(items.map((it) => (it.id === itemId ? { ...it, ...patch } : it)));
+  // The draft keeps its box while it is the only entry, so the field being
+  // typed in is not remounted (and does not lose focus) when it is stored.
+  const stored = items.length === 1 && items[0].id === draft.id;
+  const inBox = items.length === 0 || stored;
+  const editDraft = stored ? edit(draft.id) : (patch: Partial<T>) => onItems([{ ...draft, ...patch }]);
+  const shown = stored ? [] : items;
   const move = (index: number, delta: -1 | 1) => {
     const to = index + delta;
     if (to < 0 || to >= items.length) return;
@@ -336,7 +310,7 @@ function ListCard<T extends { id: string }>({
       <div>
       <ul className="m-0 flex list-none flex-col gap-2 p-0">
         <AnimatePresence initial={false}>
-          {items.map((item, i) => {
+          {shown.map((item, i) => {
             const s = summary(item);
             const isOpen = open === item.id;
             return (
@@ -405,6 +379,12 @@ function ListCard<T extends { id: string }>({
         </AnimatePresence>
       </ul>
 
+      {inBox && (
+        <div className="rounded-xl px-3.5 pt-1 pb-4" style={{ border: "1px solid var(--color-ink)" }}>
+          <div className="pt-3">{render(stored ? items[0] : draft, editDraft)}</div>
+        </div>
+      )}
+
       <button
         type="button"
         disabled={items.length >= max}
@@ -422,7 +402,6 @@ function ListCard<T extends { id: string }>({
         {addLabel}
       </button>
       </div>
-      {footer}
     </div>
   );
 }

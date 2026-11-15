@@ -94,9 +94,9 @@ function route(request: NextRequest, headers: Headers): NextResponse {
   const { pathname, search } = request.nextUrl;
 
   if (host.kind === "app") {
-    const old = /^\/p\/([^/]+)\/([^/]+)\/?$/.exec(pathname);
+    const old = /^\/p\/([^/]+)\/([^/]+)(\/resume)?\/?$/.exec(pathname);
     const origin = old ? subdomainOrigin(old[1]) : "";
-    if (old && origin) return NextResponse.redirect(`${origin}/${old[2]}${search}`, 308);
+    if (old && origin) return NextResponse.redirect(`${origin}/${old[2]}${old[3] ?? ""}${search}`, 308);
     return NextResponse.next({ request: { headers } });
   }
 

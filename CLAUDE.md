@@ -31,7 +31,7 @@ npm run build
 npm run lint
 npm run typecheck
 npm run knip
-cd backend && .venv/bin/python -m pytest    # 444 tests (.venv/Scripts on Windows)
+cd backend && .venv/bin/python -m pytest    # 486 tests (.venv/Scripts on Windows)
 ```
 
 **CI runs all of these on every pull request** (`.github/workflows/ci.yml`),
@@ -87,17 +87,30 @@ verified address claims it), then starts both.
   `API_INTERNAL_URL` (`lib/published.ts`) and falls back to `API_BASE`.
 - **`FACET_DATABASE_URL` takes the host's own `postgres://` string**;
   `Settings` names the asyncpg driver itself.
-- **Uploads live on the container's disk** (`FACET_MEDIA_ROOT`). On a host
-  that wipes it — Render's free plan does — pictures do not survive a
-  restart. `render.yaml` says how to attach a disk.
+- **Uploads live on the container's disk** (`FACET_MEDIA_ROOT`) **or in
+  Cloudflare R2** (`FACET_STORAGE=r2` plus `FACET_R2_ENDPOINT`, `_BUCKET`,
+  `_ACCESS_KEY_ID`, `_SECRET_ACCESS_KEY`; `R2Storage` in
+  `services/storage.py`, boto3 over R2's S3 API). On a host that wipes its
+  disk — Render's free plan does — only R2 keeps pictures across a restart.
+  **The bucket stays private**: every image is still served by the API
+  (`serve()` streams it), which is what signs an owner's URLs, keeps a
+  draft's pictures private and sends the sandbox headers — never give the
+  bucket public access or a public domain. Settings refuse to boot with R2
+  half configured. Storage calls block, so callers on the event loop run
+  them in a thread. Storage keys are the same paths on disk and in the
+  bucket, so `python -m app.cli copy-media-to-r2` (skips what is already
+  there; `--dry-run` lists) moves existing uploads with no database change.
 
 ## Addresses: subdomains and custom domains
 
 **A published page is `<subdomain>.facetfolio.com/<slug>`.** The subdomain
 is claimed at sign-up (it used to be called the handle — the column, the wire
 field and the error codes are `subdomain` everywhere now, migration
-`e5b9c2d7a481`), and each portfolio's slug is the path. Previews stay at
-`facetfolio.com/preview/<id>`, on the app's own host.
+`e5b9c2d7a481`), and each portfolio's slug is the path. Previews stay on the app's own host:
+`facetfolio.com/preview/page/<id>` for the page and
+`facetfolio.com/preview/resume/<id>` for the resume (`previewPath()`,
+`resumePrintPath()`). The old `/preview/<id>` and `/resume/<id>` redirect
+there.
 
 - **`src/proxy.ts` routes by Host** (`classifyHost()` in `lib/hosts.ts`):
   a subdomain's `/<slug>` is rewritten to `/p/<subdomain>/<slug>`, a verified
@@ -138,11 +151,9 @@ field and the error codes are `subdomain` everywhere now, migration
   data was stored. **Numbers and the timeline live on the header, not on a
   section**: the page draws one "By the numbers" row and one timeline, so a
   per-section copy only had to be gathered back up — and the author had to
-  guess which section to type them into. A section's own extras are its
-  image, its file and its quote. The editor says which is which: "Add to this
-  portfolio (optional)" against the header, "Add to this section (optional)"
-  against a section. Extend it whenever you add a field, or data written by an
-  older build will break. `assetSrc()` lives here too: it resolves an upload
+  guess which section to type them into. The header's card offers them
+  under "Add to this portfolio (optional)". Extend `normalize()` whenever
+  you add a field, or data written by an older build will break. `assetSrc()` lives here too: it resolves an upload
   whether it carries an API `url` or a pre-backend `dataUrl`.
 - `src/lib/api.ts` — the typed API client. Access token in memory, refresh
   token in an httpOnly cookie, one silent retry on a 401.
@@ -174,7 +185,7 @@ field and the error codes are `subdomain` everywhere now, migration
   `briefcase` glyph, display name "Profile". Do not add a LinkedIn icon. The
   reasoning is in the `icons.tsx` file header, along with why twenty-three
   solid brand marks sit beside seven stroked generics and stay that way.
-- `src/lib/seed.ts` — the five seeded portfolios. `backend/scripts/dump_seed.mjs`
+- `src/lib/seed.ts` — the six seeded portfolios; `showcase` fills every field and component, with sample pictures from `seed-images.ts`. `backend/scripts/dump_seed.mjs`
   transpiles this file and writes `backend/app/seed_data.json`, so the seed is
   not maintained twice; re-run it whenever this changes.
 - `src/components/Editor.tsx` — artboards 4b (desktop document) and 4d (mobile),
@@ -192,7 +203,7 @@ field and the error codes are `subdomain` everywhere now, migration
   resume" below. `ResumeDocument.tsx` draws all six templates from one markup,
   `src/app/resume.css` gives each its look, `ResumeSheet.tsx` is the scaled
   preview, `ResumeContent.tsx` the editor's Resume view, `ResumeStudio.tsx`
-  the builder's Resume side and `ResumePrint.tsx` the `/resume/[id]` page
+  the builder's Resume side and `ResumePrint.tsx` the `/preview/resume/[id]` page
   that Download PDF opens. `src/lib/resume.ts` holds what they share.
 - `src/components/account/panels.tsx` + `Account.tsx` — artboards 5a and 5b.
 - `src/components/published/themes.tsx` — the published page in five motion
@@ -247,11 +258,30 @@ would beat a base rule, so the size has to be inline — that is why `headline()
 returns a style object rather than a class.
 
 **One kind of thing in the editor: a section, and under its heading,
-components.** A section is a title, a description, links and **one cover
-picture**; everything else it shows is a
+components.** An open section card is its **title** and its components, with
+"Add a component" under them, and nothing else. Everything it shows is a
 component, edited in the one frame `PanelShell` (`editor/components.tsx`)
 inside the one `Card` (`editor/card.tsx`). Do not add a second card or panel
-chrome — that inconsistency is what this replaced.
+chrome, or a field outside a component — that inconsistency is what this
+replaced.
+
+- **Text, Links and Quote place the section's own fields.** `text` is the
+  description and the cover picture, `links` the links, `quote` the pull
+  quote. Like a resume list, the component holds nothing: the values stay
+  on the section (`description`, `images`, `links`, `quote` columns), where
+  every theme, the resume and the ATS check read them, so no theme changed
+  and there was no migration. A section holds at most one of each
+  (`canAddComponent()`); removing one empties its field
+  (`withoutComponent()`). `normalize()` gives a section stored before this
+  the components its filled fields need, with derived ids. They never make
+  a section a band — `shownBlocks()` skips them, and the theme's card
+  draws the fields — and they take no heading. `SECTION_BLOCKS_MAX` is 15
+  on both sides to make room for them.
+- **A section has no file to download.** It went with migration
+  `a1d4f7c9e2b6`, which drops `sections.file_asset_id`. The uploads it
+  pointed at stay in `assets`, because their bytes are on disk where a
+  migration cannot reach. An import ignores a `file` key, and so does
+  `normalize()`. Do not bring it back.
 
 - **A gallery is a component, and it names pictures rather than holding
   them.** `GalleryBlock` is `{layout, imageIds}`; the bytes stay in
@@ -262,16 +292,20 @@ chrome — that inconsistency is what this replaced.
   the cover and all galleries share the twelve-picture allowance.
   `sectionOf()` in `normalize()` gives pictures stored before this (cover
   first, the rest loose) a gallery with a derived id — no migration.
-- **The resume's lists are components too, and they place rather than
-  hold.** Experience, Education, Skills, Certifications, Languages and
-  Awards are `ResumeListBlock`s: `{type, look}` and nothing else. The
-  entries stay in `p.resume[type]` — see "The resume" for why — and the
-  component's panel edits them there (`ResumeListRows` in
-  `resume/ResumeContent.tsx`). **The component is the only thing that puts a
-  list on the page**: there is no Page switch for a list any more. It can be
-  placed any number of times — do not restrict it to one — and every
-  placement draws the same list, in its own look, because the resume has one
-  list of each kind. Removing a component keeps the entries. `LIST_LOOKS` in
+- **The resume's lists are components, and each holds its own entries.**
+  Experience, Education, Skills, Certifications, Languages and Awards are
+  `ResumeListBlock`s: `{type, look, items}`, typed per kind on both sides
+  (`ExperienceBlock`… in `app/schemas/blocks.py`, entries in
+  `schemas/resume_items.py`). The panel edits `items` (`ResumeListRows` in
+  `resume/ResumeContent.tsx`); a new one opens on a blank entry. A second
+  Experience component is a second list — it starts empty and is edited on
+  its own. **Do not share entries between components again**: one list per
+  kind, drawn by every placement, is what this replaced, because a second
+  component showed and edited the first one's roles. Migration
+  `e8b4d1a7c3f2` copied each portfolio's shared list into every component
+  that placed it and emptied the shared list; `sectionOf()` and the import
+  (`_with_list_entries()`) do the same for data that arrives older.
+  Removing a component removes its entries. `LIST_LOOKS` in
   `types.ts` says which looks each list has (the first is its default) and
   `lookOf()` falls back to it; the backend accepts any look so adding one is
   frontend-only.
@@ -323,8 +357,9 @@ chrome — that inconsistency is what this replaced.
   "Blank" used to add one empty section, which was a thing to delete first.
   Only "Copy a page" and "Founder" start with sections, because picking
   either asks for them. The test fixture `portfolio` adds one itself.
-- **The builder's two left rails are one design.** "Sections" (Page) and
-  "Blocks" (Resume): a name and a count, then numbered rows that are the
+- **The builder's two left rails are one design.** "Sections" on both
+  sides — the Resume side lists the summary and then the same sections:
+  a name and a count, then numbered rows that are the
   title only — something off the page or off the resume is dimmed, with its
   state in the row's tooltip and eye button — then one "Edit page content" /
   "Edit resume content" button. Sections are added in the editor, not here.
@@ -335,12 +370,21 @@ chrome — that inconsistency is what this replaced.
   naming why (`Unused` in `builder/controls.tsx`); Columns comes back
   wherever the Cards style is picked, because that style lays its cards
   with the same count in any theme.
-- **The resume prints, and its Blocks rail lists, only what is in use**
-  (`blockInUse()` in `lib/resume.ts`): the summary and the sections once
-  written, and a list once a component places it in a section — a section
-  off the page counts, which is how a list is kept to the resume. Entries
-  left in a list nobody placed do not print. The seed keeps its roles on
-  the resume that way, with an off-page "Experience" section.
+- **The resume is the page's sections, nothing else** (`resumeParts()` in
+  `lib/resume.ts`): the header's summary, then every section whose Resume
+  switch is on, in the page's order, each under its own title. Under the
+  title go only the components with **"Print on your resume"** checked
+  (`Block.onResume`, the checkbox at the foot of every component panel);
+  with none checked the title prints alone. There are no resume-only
+  sections and no fixed resume blocks — do not bring back an "Experience"
+  or "Your sections" block beside the sections. A section off the page but
+  on the resume is how something is kept to the resume; the seed keeps its
+  roles that way, with an off-page "Experience" section. The Resume rail's
+  eye is the section's Resume switch and its arrows move the section on the
+  page too (one order). A gallery never prints and has no checkbox
+  (`canPrintOnResume()`): the resume is text. A two-column template puts a
+  section in the narrow column when all it prints is short lists
+  (`isSidePart()`, `SIDE_BLOCKS`).
 - **Resume background patterns are drawn at half strength**
   (`PATTERN_STRENGTH` in `lib/resume-backdrops.ts`), full-page and corner
   alike, when drawn in the accent (the headings' colour). A colour picked
@@ -354,12 +398,13 @@ chrome — that inconsistency is what this replaced.
   card back before the frame paints.
 - **One Done per card, at its foot.** An open card's top bar carries only
   its switches and move buttons. The editor's top bar has "Open builder",
-  "Preview" and "Publish"; the resume PDF is downloaded from the builder's
-  Resume side, not here.
+  "Preview" and "Publish"; the resume PDF is downloaded from the published
+  screen once the resume is live.
 - **There are no built-in cards.** The editor is header, sections, footer.
   The resume's private contact line lives in the header card ("Resume
-  contact details"). It is deliberately *not* a component: it never leaves
-  the account, and the page has its own Contact component.
+  contact details"). It is deliberately *not* a component: it leaves the
+  account only when ticked on a published resume (see "Published on its
+  own"), and the page has its own Contact component.
 
 **A section is one thing with one title; there is no tab to file it
 under.** The tab used to be a second name that grouped several sections
@@ -385,8 +430,9 @@ bring it back as "group" or "category".
   title; `FeatureBand`'s is the `h2`. `menuOf()` scrolls to a band itself
   and to the run a card sits in. Meridian's tabs and Arcade's levels still
   filter with `useTabFilter` — one section per pick.
-- **On the resume the sections are entries under one heading**,
-  `PROJECTS_HEADING` in `lib/resume.ts`.
+- **On the resume each section is a section of its own**, under its title
+  (`resumeParts()` in `lib/resume.ts`). Do not file them back under one
+  "Projects" heading.
 
 **`p.layout.roleNav` keeps its name, not its wording.** It is the wire
 format, a stored value and in tests, so it is still `roleNav`; every label it
@@ -428,20 +474,25 @@ separately.
   Migration `d2f7b8c41a90` moved any old `headline`/`summary` into the
   header and `resume_from_stored()` ignores the stale keys.
 - **The facts a page section has no fields for are structured, not prose.**
-  `p.resume` holds roles (company, dates, `current`, bullets), education,
-  skill groups, certifications, languages and awards, plus the template and
-  its style. Structured so a later ATS check can read a role and its dates
+  The list components hold roles (company, dates, `current`, bullets),
+  education, skill groups, certifications, languages and awards; `p.resume`
+  holds the contact details, the template and its style. Its six list keys
+  stay on the wire, empty and unread. Structured so a later ATS check can read a role and its dates
   without parsing text — keep it that way.
-- **Switches.** A structured list is on the page while a component of its
-  type sits in a section that is not `hidden`, and on the resume unless it
-  is in `resume.hidden` ("Print on your resume" in the component's panel).
-  A section is on the page unless `hidden` and on the resume while
-  `onResume` (a column, `sections.on_resume`). On the resume, sections print
-  as entries under one "Projects" heading via `sectionGroups()`, which skips
-  a section that is only a list's place on the page — the resume prints the
-  list itself.
+- **Switches.** A section is on the page unless `hidden` and on the resume
+  while `onResume` (a column, `sections.on_resume`). A component prints
+  under it while its own `onResume` is checked — stored in the blocks JSON,
+  so no column. A component stored without the flag reads its default
+  (`defaultOnResume()`: on for Text, Links and the lists, off for the rest),
+  except a list, which reads "not in `resume.hidden`" — the switch it had
+  before; `sectionOf()` in `types.ts` and `prints_on_resume()` in
+  `services/ats.py` resolve it the same way. Migration `c3e8a5f1b7d2` (and
+  `fix_resume_switches()` on import) switched on every section that placed
+  a list with its Resume switch off, because a list used to print whatever
+  its section said. `resume.hidden` now matters only for `"summary"`, and
+  `resume.order` is no longer read; both stay on the wire.
 - **Lists reach the page as components, not as sections.** `listEntries()`
-  in `lib/resume.ts` hands any of the six lists over in one shape (title,
+  in `lib/resume.ts` hands any list component's entries over in one shape (title,
   sub, date, lines, tags) and `ResumeListView` in `published/components.tsx`
   draws it in the component's look, so the themes know nothing about roles
   or degrees. `withPlacedLists()` drops a list component whose list is empty
@@ -453,17 +504,46 @@ separately.
   /portfolios/{id}/resume`, validated by `app/schemas/resume.py`. `{}` is a
   valid resume, and `resume_from_stored()` turns anything that no longer
   validates into the defaults rather than failing the portfolio read.
-- **Only lists placed on the page ever leave the account.**
-  `PublicPortfolioOut` carries `public_resume()` — the lists that have a
-  component in a section a visitor can see, nothing else: no email, phone,
-  location, website or style, and not a list whose only component is in a
-  hidden section. `tests/test_resume.py` pins that.
-- **A live page freezes what can reach it.** `PUT /resume` takes
-  `OwnedPortfolio` so the builder can restyle a live page's resume, but
-  while live it answers 409 `portfolio_published` to any change outside
+- **A list reaches a visitor only inside its component.** The entries ride
+  in the section's blocks, so a hidden section's lists are never sent;
+  `PublicPortfolioOut.resume` and the public resume's `resume` lists are
+  always empty, and neither carries the email, phone, location, website or
+  style. `tests/test_resume.py` pins that. The published resume below is a
+  separate, owner-chosen release.
+- **Published on its own.** A resume goes live apart from its page:
+  `portfolios.resume_status` (`draft` | `live`, migration `d7a2c9e4f150`),
+  set by `POST /portfolios/{id}/resume/publish|unpublish`. Its address is
+  `<subdomain>.facetfolio.com/<slug>/resume` (`resumeUrl()`;
+  `/p/<subdomain>/<slug>/resume` and `/d/<domain>/<slug>/resume` are the
+  routes behind it — a custom domain resolves to a subdomain first, so there
+  is no separate API route). `GET /public/p/{subdomain}/{slug}/resume` is 404
+  unless the resume is live and sends `X-Robots-Tag: noindex`, so a resume
+  is never searchable. It carries only on-resume sections and printing
+  components, each carrying its own entries. **Contact details
+  leave only when ticked** (`Resume.public_contact`, `publicContact` on the
+  wire, in `RESUME_ONLY_FIELDS`): an unticked email, phone or location is
+  `""` everywhere, including inside a Contact component, header links follow
+  the website tick, and the portrait is sent only with `style.photo` on (the
+  public asset route serves it only for a live resume with photo on).
+  `PublishDialog` carries the Page / Resume ticks and the contact ticks, and
+  will not publish if the ticks did not save; the editor and both sides of
+  the builder open it from their Publish button (the builder's Resume side
+  with only the resume ticked). **The owner's `/preview/resume/[id]` is always a preview**
+  unless the resume is published *and* opened with `?print=1` (the
+  published screen's Download PDF), which is the PDF: otherwise it is — the sheet under a PREVIEW
+  watermark, blanked in print, so Ctrl+P saves nothing — and the builder's
+  Resume side links to it as Preview. The builder's sheet is always
+  watermarked (`ResumeSheet watermark`); it only ever shows a draft.
+  The public page (`PublicResume`) has its own Download PDF bar and
+  `?print=1`.
+- **A live page or live resume freezes what can reach it.** `is_frozen()`
+  (`services/portfolio.py`) is true when either is live. `PUT /resume` takes
+  `OwnedPortfolio`, but while frozen it answers 409 `portfolio_published` to any change outside
   `RESUME_ONLY_FIELDS` (style, `hidden`, the contact details). The editor
-  renders `PublishedLock` for a live portfolio as before, and the builder's
-  block rail cannot reorder while live (the order is the page's too).
+  renders `PublishedLock` while frozen, and so does the builder on **both**
+  sides — Page and Resume. Published means finished: nothing is restyled
+  until it is unpublished, and the published screen is where its links and
+  PDF are.
   `updateResume` is its own debounced write, not part of `updatePortfolio`.
 - **Thirty-two templates, one markup — and a template is a row, not a
   stylesheet.** `RESUME_TEMPLATES` in `lib/resume.ts` gives each one a part
@@ -495,7 +575,7 @@ separately.
   `lib/resume-backdrops.ts`: CSS background layers of SVG drawn in the
   accent, never an element, so the PDF's text layer is unchanged. On screen
   the sheet paints them; in print `resume.css` clears the sheet and
-  `/resume/[id]` paints the same layers on `html`. That is the only
+  `/preview/resume/[id]` paints the same layers on `html`. That is the only
   surface that reaches every page's edges, and it puts a corner graphic flush
   with the paper's top. Layers that fill the page repeat: on a printed page,
   `100%` is one page tall.
@@ -503,7 +583,7 @@ separately.
   and link rules, and it is imported in `layout.tsx`. The sheet is paper:
   white with near-black ink in either app theme, sized in mm and pt so the
   preview and the PDF agree.
-- **The PDF is the browser's own Save as PDF**, from `/resume/[id]`, which
+- **The PDF is the browser's own Save as PDF**, from `/preview/resume/[id]`, which
   writes the `@page` size and margin per resume, names the document after the
   person (the PDF's default file name) and, with `?print=1`, opens the print
   dialog once fonts and the photo have loaded. **The `@page` margin is 0**:
@@ -539,16 +619,17 @@ missing, and suggestions. The scoring is `app/services/ats.py`, behind
   after light stemming and synonym folding. The weights sum to 100 and every
   point is in the breakdown. The panel calls it an estimate, never a
   verdict. Do not replace it with a figure that is not computed this way.
-- **It reads the resume as it prints** (`resume_text()`): a list counts only
-  when a section places it and it is not switched off for the resume — the
-  same rule as `visibleBlocks()`. "Check again" calls `flushPendingSaves()`
+- **It reads the resume as it prints** (`resume_text()`): every section on
+  the resume, its title and the components with "Print on your resume"
+  checked — the same rule as `resumeParts()`. "Check again" calls `flushPendingSaves()`
   first, because the check reads stored data.
 - **The description is not stored.** The API reads it and forgets it; the
   panel keeps it in `sessionStorage` for the tab only. A test pins that.
 - **Suggestions that change the resume are explicit clicks**: add a skill
   (to the first skill group, adding an off-page Skills section if no section
   holds the list), lead the headline with the job title, print a list that
-  is switched off. Everything else is a tip. On a live page the actions are
+  nothing prints (checks "Print on your resume" on its first component and
+  switches its section on). Everything else is a tip. On a frozen portfolio the actions are
   disabled — its content is frozen. "Only add what is true of you" is on
   every skill suggestion; keep it.
 - **The vocabulary is ours** (`KNOWN_SKILLS`, `SOFT_SKILLS`, `SYNONYMS`),
@@ -572,6 +653,15 @@ does most of the work from there. Rules the code depends on:
   JS re-checks at event time (`reducedNow`).
 - **Paper and no-JS see the finished page.** Anything that starts hidden has
   a print rule, a reduced-motion rule and the `<noscript>` in `layout.tsx`.
+- **Smooth scrolling is Lenis, at "full" only, in a top-level window only.**
+  `smoothScrollRef` on `ThemeRoot` (`fx.tsx`) starts one Lenis per window;
+  the builder canvas (an iframe) and reduced-motion visitors keep native
+  scrolling. Lenis still moves the document natively, so observers and
+  scroll listeners need nothing. Scroll the page programmatically through
+  `jumpTo` / `toTop` (they route through Lenis when it is running), never a
+  bare `scrollTo`. Its CSS is in `globals.css`, minus the rule that disables
+  pointer events on iframes. Mark a nested scroller `data-lenis-prevent` if
+  `allowNestedScroll` misses it.
 - **Motion owns its own transforms.** On an element with a Motion `style`
   transform, depth is Motion's `z`, not the `.fx-z` class — the inline
   transform overwrites the class.
@@ -871,14 +961,19 @@ it, but two rules matter from this side:
 - **`src/lib/api.ts` is the only module that knows the API exists.** It owns
   the access token, one silent refresh-and-retry on a 401, and turning an
   error envelope into an `ApiError` with a `code` a caller can branch on.
-- **A live portfolio is frozen.** `EditablePortfolio` in `backend/app/api/deps.py`
+- **A portfolio is frozen while either its page or its resume is live.**
+  `EditablePortfolio` in `backend/app/api/deps.py`
   answers 409 `portfolio_published` to every portfolio and section write while
-  `status == "live"`; publish and unpublish take `OwnedPortfolio`, or there
-  would be no way back out. The editor, builder and theme gallery all render
+  `is_frozen()`; the publish and unpublish routes (page and resume) take
+  `OwnedPortfolio`, or there would be no way back out. The editor, builder and theme gallery all render
   `PublishedLock` instead of themselves for a live portfolio, and the list card offers Preview and Unpublish in place of Edit,
-  Builder and Delete. `updatePortfolio` in `src/lib/store.tsx` therefore
-  unpublishes *before* its patches and publishes *after* them — a batch that
-  published first would 409 on its own edits.
+  Builder and Delete, with "Page live" / "Resume live" pills.
+  `PublishedLock` lists each live thing with its own unpublish. `isFrozen(p)`
+  is the frontend's test. `updatePortfolio` in `src/lib/store.tsx` therefore
+  unpublishes each live thing (page, resume) *before* its patches and
+  republishes it *after*, independently — a batch that published first would
+  409 on its own edits. `settleResumeSaves()` is called by `PublishDialog`,
+  not by `updatePortfolio`.
 
 The API is camelCase on the wire, so its responses drop straight into the
 types in `src/lib/types.ts` with no mapping layer. Keep it that way.
@@ -925,10 +1020,10 @@ the *visitor's* account, which meant a signed-out visitor saw the defaults and
 a signed-in one had their own settings applied to somebody else's page.
 
 **A preview knows it is one, and every theme asks.** `PreviewProvider` wraps
-`PublishedBody` wherever it is *not* the published page — `/preview/[id]`
+`PublishedBody` wherever it is *not* the published page — `/preview/page/[id]`
 and the builder canvas — and two things read that context.
 `useRecordClick` goes quiet, so the owner's own clicks never reach analytics.
-`usePageHref` returns `/preview/<id>` instead of the public address, because
+`usePageHref` returns `/preview/page/<id>` instead of the public address, because
 the public address does not resolve until the portfolio is published: a
 section title inside a draft preview used to link straight to a 404. Render
 `PublishedBody` anywhere new and wrap it in both providers, or it will quietly
@@ -945,7 +1040,7 @@ and `links` stay in the API and the database, unshown, so nothing stored
 is lost.
 
 **Privacy & data has no "all pages as PDF" and no `/print`.** Each page
-prints from its own preview, the resume has its own Download PDF, and a stack
+prints from its own preview, the resume has its own Download PDF (once published), and a stack
 of every page in one file was a thing nobody sends anyone. **"Clear stats…"
 is two steps, never one click**: it opens a confirmation that picks "All
 pages" or one portfolio (`DELETE /analytics?portfolio=<id>`; omitted means
@@ -983,7 +1078,7 @@ deleted.
 - **Slugs are per account.** The subdomain in front of a slug is the
   namespace, so two accounts can both have `/founder`; one account cannot
   have two. The create dialog surfaces the 409 as a message.
-- **The frontend has no test runner.** The backend has 444 pytest tests;
+- **The frontend has no test runner.** The backend has 486 pytest tests;
   changes here are checked with `npm run lint`, `npm run build` and by
   actually opening the app.
 

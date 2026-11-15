@@ -23,12 +23,15 @@ export function ResumeSheet({
   maxScale = 1,
   onPages,
   shadow = true,
+  watermark = false,
 }: {
   p: Portfolio;
   maxScale?: number;
   /** Told how many pages the resume runs to, whenever that changes. */
   onPages?: (pages: number) => void;
   shadow?: boolean;
+  /** A diagonal PREVIEW over the sheet; never printed, never changes its size. */
+  watermark?: boolean;
 }) {
   const m = sheetMetrics(p.resume);
   const pageW = m.paper.w * MM;
@@ -86,6 +89,11 @@ export function ResumeSheet({
             >
               <ResumeDocument p={p} />
             </div>
+            {watermark && (
+              <div aria-hidden className="r-watermark">
+                <span>PREVIEW</span>
+              </div>
+            )}
             {breaks.map((y, i) => (
               <div
                 key={i}

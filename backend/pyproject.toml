@@ -17,6 +17,8 @@ dependencies = [
   "typer>=0.15",
   # Custom-domain verification reads TXT and CNAME records.
   "dnspython>=2.7",
+  # Uploads in Cloudflare R2 (FACET_STORAGE=r2), over its S3 API.
+  "boto3>=1.35",
 ]
 
 [project.optional-dependencies]

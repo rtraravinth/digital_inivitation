@@ -50,7 +50,6 @@ class SectionOut(CamelModel):
     hidden: bool
     on_resume: bool
     images: list[AssetOut]
-    file: AssetOut | None
     blocks: list[Block]
 
 
@@ -78,8 +77,6 @@ class SectionPatch(StrictCamelModel):
     #: The whole ordered list of pictures. Absent leaves them alone; an
     #: empty list clears them. Ids dropped from the list are released.
     image_asset_ids: list[uuid.UUID] | None = Field(default=None, max_length=SECTION_IMAGES_MAX)
-    file_asset_id: uuid.UUID | None = None
-    clear_file: bool = False
     #: The whole ordered list of components, sent whole like ``links``.
     blocks: list[Block] | None = Field(default=None, max_length=SECTION_BLOCKS_MAX)
 

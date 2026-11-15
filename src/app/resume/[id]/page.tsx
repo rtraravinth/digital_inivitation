@@ -1,19 +1,9 @@
-import { Suspense } from "react";
-import { AuthGuard } from "@/components/AuthGuard";
-import { ResumePrint } from "@/components/resume/ResumePrint";
+import { redirect } from "next/navigation";
 
-export const metadata = {
-  title: "Resume · Facet",
-};
-
-export default async function ResumePage({ params }: PageProps<"/resume/[id]">) {
+// The resume moved to /preview/resume/<id>; links made before that (and a
+// bookmarked ?print=1) still land.
+export default async function OldResume({ params, searchParams }: PageProps<"/resume/[id]">) {
   const { id } = await params;
-  return (
-    // ?print= is read on the client, so this needs a boundary.
-    <Suspense fallback={null}>
-      <AuthGuard>
-        <ResumePrint id={id} />
-      </AuthGuard>
-    </Suspense>
-  );
+  const { print } = await searchParams;
+  redirect(`/preview/resume/${id}${print === "1" ? "?print=1" : ""}`);
 }

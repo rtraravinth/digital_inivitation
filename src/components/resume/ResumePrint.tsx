@@ -9,6 +9,7 @@ import { PageState } from "../ui";
 import { PAPERS, resumeFileName, sheetMetrics, templateOf } from "@/lib/resume";
 import { layerCss, sheetLayers } from "@/lib/resume-backdrops";
 import { usePortfolios } from "@/lib/store";
+import type { Portfolio } from "@/lib/types";
 
 /**
  * The resume alone, for the browser's own Save as PDF — the same route the
@@ -24,31 +25,8 @@ export function ResumePrint({ id }: { id: string }) {
   const auto = useSearchParams().get("print") === "1";
   const p = getPortfolio(id);
 
-  useEffect(() => {
-    if (!p) return;
-    const previous = document.title;
-    document.title = resumeFileName(p);
-    return () => {
-      document.title = previous;
-    };
-  }, [p]);
-
-  // Wait for the faces and the photo, or the PDF is set in a fallback font.
-  const loaded = !!p;
-  useEffect(() => {
-    if (!loaded || !auto) return;
-    let cancelled = false;
-    const images = [...document.querySelectorAll<HTMLImageElement>(".resume img")];
-    void Promise.all([
-      document.fonts.ready,
-      ...images.map((img) => (img.complete ? Promise.resolve() : new Promise((r) => img.addEventListener("load", r, { once: true })))),
-    ]).then(() => {
-      if (!cancelled) window.setTimeout(() => window.print(), 250);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [loaded, auto]);
+  useResumeTitle(p);
+  usePrintWhenReady(!!p && p.resumeStatus === "live" && auto);
 
   if (!p) {
     return ready ? (
@@ -62,26 +40,47 @@ export function ResumePrint({ id }: { id: string }) {
     );
   }
 
-  const m = sheetMetrics(p.resume);
+  // Without ?print=1 this is a preview, published or not: the full-size sheet
+  // under a PREVIEW watermark, no Save button, and a print rule that blanks
+  // the page rather than let Ctrl+P save one. The PDF is only ever the
+  // published resume opened with ?print=1 — the published screen's Download
+  // PDF — so a draft never reaches it.
+  const live = p.resumeStatus === "live";
+  if (!live || !auto) {
+    return (
+      <>
+        <style>{`@media print { .resume-preview { display: none !important; } }`}</style>
+        <header
+          className="no-print sticky top-0 z-30 flex min-h-14 flex-wrap items-center gap-x-3 gap-y-2 px-3 py-2 sm:px-6"
+          style={{
+            background: "color-mix(in srgb, var(--color-bg) 86%, transparent)",
+            backdropFilter: "blur(12px)",
+            WebkitBackdropFilter: "blur(12px)",
+            borderBottom: "1px solid var(--color-divider)",
+          }}
+        >
+          <span className="mr-auto min-w-0 truncate text-[13.5px]" style={{ color: "var(--color-neutral-700)" }}>
+            <span className="font-semibold" style={{ color: "var(--color-ink)" }}>
+              Preview
+            </span>{" "}
+            · {live ? "Download the PDF from the published screen." : "Publish your resume to download it."}
+          </span>
+          <ThemeSwitch />
+        </header>
+        <div className="resume-preview relative">
+          <ResumeStage p={p} />
+          <div aria-hidden className="r-watermark">
+            <span>PREVIEW</span>
+          </div>
+        </div>
+      </>
+    );
+  }
+
   const template = templateOf(p.resume.style.template);
-  // The paper ground (a solid column's colour) and any background graphic
-  // are painted on the printed page, not the sheet: the page reaches every
-  // edge of every page, where the sheet starts below each top margin and
-  // stops where its text does. The gradient is horizontal and the patterns
-  // repeat, so the page's height does not matter.
-  const pageBackground = layerCss(sheetLayers(p.resume));
 
   return (
     <>
-      {/* No page margin: the browser prints its own header and footer — date,
-          title, address, page number — in that margin, and with none there is
-          nowhere to put them, whatever its "Headers and footers" box says.
-          Each page's top and bottom room comes from the table below instead. */}
-      <style>{`
-        @page { size: ${PAPERS[p.resume.style.paper].css}; margin: 0; }
-        @media print { html { ${pageBackground} -webkit-print-color-adjust: exact; print-color-adjust: exact; } body { background: transparent !important; } }
-      `}</style>
-
       <header
         className="no-print sticky top-0 z-30 flex min-h-14 flex-wrap items-center gap-x-3 gap-y-2 px-3 py-2 sm:px-6"
         style={{
@@ -112,6 +111,62 @@ export function ResumePrint({ id }: { id: string }) {
           Save as PDF
         </button>
       </header>
+
+      <ResumeStage p={p} />
+    </>
+  );
+}
+
+/** The document title becomes the PDF's default file name. */
+export function useResumeTitle(p: Portfolio | undefined) {
+  useEffect(() => {
+    if (!p) return;
+    const previous = document.title;
+    document.title = resumeFileName(p);
+    return () => {
+      document.title = previous;
+    };
+  }, [p]);
+}
+
+/** Opens the print dialog once the faces and the photo have loaded, or the PDF is set in a fallback font. */
+export function usePrintWhenReady(go: boolean) {
+  useEffect(() => {
+    if (!go) return;
+    let cancelled = false;
+    const images = [...document.querySelectorAll<HTMLImageElement>(".resume img")];
+    void Promise.all([
+      document.fonts.ready,
+      ...images.map((img) => (img.complete ? Promise.resolve() : new Promise((r) => img.addEventListener("load", r, { once: true })))),
+    ]).then(() => {
+      if (!cancelled) window.setTimeout(() => window.print(), 250);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [go]);
+}
+
+/** The @page rule, the printed page's background and the paper itself. */
+export function ResumeStage({ p }: { p: Portfolio }) {
+  const m = sheetMetrics(p.resume);
+  // The paper ground (a solid column's colour) and any background graphic
+  // are painted on the printed page, not the sheet: the page reaches every
+  // edge of every page, where the sheet starts below each top margin and
+  // stops where its text does. The gradient is horizontal and the patterns
+  // repeat, so the page's height does not matter.
+  const pageBackground = layerCss(sheetLayers(p.resume));
+
+  return (
+    <>
+      {/* No page margin: the browser prints its own header and footer — date,
+          title, address, page number — in that margin, and with none there is
+          nowhere to put them, whatever its "Headers and footers" box says.
+          Each page's top and bottom room comes from the table below instead. */}
+      <style>{`
+        @page { size: ${PAPERS[p.resume.style.paper].css}; margin: 0; }
+        @media print { html { ${pageBackground} -webkit-print-color-adjust: exact; print-color-adjust: exact; } body { background: transparent !important; } }
+      `}</style>
 
       <main className="resume-print-stage flex justify-center overflow-x-auto px-4 py-8 print:block print:p-0">
         <div className="flex-none print:shadow-none" style={{ boxShadow: "0 12px 40px -12px rgb(0 0 0 / 0.3)" }}>

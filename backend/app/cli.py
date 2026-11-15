@@ -3,6 +3,7 @@
     python -m app.cli create-user --email you@example.com --subdomain you
     python -m app.cli seed --email you@example.com
     python -m app.cli routes
+    python -m app.cli copy-media-to-r2
 
 ``seed`` loads ``app/seed_data.json``, which is dumped from the frontend's
 own ``src/lib/seed.ts`` by ``scripts/dump_seed.mjs`` — the content is not
@@ -122,9 +123,49 @@ def seed(
     email: str = typer.Option(..., help="The account to load the seed into"),
     replace: bool = typer.Option(False, "--replace", help="Delete that account's portfolios first"),
 ) -> None:
-    """Load the five seeded portfolios from src/lib/seed.ts."""
+    """Load the six seeded portfolios from src/lib/seed.ts."""
     count = _run(_seed(email, "replace" if replace else "merge"))
     typer.echo(f"imported {count} portfolios for {email}")
+
+
+@app.command("copy-media-to-r2")
+def copy_media_to_r2(
+    dry_run: bool = typer.Option(False, "--dry-run", help="List what would be copied"),
+) -> None:
+    """Copy every upload under FACET_MEDIA_ROOT into the R2 bucket.
+
+    Run once before switching FACET_STORAGE to r2. Storage keys are the same
+    paths in both places, so no database row changes; an object already in
+    the bucket is skipped, so it is safe to run again. Reads the FACET_R2_*
+    settings whatever FACET_STORAGE says.
+    """
+    from app.core.config import get_settings
+    from app.services.storage import R2Storage, r2_client
+
+    settings = get_settings()
+    secret = settings.r2_secret_access_key.get_secret_value()
+    if not (settings.r2_endpoint and settings.r2_bucket and settings.r2_access_key_id and secret):
+        raise typer.BadParameter(
+            "set FACET_R2_ENDPOINT, _BUCKET, _ACCESS_KEY_ID and _SECRET_ACCESS_KEY"
+        )
+    bucket = R2Storage(
+        r2_client(settings.r2_endpoint, settings.r2_access_key_id, secret), settings.r2_bucket
+    )
+    root = settings.media_root
+    copied = skipped = 0
+    for path in sorted(root.rglob("*")):
+        # A ".part" file is a write that never finished; it is not an upload.
+        if not path.is_file() or path.suffix == ".part":
+            continue
+        key = path.relative_to(root).as_posix()
+        if bucket.exists(key):
+            skipped += 1
+            continue
+        if not dry_run:
+            bucket.put(key, path.read_bytes())
+        copied += 1
+        typer.echo(f"{'would copy' if dry_run else 'copied'} {key}")
+    typer.echo(f"{copied} {'to copy' if dry_run else 'copied'}, {skipped} already in the bucket")
 
 
 @app.command()

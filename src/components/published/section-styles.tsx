@@ -154,7 +154,7 @@ function Body({ text, className = "" }: { text: string; className?: string }) {
 function Extras({ p, section }: { p: Portfolio; section: Section }) {
   return (
     <div className="flex flex-col items-start gap-3 empty:hidden">
-      <SectionAside p={p} section={section} />
+      <SectionAside section={section} />
       <SectionLinks p={p} section={section} />
     </div>
   );

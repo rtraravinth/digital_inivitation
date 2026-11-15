@@ -8,6 +8,7 @@ photo carries) and bounds the size. Anything not on the allowlist is refused.
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import io
 import threading
@@ -22,7 +23,7 @@ from starlette.concurrency import run_in_threadpool
 
 from app.core.config import get_settings
 from app.core.errors import NotFound, PayloadTooLarge, UnsupportedMedia
-from app.models import AccountProfile, Asset, PortfolioHeader, Section, SectionImage, User
+from app.models import AccountProfile, Asset, PortfolioHeader, SectionImage, User
 from app.models.enums import AssetKind
 from app.services.storage import build_key, get_storage
 
@@ -55,7 +56,6 @@ ASSET_REFERENCES = (
     AccountProfile.portrait_asset_id,
     PortfolioHeader.portrait_asset_id,
     SectionImage.asset_id,
-    Section.file_asset_id,
 )
 
 #: Non-image types worth attaching to a section — a PDF one-pager, mostly.
@@ -133,8 +133,9 @@ class AssetService:
 
         # Identical bytes from the same user share one blob. Scoped per user
         # so one account's delete can never remove another's file.
-        if not self.storage.exists(key):
-            self.storage.put(key, processed.data)
+        # Off the event loop: with R2 each of these is a network request.
+        if not await asyncio.to_thread(self.storage.exists, key):
+            await asyncio.to_thread(self.storage.put, key, processed.data)
 
         asset = Asset(
             user_id=user.id,
@@ -344,7 +345,7 @@ class AssetService:
             select(Asset.id).where(Asset.storage_key == key).limit(1)
         )
         if still_used is None:
-            self.storage.delete(key)
+            await asyncio.to_thread(self.storage.delete, key)
 
 
 def _looks_like_svg(raw: bytes) -> bool:

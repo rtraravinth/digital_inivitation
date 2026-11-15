@@ -22,7 +22,7 @@ const ts = require("typescript");
 
 const staging = mkdtempSync(join(tmpdir(), "facet-seed-"));
 
-for (const name of ["types", "seed"]) {
+for (const name of ["types", "seed-images", "seed"]) {
   const source = readFileSync(join(repoRoot, "src", "lib", `${name}.ts`), "utf8");
   const { outputText } = ts.transpileModule(source, {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },

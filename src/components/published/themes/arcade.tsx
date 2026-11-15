@@ -437,7 +437,7 @@ function Card({ p, section }: { p: Portfolio; section: Section }) {
             {section.description && (
               <p className="whitespace-pre-line text-muted m-0 text-[15px] leading-[1.6]">{section.description}</p>
             )}
-            <SectionAside p={p} section={section} />
+            <SectionAside section={section} />
             <SectionLinks p={p} section={section} />
           </div>
         </article>

@@ -57,6 +57,15 @@ def _clear_refresh_cookie(response: Response) -> None:
     response.delete_cookie(REFRESH_COOKIE, path=REFRESH_COOKIE_PATH)
 
 
+#: Sent when an account leaves this browser (sign-out, deletion): the
+#: browser wipes its HTTP cache, cookies — the httpOnly session cookie
+#: included — and every kind of storage for this origin. In production the
+#: app and the API share one origin, so this clears the app's too; the
+#: frontend's ``signOut()`` repeats the storage half by hand for browsers
+#: that ignore the header and for development, where the API is another port.
+CLEAR_SITE_DATA = '"cache", "cookies", "storage"'
+
+
 def _user_out(user: User) -> UserOut:
     return UserOut(
         id=user.id,
@@ -118,6 +127,7 @@ async def logout(
 ) -> None:
     await AuthService(session).logout(facet_refresh, caller.session_id)
     _clear_refresh_cookie(response)
+    response.headers["Clear-Site-Data"] = CLEAR_SITE_DATA
 
 
 @router.get("/sessions", response_model=list[SessionOut], summary="Devices signed in")

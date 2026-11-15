@@ -12,10 +12,11 @@ import asyncio
 import uuid
 from datetime import UTC, datetime, timedelta
 
-from fastapi import APIRouter, status
+from fastapi import APIRouter, Response, status
 
 from app.api.deps import CallerDep, CurrentUser, SessionDep
 from app.api.route import TransactionRoute
+from app.api.v1.auth import CLEAR_SITE_DATA
 from app.core.config import get_settings
 from app.core.dns_lookup import DnsLookupDep
 from app.core.errors import PermissionDenied
@@ -131,7 +132,7 @@ async def update_privacy(
     summary="Delete the account and everything in it",
 )
 async def delete_account(
-    session: SessionDep, caller: CallerDep, accounts: AccountCheckerDep
+    response: Response, session: SessionDep, caller: CallerDep, accounts: AccountCheckerDep
 ) -> None:
     """Delete the FACET account and its Firebase login, both or neither.
 
@@ -160,3 +161,5 @@ async def delete_account(
     for key in keys:
         # Off the event loop: with R2 each delete is a network request.
         await asyncio.to_thread(storage.delete, key)
+    # The account is gone; nothing of it stays in this browser either.
+    response.headers["Clear-Site-Data"] = CLEAR_SITE_DATA

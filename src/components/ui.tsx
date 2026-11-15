@@ -173,7 +173,7 @@ export function Segmented<T extends string>({
 }
 
 /** Live or draft, said so it reads across the room and without colour. */
-export function StatusPill({ live, floating }: { live: boolean; floating?: boolean }) {
+export function StatusPill({ live, floating, label }: { live: boolean; floating?: boolean; label?: string }) {
   return (
     <span
       className="inline-flex h-6 items-center gap-1.5 rounded-full px-2.5 text-[12px] font-medium whitespace-nowrap"
@@ -202,7 +202,7 @@ export function StatusPill({ live, floating }: { live: boolean; floating?: boole
           <Icon d={ICON.pencil} size={11} />
         </span>
       )}
-      {live ? "Live" : "Draft"}
+      {label ?? (live ? "Live" : "Draft")}
     </span>
   );
 }

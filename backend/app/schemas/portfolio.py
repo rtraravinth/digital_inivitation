@@ -17,6 +17,7 @@ from app.models.enums import (
     MotionLevel,
     PhotoTreatment,
     PortfolioStatus,
+    ResumeStatus,
     RoleNav,
     SectionStyle,
     ThemeId,
@@ -120,6 +121,7 @@ class PortfolioOut(CamelModel):
     name: str
     slug: str
     status: PortfolioStatus
+    resume_status: ResumeStatus
     summary: str
     #: Derived on read ("3 sections · 2 days ago"), never stored, so it cannot
     #: go stale the way a written copy would.
@@ -147,6 +149,7 @@ class PortfolioSummaryOut(CamelModel):
     name: str
     slug: str
     status: PortfolioStatus
+    resume_status: ResumeStatus
     summary: str
     meta: str
     theme: ThemeId

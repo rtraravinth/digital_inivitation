@@ -89,3 +89,46 @@ export async function fetchPublishedOnDomain(domain: string, slug: string): Prom
   const { subdomain } = (await response.json()) as { subdomain: string };
   return fetchPublished(subdomain, slug);
 }
+
+/**
+ * A published resume, shaped as a whole Portfolio so `ResumeDocument` draws
+ * it unchanged. The payload carries only what the resume prints: the
+ * header, the sections on it and a resume whose unticked contact fields are
+ * already empty.
+ */
+export async function fetchPublishedResume(subdomain: string, slug: string): Promise<Portfolio | null> {
+  let response: Response;
+  try {
+    response = await fetch(
+      `${SERVER_API_BASE}/api/v1/public/p/${encodeURIComponent(subdomain)}/${encodeURIComponent(slug)}/resume`,
+      { cache: "no-store" },
+    );
+  } catch {
+    return null;
+  }
+  if (!response.ok) return null;
+  const payload = (await response.json()) as Partial<Portfolio>;
+  return normalize({
+    id: "",
+    summary: "",
+    meta: "",
+    ...payload,
+    status: "draft",
+    resumeStatus: "live",
+  } as Portfolio);
+}
+
+/** The same, on the owner's verified custom domain. */
+export async function fetchPublishedResumeOnDomain(domain: string, slug: string): Promise<Portfolio | null> {
+  let response: Response;
+  try {
+    response = await fetch(`${SERVER_API_BASE}/api/v1/public/domains/${encodeURIComponent(domain)}`, {
+      cache: "no-store",
+    });
+  } catch {
+    return null;
+  }
+  if (!response.ok) return null;
+  const { subdomain } = (await response.json()) as { subdomain: string };
+  return fetchPublishedResume(subdomain, slug);
+}

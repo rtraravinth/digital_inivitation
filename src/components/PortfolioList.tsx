@@ -19,9 +19,10 @@ import { PagePreview } from "./PagePreview";
 import { ShareDialog } from "./ShareDialog";
 import { messageFor } from "@/lib/api";
 import { Glyph } from "@/lib/glyphs";
-import { displayUrl, isSlug, liveUrl } from "@/lib/slug";
+import { displayUrl, isSlug, liveUrl, resumeUrl } from "@/lib/slug";
 import { usePortfolios, type StartFrom } from "@/lib/store";
-import { previewPath, type Portfolio } from "@/lib/types";
+import { isFrozen, type Portfolio } from "@/lib/types";
+import { previewHref } from "@/lib/resume";
 import { useAccount } from "@/lib/account";
 
 /* ── Portfolios ───────────────────────────────────────────────────────────
@@ -79,7 +80,7 @@ export function PortfolioList() {
   const reduced = useReducedMotion();
   const { account, ready: accountReady } = useAccount();
 
-  const live = portfolios.filter((p) => p.status === "live").length;
+  const live = portfolios.filter(isFrozen).length;
   const counts: Record<Filter, number> = {
     all: portfolios.length,
     live,
@@ -88,8 +89,8 @@ export function PortfolioList() {
 
   const q = query.trim().toLowerCase();
   const shown = portfolios.filter((p) => {
-    if (filter === "live" && p.status !== "live") return false;
-    if (filter === "draft" && p.status === "live") return false;
+    if (filter === "live" && !isFrozen(p)) return false;
+    if (filter === "draft" && isFrozen(p)) return false;
     if (!q) return true;
     return (
       p.name.toLowerCase().includes(q) ||
@@ -140,7 +141,7 @@ export function PortfolioList() {
     onEdit: (p) => setEditing(p),
     onShare: (id) => setSharing(id),
     onDelete: (p) => setDeleting(p),
-    onUnpublish: (id) => updatePortfolio(id, (prev) => ({ ...prev, status: "draft" })),
+    onUnpublish: (id) => updatePortfolio(id, (prev) => ({ ...prev, status: "draft", resumeStatus: "draft" })),
   };
 
   return (
@@ -221,7 +222,7 @@ export function PortfolioList() {
                   className="btn btn-secondary"
                   style={{ background: "var(--color-bg)" }}
                   onClick={() =>
-                    setSharing(portfolios.find((p) => p.status === "live")!.id)
+                    setSharing(portfolios.find(isFrozen)!.id)
                   }
                 >
                   <Icon d={ICON.share} size={15} />
@@ -575,13 +576,17 @@ function Card({
 }) {
   const subdomain = useAccount().account.profile.subdomain;
   const reduced = useReducedMotion();
-  const live = p.status === "live";
+  const live = isFrozen(p);
   const gx = useMotionValue(50);
   const gy = useMotionValue(0);
   const edge = useMotionTemplate`radial-gradient(280px circle at ${gx}% ${gy}%, color-mix(in srgb, var(--color-ink) 70%, transparent), transparent 70%)`;
   const now = useNow();
   const [hot, setHot] = useState(false);
-  const address = live && subdomain ? displayUrl(liveUrl(subdomain, p.slug)) : live ? "no public address yet" : "draft · not public yet";
+  const address = !live
+    ? "draft · not public yet"
+    : !subdomain
+      ? "no public address yet"
+      : displayUrl(p.status === "live" ? liveUrl(subdomain, p.slug) : resumeUrl(subdomain, p.slug));
 
   return (
     <motion.article
@@ -676,7 +681,7 @@ function Card({
               >
                 {live ? (
                   <>
-                    <DockLink href={previewPath(p.id)} external icon={ICON.eye} label="Preview" />
+                    <DockLink href={previewHref(p)} external icon={ICON.eye} label="Preview" />
                     <DockButton onClick={() => actions.onShare(p.id)} icon={ICON.share} label="Share" />
                     <DockLink href={`/stats?p=${p.id}`} icon={ICON.chart} label="Stats" />
                   </>
@@ -684,7 +689,7 @@ function Card({
                   <>
                     <DockLink href={`/builder/${p.id}`} icon={ICON.grid} label="Builder" />
                     <DockLink href={`/editor/${p.id}`} icon={ICON.pencil} label="Content" />
-                    <DockLink href={previewPath(p.id)} external icon={ICON.eye} label="Preview" />
+                    <DockLink href={previewHref(p)} external icon={ICON.eye} label="Preview" />
                   </>
                 )}
               </div>
@@ -719,7 +724,7 @@ function Card({
           {/* Status and age only. Opening the builder or the preview is the
               dock over the picture on a pointer, and the ⋯ menu everywhere. */}
           <div className="mt-3 flex items-center gap-2">
-            <StatusPill live={live} />
+            <Pills p={p} />
             <span className="ml-auto min-w-0 truncate font-mono text-[11.5px]" style={{ color: "var(--color-neutral-600)" }}>
               {p.updatedAt && (
                 <time dateTime={p.updatedAt} title={`Updated ${UPDATED.format(new Date(p.updatedAt))}`}>
@@ -817,6 +822,22 @@ function DockButton({ onClick, icon, label }: { onClick: () => void; icon: React
 }
 
 /**
+ * What is public: a pill for the page and one for the resume, or "Draft"
+ * when neither is.
+ */
+function Pills({ p }: { p: Portfolio }) {
+  const page = p.status === "live";
+  const resume = p.resumeStatus === "live";
+  if (!page && !resume) return <StatusPill live={false} />;
+  return (
+    <span className="flex flex-wrap items-center gap-1">
+      {page && <StatusPill live label="Page live" />}
+      {resume && <StatusPill live label="Resume live" />}
+    </span>
+  );
+}
+
+/**
  * The page's address, as a link that opens it.
  *
  * A live page shows its real, working address and a copy button beside it.
@@ -825,12 +846,13 @@ function DockButton({ onClick, icon, label }: { onClick: () => void; icon: React
  */
 function PageLink({ p, subdomain }: { p: Portfolio; subdomain: string }) {
   const [copied, setCopied] = useState(false);
-  const live = p.status === "live";
+  // Page or resume: whichever is public has an address to show.
+  const live = isFrozen(p);
 
   if (!live) {
     return (
       <a
-        href={previewPath(p.id)}
+        href={previewHref(p)}
         target="_blank"
         rel="noopener noreferrer"
         className="mt-1 inline-flex max-w-full items-center gap-1 text-[12.5px] underline-offset-2 hover:underline"
@@ -854,7 +876,7 @@ function PageLink({ p, subdomain }: { p: Portfolio; subdomain: string }) {
     );
   }
 
-  const url = liveUrl(subdomain, p.slug);
+  const url = p.status === "live" ? liveUrl(subdomain, p.slug) : resumeUrl(subdomain, p.slug);
   return (
     <div className="mt-1 flex min-w-0 items-center gap-1">
       <a
@@ -933,7 +955,7 @@ function List({ portfolios, actions }: { portfolios: Portfolio[]; actions: Actio
       style={{ border: "1px solid var(--color-divider)", background: "var(--color-bg)" }}
     >
       <div
-        className="hidden grid-cols-[96px_minmax(0,1fr)_100px_200px] items-center gap-4 rounded-t-2xl px-4 py-2.5 text-[12px] font-medium md:grid"
+        className="hidden grid-cols-[96px_minmax(0,1fr)_180px_200px] items-center gap-4 rounded-t-2xl px-4 py-2.5 text-[12px] font-medium md:grid"
         style={{
           background: "var(--color-surface)",
           color: "var(--color-neutral-700)",
@@ -948,7 +970,7 @@ function List({ portfolios, actions }: { portfolios: Portfolio[]; actions: Actio
       <ul className="m-0 list-none p-0">
         <AnimatePresence initial={true}>
           {portfolios.map((p, i) => {
-            const live = p.status === "live";
+            const live = isFrozen(p);
             return (
               <motion.li
                 key={p.id}
@@ -960,7 +982,7 @@ function List({ portfolios, actions }: { portfolios: Portfolio[]; actions: Actio
                 onPointerEnter={(e) => {
                   if (e.pointerType === "mouse") setPeek(p);
                 }}
-                className="group grid grid-cols-[72px_minmax(0,1fr)_auto] items-center gap-x-4 gap-y-1.5 px-4 py-3 transition-colors hover:bg-[var(--color-surface)] md:grid-cols-[96px_minmax(0,1fr)_100px_200px]"
+                className="group grid grid-cols-[72px_minmax(0,1fr)_auto] items-center gap-x-4 gap-y-1.5 px-4 py-3 transition-colors hover:bg-[var(--color-surface)] md:grid-cols-[96px_minmax(0,1fr)_180px_200px]"
                 style={{ borderTop: i === 0 ? "none" : "1px solid var(--color-divider)" }}
               >
                 <div
@@ -974,7 +996,7 @@ function List({ portfolios, actions }: { portfolios: Portfolio[]; actions: Actio
                   <PageLink p={p} subdomain={subdomain} />
                 </div>
                 <span className="hidden md:block">
-                  <StatusPill live={live} />
+                  <Pills p={p} />
                 </span>
                 <div className="flex items-center justify-end gap-0.5">
                   {live && (
@@ -989,7 +1011,7 @@ function List({ portfolios, actions }: { portfolios: Portfolio[]; actions: Actio
                   )}
                   {live ? (
                     <a
-                      href={previewPath(p.id)}
+                      href={previewHref(p)}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="btn btn-ghost hidden sm:inline-flex"
@@ -1079,7 +1101,7 @@ function CardMenu({ portfolio: p, actions }: { portfolio: Portfolio; actions: Ac
   const [spot, setSpot] = useState<MenuSpot | null>(null);
   const ref = useRef<HTMLDivElement>(null);
   const menu = useRef<HTMLDivElement>(null);
-  const live = p.status === "live";
+  const live = isFrozen(p);
   const open = spot !== null;
 
   function toggle() {
@@ -1169,7 +1191,7 @@ function CardMenu({ portfolio: p, actions }: { portfolio: Portfolio; actions: Ac
               )}
               <a
                 role="menuitem"
-                href={previewPath(p.id)}
+                href={previewHref(p)}
                 target="_blank"
                 rel="noopener noreferrer"
                 className={item}
@@ -1236,7 +1258,7 @@ function EditDetails({
   const [name, setName] = useState(portfolio.name);
   const [summary, setSummary] = useState(portfolio.summary);
   const [slug, setSlug] = useState(portfolio.slug);
-  const live = portfolio.status === "live";
+  const live = isFrozen(portfolio);
 
   const nameError = name.trim() ? null : "Give it a name.";
   // Says which rule the address breaks, not just that it breaks one.
@@ -1292,7 +1314,7 @@ function EditDetails({
             style={{ background: "var(--color-surface)", border: "1px solid var(--color-divider)" }}
           >
             <span className="min-w-0 flex-1">
-              This page is live, so it can’t change. Unpublish it to edit, then publish again.
+              This portfolio is live, so it can’t change. Unpublish it to edit, then publish again.
             </span>
             <button
               type="button"

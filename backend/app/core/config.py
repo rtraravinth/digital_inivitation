@@ -11,7 +11,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Literal
 
-from pydantic import Field, field_validator, model_validator
+from pydantic import Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 BACKEND_DIR = Path(__file__).resolve().parents[2]
@@ -104,6 +104,16 @@ class Settings(BaseSettings):
 
     media_root: Path = Path("media")
 
+    #: Where uploaded bytes live: ``disk`` (under ``media_root``) or ``r2``,
+    #: a Cloudflare R2 bucket over its S3 API. A host that wipes its disk on
+    #: restart (Render's free plan) keeps uploads only in R2.
+    storage: Literal["disk", "r2"] = "disk"
+    #: ``https://<account id>.r2.cloudflarestorage.com``.
+    r2_endpoint: str = ""
+    r2_bucket: str = ""
+    r2_access_key_id: str = ""
+    r2_secret_access_key: SecretStr = SecretStr("")
+
     @property
     def cors_origin_regex(self) -> str | None:
         """Private-network origins on :3000, in dev and test only.
@@ -146,6 +156,27 @@ class Settings(BaseSettings):
         directory, which is how uploads end up scattered across a repo.
         """
         return value if value.is_absolute() else (BACKEND_DIR / value)
+
+    @model_validator(mode="after")
+    def _r2_is_complete(self) -> Settings:
+        """Fail at start-up, not on the first upload, when R2 is half set up."""
+        if self.storage != "r2":
+            return self
+        missing = [
+            name
+            for name, value in (
+                ("FACET_R2_ENDPOINT", self.r2_endpoint),
+                ("FACET_R2_BUCKET", self.r2_bucket),
+                ("FACET_R2_ACCESS_KEY_ID", self.r2_access_key_id),
+                ("FACET_R2_SECRET_ACCESS_KEY", self.r2_secret_access_key.get_secret_value()),
+            )
+            if not value.strip()
+        ]
+        if missing:
+            raise ValueError(f"FACET_STORAGE=r2 needs {', '.join(missing)}")
+        if not self.r2_endpoint.startswith("https://"):
+            raise ValueError("FACET_R2_ENDPOINT must be the bucket's https:// S3 endpoint")
+        return self
 
     @model_validator(mode="after")
     def _production_has_a_real_secret(self) -> Settings:

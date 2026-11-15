@@ -9,6 +9,7 @@ import {
   componentHasContent,
   coverOf,
   galleryImages,
+  isFieldBlock,
   isListBlock,
   lookOf,
   type Block,
@@ -51,6 +52,8 @@ import {
    A section with components is a *feature*: it leaves the theme's grid of
    cards and runs full width as a band after them, where a gallery and a
    timeline have room. Plain sections — a heading and a cover — stay cards.
+   Text, Links and Quote do not make a band: they place the section's own
+   fields, which the theme's card draws already.
 
    Motion is the quiet kind: a lift on hover, a photograph easing 2% inside
    its frame, an indicator sliding between tabs, an answer opening. Nothing
@@ -62,6 +65,7 @@ const EASE = [0.16, 1, 0.3, 1] as const;
 /** The components a visitor would actually see. */
 export function shownBlocks(section: Section): Block[] {
   return (section.blocks ?? [])
+    .filter((b) => !isFieldBlock(b))
     .filter((b) => componentHasContent(b))
     .filter((b) => b.type !== "contact" || isContactShown(b))
     // A gallery whose pictures the section no longer holds has nothing to show.
@@ -162,7 +166,7 @@ export function FeatureBand({
           {section.description && (
             <p className="text-muted m-0 max-w-[60ch] text-[16.5px] leading-[1.7] whitespace-pre-line">{section.description}</p>
           )}
-          <SectionAside p={p} section={section} />
+          <SectionAside section={section} />
           <SectionLinks p={p} section={section} />
         </div>
         {cover && (
@@ -255,6 +259,11 @@ export function ComponentView({ p, section, block }: { p: Portfolio; section: Se
 function renderBlock(p: Portfolio, section: Section, b: Block) {
   if (isListBlock(b)) return <ResumeListView p={p} block={b} />;
   switch (b.type) {
+    // The theme draws the section's own fields; see `shownBlocks()`.
+    case "text":
+    case "links":
+    case "quote":
+      return null;
     case "gallery":
       return <GalleryView section={section} block={b} />;
     case "timeline":
@@ -313,7 +322,7 @@ function TimelineView({ block }: { block: TimelineBlock }) {
  * one that suits its kind until one is made.
  */
 function ResumeListView({ p, block }: { p: Portfolio; block: ResumeListBlock }) {
-  const sections = listSections(p.resume, block.type);
+  const sections = listSections(block);
   if (sections.length === 0) return null;
   return renderStyle(p, lookOf(block), sections, block.title || BLOCK_TYPES.find((t) => t.id === block.type)?.name || "Entries");
 }

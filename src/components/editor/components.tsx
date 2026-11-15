@@ -3,6 +3,7 @@
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { useId, useRef, useState } from "react";
 import { Icon, IconButton } from "../ui";
+import { LinkEditor } from "../LinkEditor";
 import { Glyph } from "@/lib/glyphs";
 import { readImageAsset } from "@/lib/assets";
 import { newId } from "@/lib/store";
@@ -10,6 +11,10 @@ import { ResumeListRows, listSummary } from "../resume/ResumeContent";
 import {
   BLOCK_TYPES,
   SECTION_BLOCKS_MAX,
+  canAddComponent,
+  canPrintOnResume,
+  isFieldBlock,
+  withoutComponent,
   SECTION_IMAGES_MAX,
   assetSrc,
   componentHasContent,
@@ -21,6 +26,7 @@ import {
   type Block,
   type BlockType,
   type ContactBlock,
+  type FieldBlock,
   type GalleryBlock,
   type ResumeListBlock,
   type PageBlock,
@@ -34,8 +40,9 @@ import {
    gallery's layout, a list's look — is picked in the builder, with the rest
    of the page's design, and has no control in this file.
 
-   A section is a heading and a cover picture; everything under that is a
-   component, and every component is the same panel — `PanelShell`: a mark,
+   A section is a title; everything under it is a component — its
+   description and cover (Text), its links and its pull quote too — and
+   every component is the same panel — `PanelShell`: a mark,
    a name, what it holds, then the rows its kind needs and nothing else. A
    timeline asks for a date, a title and a line; a gallery for pictures and
    how to lay them out; an Experience component for roles and their dates
@@ -89,6 +96,18 @@ const LIST_ICON: Record<PageBlock, React.ReactNode> = {
 /** One drawn mark per component, on the same 24px grid as the rest. */
 export const COMPONENT_ICON: Record<BlockType, React.ReactNode> = {
   ...LIST_ICON,
+  text: <path d="M4 6h16M4 10.5h16M4 15h10M4 19.5h7" />,
+  links: (
+    <>
+      <path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1" />
+      <path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1" />
+    </>
+  ),
+  quote: (
+    <>
+      <path d="M5 17.5c0-4 1.2-7.5 4.5-9.5M5 13h4v4.5H5zM13.5 17.5c0-4 1.2-7.5 4.5-9.5M13.5 13h4v4.5h-4z" />
+    </>
+  ),
   gallery: (
     <>
       <rect x="3.5" y="4.5" width="17" height="15" rx="1.5" />
@@ -150,8 +169,9 @@ export function componentName(type: BlockType): string {
 }
 
 /** "3 milestones", "Email, phone" — what a closed card says about one. */
-export function componentSummary(b: Block, resume?: Resume): string {
-  if (isListBlock(b)) return resume ? listSummary(resume, b.type) : "";
+export function componentSummary(b: Block, resume?: Resume, section?: Section): string {
+  if (isListBlock(b)) return listSummary(b);
+  if (isFieldBlock(b)) return section ? fieldSummary(b, section) : "";
   if (b.type === "gallery") {
     const n = b.imageIds.length;
     return n === 0 ? "Empty" : `${n} ${n === 1 ? "picture" : "pictures"}`;
@@ -167,7 +187,18 @@ export function componentSummary(b: Block, resume?: Resume): string {
   return filled === 0 ? "Empty" : `${filled} ${filled === 1 ? noun[0] : noun[1]}`;
 }
 
-const ITEM_NOUN: Record<Exclude<BlockType, "contact" | "gallery" | PageBlock>, [string, string]> = {
+/** What a field component's section holds, in a few words. */
+function fieldSummary(b: FieldBlock, s: Section): string {
+  if (b.type === "links") {
+    const n = s.links.length;
+    return n === 0 ? "Empty" : `${n} ${n === 1 ? "link" : "links"}`;
+  }
+  if (b.type === "quote") return s.quote?.attribution.trim() || (s.quote?.text.trim() ? "A quote" : "Empty");
+  const parts = [s.description.trim() && "words", coverOf(s) && "a cover"].filter(Boolean);
+  return parts.length ? parts.join(" and ").replace(/^./, (c) => c.toUpperCase()) : "Empty";
+}
+
+const ITEM_NOUN: Record<Exclude<BlockType, "contact" | "gallery" | PageBlock | FieldBlock["type"]>, [string, string]> = {
   timeline: ["milestone", "milestones"],
   testimonials: ["testimonial", "testimonials"],
   clients: ["client", "clients"],
@@ -183,7 +214,7 @@ const ITEM_NOUN: Record<Exclude<BlockType, "contact" | "gallery" | PageBlock>, [
  * The section's one cover picture: what a theme leads the section with. A
  * set of pictures is a Gallery component, further down.
  */
-export function CoverField({ section, onChange }: { section: Section; onChange: (recipe: (s: Section) => Section) => void }) {
+function CoverField({ section, onChange }: { section: Section; onChange: (recipe: (s: Section) => Section) => void }) {
   const input = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -419,12 +450,14 @@ function PicturesField({
 
 /* ── the picker ───────────────────────────────────────────────────────── */
 
-/** "Add a component": a disclosure that opens every kind, in one list. */
-export function ComponentPicker({ count, onAdd }: { count: number; onAdd: (type: BlockType) => void }) {
+/** "Add a component": a disclosure that opens every kind, in one list —
+ *  less Text, Links or Quote once the section has one. */
+export function ComponentPicker({ section, onAdd }: { section: Section; onAdd: (type: BlockType) => void }) {
   const [open, setOpen] = useState(false);
   const panel = useId();
   const reduced = useReducedMotion();
-  const full = count >= SECTION_BLOCKS_MAX;
+  const full = section.blocks.length >= SECTION_BLOCKS_MAX;
+  const offered = BLOCK_TYPES.filter((t) => canAddComponent(section, t.id));
 
   return (
     <div>
@@ -453,7 +486,7 @@ export function ComponentPicker({ count, onAdd }: { count: number; onAdd: (type:
             className="overflow-hidden"
           >
             <ul className="m-0 mt-3 grid list-none grid-cols-1 gap-2 p-0 sm:grid-cols-2">
-              {BLOCK_TYPES.map((t) => (
+              {offered.map((t) => (
                 <li key={t.id}>
                   <button
                     type="button"
@@ -494,7 +527,7 @@ export function newComponent(type: BlockType): Block {
 
 type Field = { key: string; label: string; placeholder: string; long?: boolean; narrow?: boolean };
 
-const FIELDS: Record<Exclude<BlockType, "contact" | "gallery" | PageBlock>, { fields: Field[]; add: string }> = {
+const FIELDS: Record<Exclude<BlockType, "contact" | "gallery" | PageBlock | FieldBlock["type"]>, { fields: Field[]; add: string }> = {
   timeline: {
     add: "Add a milestone",
     fields: [
@@ -626,7 +659,7 @@ export function ComponentPanel({
   onSection: (recipe: (s: Section) => Section) => void;
 }) {
   const [confirming, setConfirming] = useState(false);
-  const empty = !componentHasContent(block, p.resume);
+  const empty = !componentHasContent(block, p.resume, section);
   const name = componentName(block.type);
 
   const onChange = (next: Block) => onSection((s) => ({ ...s, blocks: s.blocks.map((x) => (x.id === block.id ? next : x)) }));
@@ -640,22 +673,15 @@ export function ComponentPanel({
       blocks.splice(to, 0, moved);
       return { ...s, blocks };
     });
-  const onRemove = () =>
-    onSection((s) => {
-      const gone = s.blocks.find((x) => x.id === block.id);
-      const theirs = new Set(gone?.type === "gallery" ? gone.imageIds : []);
-      return {
-        ...s,
-        blocks: s.blocks.filter((x) => x.id !== block.id),
-        images: s.images.filter((a) => !a.id || !theirs.has(a.id)),
-      };
-    });
+  // A gallery takes its pictures with it, and a field component the field
+  // it placed — see `withoutComponent()`.
+  const onRemove = () => onSection((s) => withoutComponent(s, block.id));
 
   return (
     <PanelShell
       icon={COMPONENT_ICON[block.type]}
       name={name}
-      summary={empty ? "Empty — not shown yet" : componentSummary(block, p.resume)}
+      summary={empty ? "Empty — not shown yet" : componentSummary(block, p.resume, section)}
       tools={
         <>
           <IconButton label={`Move ${name} up`} onClick={() => !first && onMove(-1)}>
@@ -685,24 +711,48 @@ export function ComponentPanel({
         </>
       }
     >
-      <div className="field">
-        <label htmlFor={`${block.id}-title`}>Heading (optional)</label>
-        <input
-          id={`${block.id}-title`}
-          className="input"
-          placeholder={HEADING_HINT[block.type]}
-          value={block.title}
-          onChange={(e) => onChange({ ...block, title: e.target.value })}
-        />
-      </div>
-      {isListBlock(block) ? (
-        <ResumeListRows p={p} block={block.type} />
+      {/* A field component is the section's own field, under the section's
+          own title; a heading of its own would be a second title. */}
+      {isFieldBlock(block) ? null : (
+        <div className="field">
+          <label htmlFor={`${block.id}-title`}>Heading (optional)</label>
+          <input
+            id={`${block.id}-title`}
+            className="input"
+            placeholder={HEADING_HINT[block.type]}
+            value={block.title}
+            onChange={(e) => onChange({ ...block, title: e.target.value })}
+          />
+        </div>
+      )}
+      {isFieldBlock(block) ? (
+        <FieldPanel block={block} section={section} onSection={onSection} />
+      ) : isListBlock(block) ? (
+        <ResumeListRows block={block} onChange={onChange} />
       ) : block.type === "gallery" ? (
         <GalleryFields block={block} section={section} onSection={onSection} />
       ) : block.type === "contact" ? (
         <ContactFields block={block} onChange={onChange} />
       ) : (
         <ItemRows block={block} onChange={onChange} />
+      )}
+      {canPrintOnResume(block.type) && (
+        <label className="flex cursor-pointer items-start gap-3 text-[13.5px]">
+          <input
+            type="checkbox"
+            className="mt-0.5 h-4 w-4 flex-none accent-[var(--color-ink)]"
+            checked={block.onResume}
+            onChange={() => onChange({ ...block, onResume: !block.onResume })}
+          />
+          <span>
+            <span className="font-medium">Print on your resume</span>
+            <span className="block text-[12.5px] text-muted">
+              {section.onResume
+                ? "Prints under this section’s title on the resume, set in the resume’s own template."
+                : "This section is off the resume — switch its Resume on for this to print."}
+            </span>
+          </span>
+        </label>
       )}
     </PanelShell>
   );
@@ -749,7 +799,72 @@ function GalleryFields({
   );
 }
 
-const HEADING_HINT: Record<BlockType, string> = {
+/** The section's own field, edited where the component sits. */
+function FieldPanel({
+  block,
+  section: s,
+  onSection,
+}: {
+  block: FieldBlock;
+  section: Section;
+  onSection: (recipe: (s: Section) => Section) => void;
+}) {
+  if (block.type === "links") {
+    return <LinkEditor links={s.links} onChange={(links) => onSection((x) => ({ ...x, links }))} />;
+  }
+  if (block.type === "quote") {
+    const quote = s.quote ?? { text: "", attribution: "" };
+    return (
+      <>
+        <div className="field">
+          <label htmlFor={`${block.id}-text`}>What they said</label>
+          <textarea
+            id={`${block.id}-text`}
+            className="input"
+            rows={2}
+            placeholder="In their words"
+            value={quote.text}
+            onChange={(e) => onSection((x) => ({ ...x, quote: { text: e.target.value, attribution: x.quote?.attribution ?? "" } }))}
+          />
+        </div>
+        <div className="field">
+          <label htmlFor={`${block.id}-by`}>Who said it</label>
+          <input
+            id={`${block.id}-by`}
+            className="input"
+            placeholder="A food critic, Deccan Herald"
+            value={quote.attribution}
+            onChange={(e) => onSection((x) => ({ ...x, quote: { text: x.quote?.text ?? "", attribution: e.target.value } }))}
+          />
+        </div>
+      </>
+    );
+  }
+  return (
+    <>
+      <div className="field">
+        <label htmlFor={`${block.id}-desc`}>Description</label>
+        <textarea
+          id={`${block.id}-desc`}
+          className="input"
+          rows={4}
+          placeholder="What it is, in a few sentences"
+          value={s.description}
+          onChange={(e) => onSection((x) => ({ ...x, description: e.target.value }))}
+        />
+      </div>
+      <div className="field">
+        <span className="text-[13px] font-medium">Cover picture</span>
+        <p className="m-0 mb-2 text-[12px] text-muted">
+          One picture the page leads this section with. For a set of pictures, add a Gallery component.
+        </p>
+        <CoverField section={s} onChange={onSection} />
+      </div>
+    </>
+  );
+}
+
+const HEADING_HINT: Record<Exclude<BlockType, FieldBlock["type"]>, string> = {
   experience: "Where I’ve worked",
   education: "Education",
   skills: "What I’m good at",
@@ -767,7 +882,7 @@ const HEADING_HINT: Record<BlockType, string> = {
   contact: "Get in touch",
 };
 
-type ListBlock = Exclude<Block, ContactBlock | GalleryBlock | ResumeListBlock>;
+type ListBlock = Exclude<Block, ContactBlock | GalleryBlock | ResumeListBlock | FieldBlock>;
 
 function ItemRows({ block, onChange }: { block: ListBlock; onChange: (next: Block) => void }) {
   const config = FIELDS[block.type];

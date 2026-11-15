@@ -16,6 +16,12 @@ themselves are the section's ``section_images`` rows, and an id the section
 does not hold draws nothing. That keeps every asset reference a foreign key,
 which is what asset release and the public asset route rely on.
 
+The section's own fields are placed the same way. ``text`` places its
+description and cover picture, ``links`` its links and ``quote`` its pull
+quote: the values stay on the section's own columns, where the themes, the
+resume and the ATS check read them, and the component says the section has
+them. A section holds at most one of each.
+
 The resume's lists — experience, education, skills, certifications,
 languages, awards — are components in the same way a gallery is: the
 component only *places* the list in a section and picks its look. The
@@ -31,6 +37,14 @@ from pydantic import Field
 
 from app.models.enums import BLOCK_ITEMS_MAX, SECTION_IMAGES_MAX
 from app.schemas.common import SafeUrl, StrictCamelModel
+from app.schemas.resume_items import (
+    Award,
+    Certification,
+    EducationItem,
+    ExperienceItem,
+    Language,
+    SkillGroup,
+)
 
 _ID = Field(max_length=64)
 _SHORT = Field(default="", max_length=200)
@@ -88,6 +102,12 @@ class _Block(StrictCamelModel):
     id: str = _ID
     #: An optional heading over the component, e.g. "Kind words".
     title: str = _SHORT
+    #: "Print on your resume": whether the component prints under its
+    #: section's title on the resume. ``None`` is a component stored before
+    #: the switch was each component's; ``prints_on_resume()`` in
+    #: app/services/ats.py and ``sectionOf()`` in src/lib/types.ts resolve it
+    #: the same way. A gallery never prints, whatever this says.
+    on_resume: bool | None = Field(default=None, exclude_if=lambda v: v is None)
 
 
 class GalleryBlock(_Block):
@@ -105,15 +125,34 @@ class GalleryBlock(_Block):
     )
 
 
-class ResumeListBlock(_Block):
-    """One of the resume's lists, shown in this section.
+class TextBlock(_Block):
+    """Places the section's description and cover picture. Holds neither."""
 
-    Holds no entries: they are ``portfolios.resume[type]``. A list reaches a
-    visitor only while a component of its type sits in a section that is on
-    the page — see ``public_resume``.
+    type: Literal["text"]
+
+
+class LinksBlock(_Block):
+    """Places the section's links. Holds none."""
+
+    type: Literal["links"]
+
+
+class QuoteBlock(_Block):
+    """Places the section's pull quote. Holds none."""
+
+    type: Literal["quote"]
+
+
+class _ListBlock(_Block):
+    """One of the resume's lists, in this section, holding its own entries.
+
+    Each component is its own list: a second Experience component starts
+    empty and keeps its own roles. (Before migration ``e8b4d1a7c3f2`` the
+    entries were one list per kind in ``portfolios.resume``, which every
+    component of that kind placed.) The entries are structured, not prose,
+    so the resume templates and the ATS check read a role and its dates.
     """
 
-    type: Literal["experience", "education", "skills", "certifications", "languages", "awards"]
     #: How the page draws it: one of the section styles, the same shapes the
     #: page's plain sections take. "theme" leaves it to the one that suits
     #: this kind of list. "cards" and "tags" are what "grid" and "chips" were
@@ -131,6 +170,36 @@ class ResumeListBlock(_Block):
         "cards",
         "tags",
     ] = "theme"
+
+
+class ExperienceBlock(_ListBlock):
+    type: Literal["experience"]
+    items: list[ExperienceItem] = Field(default_factory=list, max_length=40)
+
+
+class EducationBlock(_ListBlock):
+    type: Literal["education"]
+    items: list[EducationItem] = Field(default_factory=list, max_length=20)
+
+
+class SkillsBlock(_ListBlock):
+    type: Literal["skills"]
+    items: list[SkillGroup] = Field(default_factory=list, max_length=20)
+
+
+class CertificationsBlock(_ListBlock):
+    type: Literal["certifications"]
+    items: list[Certification] = Field(default_factory=list, max_length=40)
+
+
+class LanguagesBlock(_ListBlock):
+    type: Literal["languages"]
+    items: list[Language] = Field(default_factory=list, max_length=20)
+
+
+class AwardsBlock(_ListBlock):
+    type: Literal["awards"]
+    items: list[Award] = Field(default_factory=list, max_length=40)
 
 
 class TimelineBlock(_Block):
@@ -189,7 +258,10 @@ class ContactBlock(_Block):
 
 
 Block = Annotated[
-    GalleryBlock
+    TextBlock
+    | LinksBlock
+    | QuoteBlock
+    | GalleryBlock
     | TimelineBlock
     | TestimonialsBlock
     | ClientsBlock
@@ -198,6 +270,40 @@ Block = Annotated[
     | ServicesBlock
     | FaqBlock
     | ContactBlock
-    | ResumeListBlock,
+    | ExperienceBlock
+    | EducationBlock
+    | SkillsBlock
+    | CertificationsBlock
+    | LanguagesBlock
+    | AwardsBlock,
     Field(discriminator="type"),
 ]
+
+
+#: The resume's lists, as component types.
+RESUME_LISTS = ("experience", "education", "skills", "certifications", "languages", "awards")
+
+
+def fix_resume_switches(
+    on_resume: bool, blocks: list[dict], hidden: list[str] | set[str]
+) -> tuple[bool, list[dict]]:
+    """A section from before "Print on your resume" was each component's,
+    switched so the resume prints what it printed then.
+
+    A list used to print whatever its section's Resume switch said — that
+    switch only decided whether the section's own words printed. Now the
+    section's switch decides whether anything under it prints, so a section
+    that places a list but had the switch off is switched on, with each
+    component told explicitly: its list prints unless the whole list was
+    switched off (``hidden``), and nothing else under it does. Anything else
+    is returned as it was. Migration ``c3e8a5f1b7d2`` does the same to rows
+    already stored.
+    """
+    if on_resume or not any(b.get("type") in RESUME_LISTS for b in blocks):
+        return on_resume, blocks
+    fixed = []
+    for b in blocks:
+        if not isinstance(b.get("onResume"), bool):
+            b = {**b, "onResume": b.get("type") in RESUME_LISTS and b.get("type") not in hidden}
+        fixed.append(b)
+    return True, fixed

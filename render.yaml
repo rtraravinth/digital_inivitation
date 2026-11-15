@@ -4,8 +4,9 @@
 #
 # Both are on the free plan, which is for trying it out, not for keeping:
 #   - a free service sleeps when idle and its disk is wiped when it wakes, so
-#     UPLOADED PICTURES DO NOT SURVIVE. For them to last, set `plan: starter`
-#     on the service and uncomment the `disk` block below.
+#     UPLOADED PICTURES DO NOT SURVIVE on its disk. For them to last, either
+#     store them in Cloudflare R2 (set FACET_STORAGE=r2 and the FACET_R2_*
+#     values below) or set `plan: starter` and uncomment the `disk` block.
 #   - a free database is deleted after a limited period. Set a paid `plan` on
 #     the database before relying on it.
 
@@ -38,6 +39,20 @@ services:
       # With the disk above, change this to /var/data/media.
       - key: FACET_MEDIA_ROOT
         value: /app/backend/media
+      # Uploads in a private Cloudflare R2 bucket instead of the disk: set
+      # FACET_STORAGE to r2 and fill in the bucket's S3 endpoint
+      # (https://<account id>.r2.cloudflarestorage.com), name and an
+      # Object Read & Write token for that bucket alone.
+      - key: FACET_STORAGE
+        value: disk
+      - key: FACET_R2_ENDPOINT
+        sync: false
+      - key: FACET_R2_BUCKET
+        sync: false
+      - key: FACET_R2_ACCESS_KEY_ID
+        sync: false
+      - key: FACET_R2_SECRET_ACCESS_KEY
+        sync: false
       # Firebase Authentication. The project id is all the API needs to
       # verify a sign-in; the four NEXT_PUBLIC_ values are the web app's
       # config from Firebase → Project settings → Your apps. They are public

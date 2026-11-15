@@ -8,22 +8,32 @@ job's company and dates, a degree's school, a list of skills. Structured
 rather than free text, so a later ATS check can read a role and its dates
 without parsing prose.
 
-Each structured list can also appear on the published page, by placing a
-component of its type in a section (``ResumeListBlock`` in
-app/schemas/blocks.py). Only lists placed in a section a visitor can see
-ever leave the owner's account — see ``public_resume`` — because the rest
-carries an email and a phone number.
+The structured lists themselves now live in the list components, each with
+its own entries (``ExperienceBlock`` and the rest in app/schemas/blocks.py).
+The lists this model still accepts are what a resume held before that;
+migration ``e8b4d1a7c3f2`` moved them into the components and emptied them,
+and an import does the same (``services/transfer.py``).
 """
 
 from __future__ import annotations
 
-from collections.abc import Iterable
 from typing import Any, Literal
 
 from pydantic import Field, ValidationError
 
 from app.models.enums import FontId
-from app.schemas.common import CamelModel, SafeUrl, StrictCamelModel
+from app.schemas.account import LinkItem
+from app.schemas.asset import AssetOut
+from app.schemas.common import CamelModel, StrictCamelModel
+from app.schemas.resume_items import (
+    Award,
+    Certification,
+    EducationItem,
+    ExperienceItem,
+    Language,
+    SkillGroup,
+)
+from app.schemas.section import SectionOut
 
 #: Mirrors ``RESUME_TEMPLATE_IDS`` in src/lib/types.ts. A template is only a
 #: look, so adding one needs no migration — but an id the frontend sends must
@@ -116,10 +126,6 @@ PAGE_BLOCKS: list[str] = [
     "awards",
 ]
 
-_ID = Field(max_length=64)
-_LINE = Field(default="", max_length=300)
-_DATE = Field(default="", max_length=40)
-
 
 class ResumeStyle(StrictCamelModel):
     template: ResumeTemplate = "classic"
@@ -137,64 +143,26 @@ class ResumeStyle(StrictCamelModel):
     backdrop_color: str = Field(default="", pattern=r"^(#[0-9a-fA-F]{6})?$")
 
 
-class ExperienceItem(StrictCamelModel):
-    id: str = _ID
-    role: str = _LINE
-    company: str = _LINE
-    location: str = _LINE
-    start: str = _DATE
-    end: str = _DATE
-    #: "Present" without typing it, and a later ATS check can tell a current
-    #: role from one whose end date was simply left blank.
-    current: bool = False
-    bullets: list[str] = Field(default_factory=list, max_length=20)
+class PublicContact(StrictCamelModel):
+    """Which contact details a published resume shows. All on by default, so a
+    resume stored before the ticks existed behaves as the owner expects once
+    they publish it: the details they typed are the ones printed."""
 
-
-class EducationItem(StrictCamelModel):
-    id: str = _ID
-    degree: str = _LINE
-    school: str = _LINE
-    location: str = _LINE
-    start: str = _DATE
-    end: str = _DATE
-    detail: str = Field(default="", max_length=1000)
-
-
-class SkillGroup(StrictCamelModel):
-    id: str = _ID
-    #: Optional: an unnamed group prints as a plain list.
-    name: str = Field(default="", max_length=120)
-    items: list[str] = Field(default_factory=list, max_length=60)
-
-
-class Certification(StrictCamelModel):
-    id: str = _ID
-    name: str = _LINE
-    issuer: str = _LINE
-    date: str = _DATE
-    url: SafeUrl = ""
-
-
-class Language(StrictCamelModel):
-    id: str = _ID
-    name: str = Field(default="", max_length=120)
-    level: str = Field(default="", max_length=120)
-
-
-class Award(StrictCamelModel):
-    id: str = _ID
-    title: str = _LINE
-    issuer: str = _LINE
-    date: str = _DATE
-    detail: str = Field(default="", max_length=1000)
+    email: bool = True
+    phone: bool = True
+    location: bool = True
+    website: bool = True
 
 
 class Resume(StrictCamelModel):
-    #: Resume-only: printed on the resume, never sent to a visitor.
+    #: Resume-only: printed on the resume; sent to a visitor only when ticked
+    #: in ``public_contact`` on a published resume.
     email: str = Field(default="", max_length=320)
     phone: str = Field(default="", max_length=60)
     location: str = Field(default="", max_length=200)
     website: str = Field(default="", max_length=2000)
+    #: Which of the four a published resume shows to a visitor.
+    public_contact: PublicContact = Field(default_factory=PublicContact)
 
     experience: list[ExperienceItem] = Field(default_factory=list, max_length=40)
     education: list[EducationItem] = Field(default_factory=list, max_length=20)
@@ -210,9 +178,9 @@ class Resume(StrictCamelModel):
     style: ResumeStyle = Field(default_factory=ResumeStyle)
 
 
-#: What a resume edit may change while the page is live: how the resume
+#: What a resume edit may change while the page or the resume is live: how the resume
 #: looks and which blocks it prints. Everything else can reach the page.
-RESUME_ONLY_FIELDS = {"style", "hidden", "email", "phone", "location", "website"}
+RESUME_ONLY_FIELDS = {"style", "hidden", "email", "phone", "location", "website", "public_contact"}
 
 
 def _known(model: type[StrictCamelModel], data: Any) -> dict:
@@ -252,36 +220,20 @@ def resume_from_stored(raw: Any) -> Resume:
 
 
 class PublicResume(CamelModel):
-    """The resume lists a visitor may see: only those placed in a section
-    that is on the page, and never the contact details or the style."""
+    """The resume lists a published page carries: always empty now.
 
-    experience: list[ExperienceItem]
-    education: list[EducationItem]
-    skills: list[SkillGroup]
-    certifications: list[Certification]
-    languages: list[Language]
-    awards: list[Award]
-
-
-def placed_lists(sections_blocks: Iterable[list | None]) -> set[str]:
-    """The resume lists that have a component among these sections' blocks.
-
-    Hand it the blocks of the sections a visitor will see — a list whose
-    only component sits in a hidden section stays in the account.
+    Each list component holds its own entries (``app/schemas/blocks.py``), so
+    a page's lists reach a visitor inside the sections they sit in — a hidden
+    section is never sent — and nothing of the stored resume is. The field
+    stays so the page's payload keeps its shape for the frontend.
     """
-    return {
-        block.get("type")
-        for blocks in sections_blocks
-        for block in (blocks or [])
-        if isinstance(block, dict) and block.get("type") in PAGE_BLOCKS
-    }
 
-
-def public_resume(raw: Any, placed: set[str]) -> PublicResume:
-    resume = resume_from_stored(raw)
-    return PublicResume(
-        **{block: getattr(resume, block) if block in placed else [] for block in PAGE_BLOCKS},
-    )
+    experience: list[ExperienceItem] = Field(default_factory=list)
+    education: list[EducationItem] = Field(default_factory=list)
+    skills: list[SkillGroup] = Field(default_factory=list)
+    certifications: list[Certification] = Field(default_factory=list)
+    languages: list[Language] = Field(default_factory=list)
+    awards: list[Award] = Field(default_factory=list)
 
 
 class AtsCheckIn(StrictCamelModel):
@@ -321,3 +273,26 @@ class AtsReport(CamelModel):
     matched: list[AtsTerm]
     missing: list[AtsTerm]
     suggestions: list[AtsSuggestion]
+
+
+class PublicResumeHeader(CamelModel):
+    name: str
+    current: str
+    description: str
+    links: list[LinkItem]
+    portrait: AssetOut | None
+
+
+class PublicResumeOut(CamelModel):
+    """A published resume: what ``/p/{subdomain}/{slug}/resume`` returns.
+
+    The contact details the owner left unticked are sent as empty strings, so
+    they are absent from the response rather than hidden by the page.
+    """
+
+    name: str
+    slug: str
+    subdomain: str
+    header: PublicResumeHeader
+    sections: list[SectionOut]
+    resume: Resume

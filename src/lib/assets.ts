@@ -18,7 +18,7 @@ export function formatBytes(n: number): string {
   return `${(n / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-async function upload(file: File, kind: "image" | "file"): Promise<Asset> {
+async function upload(file: File, kind: "image"): Promise<Asset> {
   const form = new FormData();
   form.append("file", file);
   form.append("kind", kind);
@@ -34,8 +34,4 @@ export async function readImageAsset(file: File): Promise<Asset> {
     throw new Error("That isn't an image.");
   }
   return upload(file, "image");
-}
-
-export async function readFileAsset(file: File): Promise<Asset> {
-  return upload(file, "file");
 }

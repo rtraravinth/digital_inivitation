@@ -1,7 +1,10 @@
-import { MENU_PDF, PICTURES, PORTRAIT } from "./seed-images";
+import { PICTURES, PORTRAIT } from "./seed-images";
 import {
   normalize,
   type Asset,
+  type Block,
+  type ListLook,
+  type PageBlock,
   type Portfolio,
   type PortfolioHeader,
   type Resume,
@@ -9,8 +12,12 @@ import {
 } from "./types";
 
 /** Optional fields fall back to the defaults in normalize(). */
-type Opt = "images" | "file" | "quote" | "blocks" | "hidden" | "onResume" | "tab";
-type SeedSection = Omit<Section, Opt> & Partial<Pick<Section, Opt>>;
+type Opt = "images" | "quote" | "hidden" | "onResume" | "tab";
+/** A list component written without `items` takes the seed's resume list of
+ *  its kind — normalize() hands it over, as it does for older stored data. */
+type SeedListBlock = { id: string; type: PageBlock; title: string; look: ListLook; onResume: boolean };
+type SeedSection = Omit<Section, Opt | "blocks"> &
+  Partial<Pick<Section, Opt>> & { blocks?: Array<Block | SeedListBlock> };
 
 type HeaderOpt = "portrait" | "numbers" | "dates";
 type SeedHeader = Omit<PortfolioHeader, HeaderOpt> &
@@ -18,10 +25,10 @@ type SeedHeader = Omit<PortfolioHeader, HeaderOpt> &
 
 type SeedPortfolio = Omit<
   Portfolio,
-  "theme" | "accent" | "ground" | "groundHex" | "font" | "bodyFont" | "layout" | "resume" | "sections" | "header" | "footer"
+  "theme" | "accent" | "ground" | "groundHex" | "font" | "bodyFont" | "layout" | "resume" | "resumeStatus" | "sections" | "header" | "footer"
 > &
   Partial<
-    Pick<Portfolio, "theme" | "accent" | "ground" | "groundHex" | "font" | "bodyFont" | "layout" | "footer">
+    Pick<Portfolio, "theme" | "accent" | "ground" | "groundHex" | "font" | "bodyFont" | "layout" | "footer" | "resumeStatus">
   > & {
     /** Only the full page carries one; normalize() gives the rest the defaults. */
     resume?: Partial<Resume>;
@@ -191,6 +198,7 @@ const RAW: SeedPortfolio[] = [
           {
             id: "s1b1",
             type: "timeline",
+            onResume: false,
             title: "How it grew",
             items: [
               { id: "s1t1", date: "2019", title: "One kitchen, two brands", text: "A rented facility in HSR Layout and a biryani menu we still run." },
@@ -227,6 +235,7 @@ const RAW: SeedPortfolio[] = [
           {
             id: "s3b2",
             type: "stats",
+            onResume: false,
             title: "",
             items: [
               { id: "s3n1", value: "82", label: "Issues" },
@@ -254,6 +263,7 @@ const RAW: SeedPortfolio[] = [
           {
             id: "s4b1",
             type: "services",
+            onResume: false,
             title: "What I offer",
             items: [
               { id: "s4v1", title: "Financial plan", text: "A written plan for your household: goals, insurance, investments and tax, reviewed with you in two sessions.", price: "₹45,000 one-time" },
@@ -264,6 +274,7 @@ const RAW: SeedPortfolio[] = [
           {
             id: "s4b2",
             type: "tabs",
+            onResume: false,
             title: "How it works",
             items: [
               { id: "s4a1", label: "First call", text: "Thirty minutes, free. We talk about where you are and whether I am the right adviser. Often I am not, and I will say so." },
@@ -274,6 +285,7 @@ const RAW: SeedPortfolio[] = [
           {
             id: "s4b3",
             type: "faq",
+            onResume: false,
             title: "Questions families ask",
             items: [
               { id: "s4f1", question: "Do you earn commissions?", answer: "No. I am fee-only: the fee is the whole of what I earn, so no product I suggest pays me anything." },
@@ -314,12 +326,12 @@ const RAW: SeedPortfolio[] = [
         title: "Background",
         description: "",
         links: [],
-        onResume: false,
+        onResume: true,
         blocks: [
-          { id: "s8b1", type: "education", title: "Education", look: "list" },
-          { id: "s8b2", type: "skills", title: "Skills", look: "chips" },
-          { id: "s8b3", type: "certifications", title: "Certifications", look: "list" },
-          { id: "s8b4", type: "languages", title: "Languages", look: "chips" },
+          { id: "s8b1", type: "education", onResume: true, title: "Education", look: "list" },
+          { id: "s8b2", type: "skills", onResume: true, title: "Skills", look: "chips" },
+          { id: "s8b3", type: "certifications", onResume: true, title: "Certifications", look: "list" },
+          { id: "s8b4", type: "languages", onResume: true, title: "Languages", look: "chips" },
         ],
       },
       // The roles are on the resume only: the page tells the businesses as
@@ -331,8 +343,8 @@ const RAW: SeedPortfolio[] = [
         description: "",
         links: [],
         hidden: true,
-        onResume: false,
-        blocks: [{ id: "s9b1", type: "experience", title: "", look: "theme" }],
+        onResume: true,
+        blocks: [{ id: "s9b1", type: "experience", onResume: true, title: "", look: "theme" }],
       },
       {
         id: "s7",
@@ -345,6 +357,7 @@ const RAW: SeedPortfolio[] = [
           {
             id: "s7b1",
             type: "contact",
+            onResume: false,
             title: "Get in touch",
             text: "Write a line about what you need and I will come back with a time.",
             email: "rohan@slowcompounding.in",
@@ -561,7 +574,7 @@ const RAW: SeedPortfolio[] = [
   },
   // Every field the editor has, filled in, so the builder and the preview
   // show what each one draws: header extras and portrait, cover pictures,
-  // all three gallery layouts, a file, a quote, every component (each resume
+  // all three gallery layouts, a quote, every component (each resume
   // list in a different look), a hidden section and a full footer.
   {
     id: "showcase",
@@ -682,7 +695,7 @@ const RAW: SeedPortfolio[] = [
       },
     },
     sections: [
-      // Cover, quote, file, links, a mosaic gallery and a timeline.
+      // Cover, quote, links, a mosaic gallery and a timeline.
       {
         id: "ss1",
         title: "Northwell Kitchens",
@@ -700,13 +713,13 @@ const RAW: SeedPortfolio[] = [
           pic("img-ss1-g3", "facility", "facility.jpg"),
           pic("img-ss1-g4", "team", "team.jpg"),
         ],
-        file: { id: "file-ss1", name: "northwell-menu.pdf", mime: "application/pdf", size: 0, dataUrl: MENU_PDF },
         quote: { text: "The best biryani that never had a dining room.", attribution: "A food critic, Deccan Herald" },
         blocks: [
-          { id: "ss1b1", type: "gallery", title: "In the kitchens", layout: "mosaic", imageIds: ["img-ss1-g1", "img-ss1-g2", "img-ss1-g3", "img-ss1-g4"] },
+          { id: "ss1b1", type: "gallery", onResume: false, title: "In the kitchens", layout: "mosaic", imageIds: ["img-ss1-g1", "img-ss1-g2", "img-ss1-g3", "img-ss1-g4"] },
           {
             id: "ss1b2",
             type: "timeline",
+            onResume: false,
             title: "How it grew",
             items: [
               { id: "ss1t1", date: "2019", title: "One kitchen, two brands", text: "A rented facility in HSR Layout." },
@@ -735,8 +748,8 @@ const RAW: SeedPortfolio[] = [
           pic("img-ss2-s4", "kitchenPass", "pass-2.jpg"),
         ],
         blocks: [
-          { id: "ss2b1", type: "gallery", title: "Grid", layout: "grid", imageIds: ["img-ss2-g1", "img-ss2-g2", "img-ss2-g3"] },
-          { id: "ss2b2", type: "gallery", title: "Strip", layout: "strip", imageIds: ["img-ss2-s1", "img-ss2-s2", "img-ss2-s3", "img-ss2-s4"] },
+          { id: "ss2b1", type: "gallery", onResume: false, title: "Grid", layout: "grid", imageIds: ["img-ss2-g1", "img-ss2-g2", "img-ss2-g3"] },
+          { id: "ss2b2", type: "gallery", onResume: false, title: "Strip", layout: "strip", imageIds: ["img-ss2-s1", "img-ss2-s2", "img-ss2-s3", "img-ss2-s4"] },
         ],
       },
       // The resume's lists, one look each.
@@ -745,19 +758,19 @@ const RAW: SeedPortfolio[] = [
         title: "Experience",
         description: "",
         links: [],
-        onResume: false,
-        blocks: [{ id: "ss3b1", type: "experience", title: "Roles", look: "timeline" }],
+        onResume: true,
+        blocks: [{ id: "ss3b1", type: "experience", onResume: true, title: "Roles", look: "timeline" }],
       },
       {
         id: "ss4",
         title: "Education and credentials",
         description: "",
         links: [],
-        onResume: false,
+        onResume: true,
         blocks: [
-          { id: "ss4b1", type: "education", title: "Education", look: "grid" },
-          { id: "ss4b2", type: "certifications", title: "Certifications", look: "list" },
-          { id: "ss4b3", type: "awards", title: "Awards", look: "spotlight" },
+          { id: "ss4b1", type: "education", onResume: true, title: "Education", look: "grid" },
+          { id: "ss4b2", type: "certifications", onResume: true, title: "Certifications", look: "list" },
+          { id: "ss4b3", type: "awards", onResume: true, title: "Awards", look: "spotlight" },
         ],
       },
       {
@@ -765,10 +778,10 @@ const RAW: SeedPortfolio[] = [
         title: "Skills and languages",
         description: "",
         links: [],
-        onResume: false,
+        onResume: true,
         blocks: [
-          { id: "ss5b1", type: "skills", title: "Skills", look: "chips" },
-          { id: "ss5b2", type: "languages", title: "Languages", look: "carousel" },
+          { id: "ss5b1", type: "skills", onResume: true, title: "Skills", look: "chips" },
+          { id: "ss5b2", type: "languages", onResume: true, title: "Languages", look: "carousel" },
         ],
       },
       // Services, numbers, tabs and questions.
@@ -783,6 +796,7 @@ const RAW: SeedPortfolio[] = [
           {
             id: "ss6b1",
             type: "services",
+            onResume: false,
             title: "What I offer",
             items: [
               { id: "ss6v1", title: "Financial plan", text: "A written plan for your household, in two sessions.", price: "₹45,000 one-time" },
@@ -793,6 +807,7 @@ const RAW: SeedPortfolio[] = [
           {
             id: "ss6b2",
             type: "stats",
+            onResume: false,
             title: "The practice in numbers",
             items: [
               { id: "ss6n1", value: "60", label: "Households" },
@@ -803,6 +818,7 @@ const RAW: SeedPortfolio[] = [
           {
             id: "ss6b3",
             type: "tabs",
+            onResume: false,
             title: "How it works",
             items: [
               { id: "ss6a1", label: "First call", text: "Thirty minutes, free, to see whether I am the right adviser." },
@@ -813,6 +829,7 @@ const RAW: SeedPortfolio[] = [
           {
             id: "ss6b4",
             type: "faq",
+            onResume: false,
             title: "Questions",
             items: [
               { id: "ss6f1", question: "Do you earn commissions?", answer: "No. The fee is the whole of what I earn." },
@@ -833,6 +850,7 @@ const RAW: SeedPortfolio[] = [
           {
             id: "ss7b1",
             type: "testimonials",
+            onResume: false,
             title: "Kind words",
             items: [
               { id: "ss7q1", quote: "He told us not to buy the policy our bank was pushing. That saved us lakhs.", name: "Priya S.", role: "Advisory client" },
@@ -843,6 +861,7 @@ const RAW: SeedPortfolio[] = [
           {
             id: "ss7b2",
             type: "clients",
+            onResume: false,
             title: "Worked with",
             items: [
               { id: "ss7c1", name: "Tiffin House", url: "https://example.com/tiffin" },
@@ -881,6 +900,7 @@ const RAW: SeedPortfolio[] = [
           {
             id: "ss10b1",
             type: "contact",
+            onResume: false,
             title: "Get in touch",
             text: "Write a line about what you need and I will come back with a time.",
             email: "rohan@example.com",

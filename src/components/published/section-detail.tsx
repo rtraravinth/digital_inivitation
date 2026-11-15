@@ -136,7 +136,7 @@ export function SectionDetail({ p, section }: { p: Portfolio; section: Section }
               </p>
             )}
             <div className="flex flex-col items-start gap-4">
-              <SectionAside p={p} section={section} />
+              <SectionAside section={section} />
               <SectionLinks p={p} section={section} />
             </div>
           </motion.figcaption>

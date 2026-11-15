@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import uuid
+from urllib.parse import quote
 
 from fastapi import APIRouter, File, Form, Query, Request, UploadFile, status
-from fastapi.responses import FileResponse, Response
+from fastapi.concurrency import run_in_threadpool
+from fastapi.responses import FileResponse, Response, StreamingResponse
 
 from app.api.deps import CurrentUser, SessionDep, get_caller
 from app.api.route import TransactionRoute
@@ -64,7 +66,7 @@ async def read_asset(
     request: Request,
     t: str | None = Query(default=None, description="The signature from the asset's url"),
 ) -> Response:
-    return serve(await _readable(session, request, asset_id, t))
+    return await serve(await _readable(session, request, asset_id, t))
 
 
 async def _readable(
@@ -113,17 +115,15 @@ UPLOAD_CSP = "default-src 'none'; style-src 'unsafe-inline'; img-src data:; sand
 SANDBOX_EXEMPT = frozenset({"application/pdf"})
 
 
-def serve(asset: Asset, *, public: bool = False) -> Response:
+async def serve(asset: Asset, *, public: bool = False) -> Response:
     """Stream the bytes with a content hash as the ETag.
 
     The blob at a key never changes — the key *is* the hash — so it can be
-    cached hard and revalidated for free.
+    cached hard and revalidated for free. On disk it is sent as a file; from
+    R2 it is streamed through here, so the bucket stays private and every
+    header below still applies.
     """
-    path = get_storage().path_for(asset.storage_key)
-    if path is None:
-        # The row outlived its file. Say "gone", not "server error".
-        raise NotFound("That upload is no longer stored.", code="asset_missing")
-
+    storage = get_storage()
     cache = "public, max-age=31536000, immutable" if public else "private, max-age=300"
     headers = {
         "ETag": f'"{asset.sha256}"',
@@ -133,12 +133,26 @@ def serve(asset: Asset, *, public: bool = False) -> Response:
     }
     if asset.mime not in SANDBOX_EXEMPT:
         headers["Content-Security-Policy"] = UPLOAD_CSP
-    return FileResponse(
-        path,
-        media_type=asset.mime,
-        headers=headers,
-        # Starlette writes the name RFC 6266-encoded, so a quote or a line
-        # break in an uploaded file's name cannot reshape the header.
-        filename=asset.original_name,
-        content_disposition_type="inline",
-    )
+
+    path = storage.path_for(asset.storage_key)
+    if path is not None:
+        return FileResponse(
+            path,
+            media_type=asset.mime,
+            headers=headers,
+            # Starlette writes the name RFC 6266-encoded, so a quote or a line
+            # break in an uploaded file's name cannot reshape the header.
+            filename=asset.original_name,
+            content_disposition_type="inline",
+        )
+
+    # A bucket: the request goes out on a thread, never on the event loop.
+    body = await run_in_threadpool(storage.chunks, asset.storage_key)
+    if body is None:
+        # The row outlived its file. Say "gone", not "server error".
+        raise NotFound("That upload is no longer stored.", code="asset_missing")
+    headers["Content-Length"] = str(asset.byte_size)
+    # The same RFC 6266 encoding FileResponse uses: always the starred form,
+    # so no character in the name can reshape the header.
+    headers["Content-Disposition"] = f"inline; filename*=utf-8''{quote(asset.original_name)}"
+    return StreamingResponse(body, media_type=asset.mime, headers=headers)

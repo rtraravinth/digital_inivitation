@@ -4,6 +4,7 @@ import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import Link from "next/link";
 import { useId, useState, type ReactNode } from "react";
 import { AtsCheck } from "./AtsCheck";
+import { PublishDialog } from "../PublishDialog";
 import { ResumeDocument } from "./ResumeDocument";
 import { ResumeSheet } from "./ResumeSheet";
 import { ColourPicker } from "../builder/ColourPicker";
@@ -11,7 +12,6 @@ import { FontSelect } from "../builder/FontSelect";
 import { ICON, Icon, IconButton, Segmented, StatusPill } from "../ui";
 import { Glyph } from "@/lib/glyphs";
 import {
-  BLOCK_LABEL,
   COLUMN_OPTIONS,
   MM,
   PAPERS,
@@ -21,15 +21,16 @@ import {
   SPACINGS,
   TEMPLATE_CATEGORIES,
   TEMPLATE_DEFAULTS,
-  blockHasContent,
-  blockInUse,
+  resumeParts,
   resumePrintPath,
+  summaryOf,
   templateOf,
   type TemplateCategory,
 } from "@/lib/resume";
 import { RESUME_BACKDROPS, backdropLayers, layerStyle, patternColour } from "@/lib/resume-backdrops";
 import { usePortfolios } from "@/lib/store";
-import type { Paper, Portfolio, Resume, ResumeBlock, ResumeColumns, ResumeStyle, ResumeTemplateId } from "@/lib/types";
+import { isFrozen } from "@/lib/types";
+import type { Paper, Portfolio, Resume, ResumeColumns, ResumeStyle, ResumeTemplateId } from "@/lib/types";
 
 /* ── the builder's Resume side ────────────────────────────────────────────
    The same three panels as the Page side, so moving between them changes
@@ -45,7 +46,6 @@ type Tab = "template" | "style" | "ats";
 type SheetTab = "template" | "style" | "ats" | "blocks";
 
 const EASE = [0.16, 1, 0.3, 1] as const;
-const DOWNLOAD = <path d="M12 4v11m0 0-4-4m4 4 4-4M5 20h14" />;
 
 export function ResumeStudio({
   p,
@@ -66,12 +66,31 @@ export function ResumeStudio({
   const style = (patch: Partial<ResumeStyle>) => change((r) => ({ ...r, style: { ...r.style, ...patch } }));
   const template = templateOf(p.resume.style.template);
 
-  const download = (
-    <a href={resumePrintPath(p.id)} target="_blank" rel="noopener noreferrer" className="btn btn-primary" style={{ marginTop: 0, minHeight: 34 }}>
-      <Icon d={DOWNLOAD} size={14} />
-      <span className="hidden sm:inline">Download PDF</span>
-      <span className="sm:hidden">PDF</span>
-    </a>
+  // The builder only opens on a draft (a published portfolio shows the
+  // published screen instead), so this bar is the Page side's: Preview and
+  // Publish. Publish is the editor's own dialog, opened with only the resume
+  // ticked; the link and the PDF live on the published screen.
+  const [publishing, setPublishing] = useState(false);
+  const actions = (
+    <>
+      <a
+        href={resumePrintPath(p.id, false)}
+        // A new tab: the sheet full size, watermarked, and refusing to print.
+        target="_blank"
+        rel="noopener noreferrer"
+        className="btn btn-secondary"
+        style={{ marginTop: 0, minHeight: 34 }}
+      >
+        <Icon d={ICON.eye} size={14} />
+        <span className="hidden sm:inline">Preview</span>
+      </a>
+      <button type="button" className="btn btn-primary" style={{ marginTop: 0, minHeight: 34 }} onClick={() => setPublishing(true)}>
+        Publish
+      </button>
+      <AnimatePresence>
+        {publishing && <PublishDialog key="publish" p={p} only="resume" onClose={() => setPublishing(false)} />}
+      </AnimatePresence>
+    </>
   );
 
   const inspector = (which: Tab) =>
@@ -110,14 +129,14 @@ export function ResumeStudio({
           <span className="hidden h-5 w-px sm:block" style={{ background: "var(--color-divider)" }} />
           <span className="hidden min-w-0 truncate text-[14.5px] font-semibold tracking-[-0.01em] md:inline">{p.name}</span>
           <span className="hidden xl:inline-flex">
-            <StatusPill live={p.status === "live"} />
+            <StatusPill live={false} />
           </span>
           <span className="lg:hidden">{modeSwitch}</span>
           <span className="ml-auto flex flex-none items-center gap-2">
             <Link href={`/editor/${p.id}`} className="btn btn-secondary hidden md:inline-flex" style={{ marginTop: 0, minHeight: 34 }}>
               Edit resume
             </Link>
-            {download}
+            {actions}
           </span>
         </header>
 
@@ -168,7 +187,7 @@ export function ResumeStudio({
             </div>
             <div className="min-h-0 flex-1 overflow-y-auto rounded-2xl p-6" style={{ background: "var(--color-neutral-200)" }}>
               <div className="mx-auto max-w-[860px]">
-                <ResumeSheet p={p} onPages={setPages} />
+                <ResumeSheet p={p} onPages={setPages} watermark />
               </div>
             </div>
             <p className="m-0 mt-2 flex-none text-center text-[12px]" style={{ color: "var(--color-neutral-600)" }}>
@@ -225,7 +244,7 @@ export function ResumeStudio({
           </div>
           <div className="px-4 pt-3 pb-4">
             <div className="max-h-[520px] overflow-y-auto rounded-2xl p-3" style={{ background: "var(--color-neutral-200)" }}>
-              <ResumeSheet p={p} onPages={setPages} />
+              <ResumeSheet p={p} onPages={setPages} watermark />
             </div>
           </div>
           <div className="mx-4 mb-8 overflow-hidden rounded-2xl" style={{ background: "var(--color-bg)", border: "1px solid var(--color-divider)" }}>
@@ -286,91 +305,109 @@ function PaperSwitch({ value, onChange, id }: { value: Paper; onChange: (p: Pape
   );
 }
 
-/* ── blocks: order and visibility ─────────────────────────────────────── */
+/* ── sections: order and visibility ───────────────────────────────────── */
 
+const EYE_OFF = <path d="M3 3l18 18M10.6 5.1A10 10 0 0 1 12 5c6.4 0 10 7 10 7a17 17 0 0 1-3.2 4M6.6 6.6C3.8 8.4 2 12 2 12s3.6 7 10 7a9.7 9.7 0 0 0 4.4-1" />;
+
+/**
+ * What the resume prints, in order: the summary, then the page's own
+ * sections — the resume has no sections of its own. A section's eye is its
+ * Resume switch and its arrows move it on the page too, because the two
+ * share one order. What prints under a section's title is chosen in the
+ * editor, with "Print on your resume" on each component.
+ */
 function BlockRail({ p, onChange }: { p: Portfolio; onChange: (recipe: (r: Resume) => Resume) => void }) {
   const reduced = useReducedMotion();
+  const { updateSection, moveSection } = usePortfolios();
   const r = p.resume;
-  // The order is the page's too (the structured blocks on it follow it), so
-  // a live page freezes it; what prints stays a resume-only choice.
-  const live = p.status === "live";
-
-  // Swaps with its neighbour in the list shown, so a block that is not in
-  // use — and not shown — never makes a click look like it did nothing.
-  const move = (block: ResumeBlock, delta: -1 | 1) =>
-    onChange((prev) => {
-      const shown = prev.order.filter((b) => blockInUse(p, b));
-      const other = shown[shown.indexOf(block) + delta];
-      if (!other) return prev;
-      const order = [...prev.order];
-      const a = order.indexOf(block);
-      const b = order.indexOf(other);
-      [order[a], order[b]] = [order[b], order[a]];
-      return { ...prev, order };
-    });
-  // Only what this portfolio has: its summary and sections once written, and
-  // a resume list once a component places it — not every block there could be.
-  const inUse = r.order.filter((b) => blockInUse(p, b));
-  const toggle = (block: ResumeBlock) =>
+  // A live page's sections are frozen; only the summary, a resume-only
+  // switch, can still change.
+  const live = isFrozen(p);
+  const summaryOff = r.hidden.includes("summary");
+  const printed = new Map(resumeParts(p).map((x) => [x.section.id, x.blocks.length]));
+  const toggleSummary = () =>
     onChange((prev) => ({
       ...prev,
-      hidden: prev.hidden.includes(block) ? prev.hidden.filter((b) => b !== block) : [...prev.hidden, block],
+      hidden: prev.hidden.includes("summary") ? prev.hidden.filter((b) => b !== "summary") : [...prev.hidden, "summary"],
     }));
+
+  const rows: Array<{ id: string; name: string; off: boolean; note?: string; toggle: () => void; move?: (d: -1 | 1) => void }> = [
+    ...(summaryOf(p) ? [{ id: "summary", name: "Summary", off: summaryOff, note: "The About in your header", toggle: toggleSummary }] : []),
+    ...p.sections.map((s) => {
+      const count = printed.get(s.id);
+      return {
+        id: s.id,
+        name: s.title.trim() || "Untitled section",
+        off: !s.onResume,
+        note: !s.onResume
+          ? "Not printed"
+          : count === undefined
+            ? "Nothing to print yet"
+            : count === 0
+              ? "Title only — nothing under it has “Print on your resume” checked"
+              : undefined,
+        toggle: () => !live && updateSection(p.id, s.id, (x) => ({ ...x, onResume: !x.onResume })),
+        move: (d: -1 | 1) => !live && moveSection(p.id, s.id, d),
+      };
+    }),
+  ];
 
   return (
     <div className="flex flex-col">
       <div className="flex items-baseline px-4 pt-4 pb-2">
-        <h2 className="m-0 text-[14px] tracking-[-0.01em]">Blocks</h2>
+        <h2 className="m-0 text-[14px] tracking-[-0.01em]">Sections</h2>
         <span className="ml-auto font-mono text-[11px]" style={{ color: "var(--color-neutral-600)" }}>
-          {inUse.length}
+          {rows.length}
         </span>
       </div>
 
-      {inUse.length === 0 && (
-        <p className="m-0 px-4 pb-1 text-[12.5px] leading-snug text-muted">No blocks yet. Add them in Edit resume content.</p>
+      {rows.length === 0 && (
+        <p className="m-0 px-4 pb-1 text-[12.5px] leading-snug text-muted">No sections yet. Add them in Edit resume content.</p>
       )}
       <ul className="m-0 flex list-none flex-col gap-0.5 p-0 px-2">
-        {inUse.map((b, i) => {
-          const off = r.hidden.includes(b);
-          const empty = !blockHasContent(p, b);
+        {rows.map((row, i) => {
+          const dim = row.off || row.note === "Nothing to print yet";
+          const sectionIndex = i - (rows[0]?.id === "summary" ? 1 : 0);
+          const locked = live && row.id !== "summary";
           return (
             <motion.li
-              key={b}
+              key={row.id}
               layout={!reduced}
               transition={{ duration: 0.3, ease: EASE }}
               className="group relative flex items-center gap-2 rounded-lg px-2 py-2 transition-colors hover:bg-[var(--color-surface)] focus-within:bg-[var(--color-surface)]"
-              style={{ opacity: off || empty ? 0.5 : 1 }}
+              style={{ opacity: dim ? 0.5 : 1 }}
             >
               <span className="w-5 flex-none font-mono text-[11px]" style={{ color: "var(--color-neutral-600)" }}>
                 {String(i + 1).padStart(2, "0")}
               </span>
-              {/* Title only, as in the page's Sections rail. A block left off
-                  the resume, or with nothing to print, is dimmed. */}
-              <span
-                className="min-w-0 flex-1 truncate text-[13px] font-medium"
-                title={off ? "Not printed" : empty ? "Nothing to print yet" : undefined}
-              >
-                {BLOCK_LABEL[b]}
+              <span className="min-w-0 flex-1 truncate text-[13px] font-medium" title={row.note}>
+                {row.name}
               </span>
               <span
                 className="flex flex-none items-center rounded-md transition-opacity lg:pointer-events-none lg:absolute lg:top-1/2 lg:right-1 lg:-translate-y-1/2 lg:opacity-0 lg:group-focus-within:pointer-events-auto lg:group-focus-within:opacity-100 lg:group-hover:pointer-events-auto lg:group-hover:opacity-100"
                 style={{ background: "var(--color-surface)" }}
               >
-                <IconButton label={live ? "Unpublish to reorder" : `Move ${BLOCK_LABEL[b]} up`} onClick={() => !live && move(b, -1)}>
-                  <span style={{ opacity: live || i === 0 ? 0.3 : 1 }}>
-                    <Glyph id="up" size={14} />
+                {row.move && (
+                  <>
+                    <IconButton label={live ? "Unpublish to reorder" : `Move ${row.name} up`} onClick={() => row.move?.(-1)}>
+                      <span style={{ opacity: live || sectionIndex === 0 ? 0.3 : 1 }}>
+                        <Glyph id="up" size={14} />
+                      </span>
+                    </IconButton>
+                    <IconButton label={live ? "Unpublish to reorder" : `Move ${row.name} down`} onClick={() => row.move?.(1)}>
+                      <span style={{ opacity: live || sectionIndex === p.sections.length - 1 ? 0.3 : 1 }}>
+                        <Glyph id="down" size={14} />
+                      </span>
+                    </IconButton>
+                  </>
+                )}
+                <IconButton
+                  label={locked ? "Unpublish to change" : row.off ? `Print ${row.name}` : `Leave ${row.name} off the resume`}
+                  onClick={row.toggle}
+                >
+                  <span style={{ opacity: locked ? 0.3 : 1 }}>
+                    <Icon d={row.off ? EYE_OFF : ICON.eye} size={14} />
                   </span>
-                </IconButton>
-                <IconButton label={live ? "Unpublish to reorder" : `Move ${BLOCK_LABEL[b]} down`} onClick={() => !live && move(b, 1)}>
-                  <span style={{ opacity: live || i === inUse.length - 1 ? 0.3 : 1 }}>
-                    <Glyph id="down" size={14} />
-                  </span>
-                </IconButton>
-                <IconButton label={off ? `Show ${BLOCK_LABEL[b]}` : `Hide ${BLOCK_LABEL[b]}`} onClick={() => toggle(b)}>
-                  <Icon
-                    d={off ? <path d="M3 3l18 18M10.6 5.1A10 10 0 0 1 12 5c6.4 0 10 7 10 7a17 17 0 0 1-3.2 4M6.6 6.6C3.8 8.4 2 12 2 12s3.6 7 10 7a9.7 9.7 0 0 0 4.4-1" /> : ICON.eye}
-                    size={14}
-                  />
                 </IconButton>
               </span>
             </motion.li>
@@ -383,9 +420,12 @@ function BlockRail({ p, onChange }: { p: Portfolio; onChange: (recipe: (r: Resum
           Edit resume content
           <Glyph id="arrow" size={14} />
         </Link>
+        <p className="m-0 text-[12px] leading-snug text-muted">
+          Under each title, the resume prints the components with “Print on your resume” checked.
+        </p>
       </div>
       {live && (
-        <p className="m-0 mx-3 mb-4 text-[12px] leading-snug text-muted">The page is live, so the order is fixed until you unpublish.</p>
+        <p className="m-0 mx-3 mb-4 text-[12px] leading-snug text-muted">The page is live, so its sections are fixed until you unpublish.</p>
       )}
     </div>
   );

@@ -391,7 +391,7 @@ function Poster({ p, section, number }: { p: Portfolio; section: Section; number
         <p className="whitespace-pre-line text-muted m-0 line-clamp-3 text-[14px] leading-[1.6]">{section.description}</p>
       )}
       <div className="flex flex-col items-start gap-3">
-        <SectionAside p={p} section={section} />
+        <SectionAside section={section} />
         <SectionLinks p={p} section={section} />
       </div>
     </article>

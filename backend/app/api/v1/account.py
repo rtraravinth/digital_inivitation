@@ -8,6 +8,7 @@ is real.
 
 from __future__ import annotations
 
+import asyncio
 import uuid
 from datetime import UTC, datetime, timedelta
 
@@ -157,4 +158,5 @@ async def delete_account(
 
     storage = get_storage()
     for key in keys:
-        storage.delete(key)
+        # Off the event loop: with R2 each delete is a network request.
+        await asyncio.to_thread(storage.delete, key)

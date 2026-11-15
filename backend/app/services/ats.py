@@ -613,7 +613,7 @@ def check(resume: ResumeText, jd: str) -> Report:
                 "id": f"show:{block}",
                 "kind": "show_block",
                 "title": f"Print {block.capitalize()} on your resume",
-                "detail": "It has entries but is switched off for the resume, so an ATS never reads them.",
+                "detail": "It has entries, but no component placing it has “Print on your resume” checked, so an ATS never reads them.",
                 "value": block,
             }
         )
@@ -707,19 +707,73 @@ def check(resume: ResumeText, jd: str) -> Report:
 LISTS = ("experience", "education", "skills", "certifications", "languages", "awards")
 
 
+#: What "Print on your resume" starts as for a component stored without it:
+#: the section's text and links and the resume's lists print, the rest not.
+#: Mirrors ``defaultOnResume()`` in src/lib/types.ts.
+_PRINTS_BY_DEFAULT = {"text", "links", *LISTS}
+
+
+def prints_on_resume(block: dict, hidden: set[str]) -> bool:
+    """Whether a component prints under its section's title on the resume.
+
+    Mirrors ``printsOnResume()`` and ``sectionOf()`` in src/lib/types.ts: a
+    gallery never does; a component that says prints as it says; one stored
+    before the switch was each component's falls back to the old rule — a
+    list printed unless the whole list was switched off for the resume.
+    """
+    kind = block.get("type")
+    if kind == "gallery":
+        return False
+    flag = block.get("onResume")
+    if isinstance(flag, bool):
+        return flag
+    if kind in LISTS:
+        return kind not in hidden
+    return kind in _PRINTS_BY_DEFAULT
+
+
+def _items_text(block: dict) -> list[str]:
+    """The words a page component prints on the resume."""
+    fields = (
+        "date",
+        "title",
+        "text",
+        "quote",
+        "name",
+        "role",
+        "label",
+        "value",
+        "price",
+        "question",
+        "answer",
+    )
+    out = [
+        " ".join(str(item.get(f) or "") for f in fields).strip()
+        for item in block.get("items") or []
+    ]
+    if block.get("type") == "contact":
+        out.append(
+            " ".join(str(block.get(f) or "") for f in ("text", "email", "phone", "location"))
+        )
+    return [t for t in out if t]
+
+
 def resume_text(header: dict, resume: dict, sections: list[dict]) -> ResumeText:
     """The resume a portfolio prints, as an ATS would read it.
 
-    Mirrors what the resume sheet draws (`visibleBlocks()` in
-    src/lib/resume.ts): a list prints when a section places its component and
-    the list is not switched off for the resume; sections switched on for the
-    resume print as entries. Hand it plain dicts — the stored JSON, camelCase.
+    Mirrors what the resume sheet draws (``resumeParts()`` in
+    src/lib/resume.ts): every section switched on for the resume, by its
+    title, and under it each component with "Print on your resume" checked.
+    A list component carries its own entries, so two Experience components
+    are two sets of roles. ``resume`` supplies only the header facts. Hand it
+    plain dicts — the stored JSON, camelCase.
     """
-    placed = {
-        b.get("type") for s in sections for b in (s.get("blocks") or []) if isinstance(b, dict)
-    }
     hidden = set(resume.get("hidden") or [])
-    prints = {name for name in LISTS if name in placed and name not in hidden}
+    # Each list component holds its own entries; the ones that print are
+    # read, in the page's order, however many components there are.
+    entries: dict[str, list[dict]] = {name: [] for name in LISTS}
+    # Kinds with entries in a component that does not print.
+    unprinted: set[str] = set()
 
     out = ResumeText(
         name=header.get("name") or "",
@@ -729,42 +783,54 @@ def resume_text(header: dict, resume: dict, sections: list[dict]) -> ResumeText:
         phone=resume.get("phone") or "",
         photo=bool((resume.get("style") or {}).get("photo")) and bool(header.get("portrait")),
     )
-    if "experience" in prints:
-        for role in resume.get("experience") or []:
-            out.experience.append(role)
-            out.titles.append(role.get("role") or "")
-            out.bullets.extend(b for b in role.get("bullets") or [] if b.strip())
-            out.other.append(f"{role.get('company') or ''} {role.get('location') or ''}")
-    if "education" in prints:
-        out.education = [
-            f"{e.get('degree') or ''} {e.get('school') or ''} {e.get('detail') or ''}"
-            for e in resume.get("education") or []
-        ]
-    if "skills" in prints:
-        out.skills = [
-            i
-            for g in resume.get("skills") or []
-            for i in [g.get("name") or "", *(g.get("items") or [])]
-            if i
-        ]
-    if "certifications" in prints:
-        out.other += [
-            f"{c.get('name') or ''} {c.get('issuer') or ''}"
-            for c in resume.get("certifications") or []
-        ]
-    if "awards" in prints:
-        out.other += [
-            f"{a.get('title') or ''} {a.get('detail') or ''}" for a in resume.get("awards") or []
-        ]
-    if "languages" in prints:
-        out.other += [lang.get("name") or "" for lang in resume.get("languages") or []]
-    if "projects" not in hidden:
-        for s in sections:
-            if s.get("onResume") and (s.get("title") or s.get("description")):
-                out.other.append(f"{s.get('title') or ''} {s.get('description') or ''}")
+    for s in sections:
+        blocks = [b for b in s.get("blocks") or [] if isinstance(b, dict)]
+        on_resume = s.get("onResume", True)
+        if on_resume and s.get("title"):
+            out.other.append(s["title"])
+        for b in blocks:
+            kind = b.get("type")
+            items = [i for i in b.get("items") or [] if isinstance(i, dict)]
+            printing = on_resume and prints_on_resume(b, hidden)
+            if kind in LISTS:
+                if printing:
+                    entries[kind] += items
+                elif items:
+                    unprinted.add(kind)
+                continue
+            if not printing:
+                continue
+            if kind == "text":
+                out.other.append(s.get("description") or "")
+            elif kind == "links":
+                out.other += [
+                    f"{lk.get('label') or ''} {lk.get('url') or ''}" for lk in s.get("links") or []
+                ]
+            elif kind == "quote":
+                out.other.append((s.get("quote") or {}).get("text") or "")
+            else:
+                if b.get("title"):
+                    out.other.append(b["title"])
+                out.other += _items_text(b)
 
-    # A list with entries that the author has switched off for the resume.
-    for name in LISTS:
-        if name in placed and name in hidden and resume.get(name):
-            out.hidden_lists.append(name)
+    for role in entries["experience"]:
+        out.experience.append(role)
+        out.titles.append(role.get("role") or "")
+        out.bullets.extend(b for b in role.get("bullets") or [] if b.strip())
+        out.other.append(f"{role.get('company') or ''} {role.get('location') or ''}")
+    out.education = [
+        f"{e.get('degree') or ''} {e.get('school') or ''} {e.get('detail') or ''}"
+        for e in entries["education"]
+    ]
+    out.skills = [
+        i for g in entries["skills"] for i in [g.get("name") or "", *(g.get("items") or [])] if i
+    ]
+    out.other += [
+        f"{c.get('name') or ''} {c.get('issuer') or ''}" for c in entries["certifications"]
+    ]
+    out.other += [f"{a.get('title') or ''} {a.get('detail') or ''}" for a in entries["awards"]]
+    out.other += [lang.get("name") or "" for lang in entries["languages"]]
+
+    # A list with entries that nothing prints: suggested for printing.
+    out.hidden_lists = [name for name in LISTS if name in unprinted and not entries[name]]
     return out

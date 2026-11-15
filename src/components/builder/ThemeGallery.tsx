@@ -11,6 +11,7 @@ import {
   PROFESSIONS,
   THEMES,
   applyProfession,
+  isFrozen,
   previewPath,
   type Portfolio,
   type ProfessionId,
@@ -48,7 +49,7 @@ export function ThemeGallery({ id }: { id: string }) {
   // A live page is frozen — the API refuses every write to it — so this
   // screen steps aside for Preview and Unpublish rather than offering looks
   // it could never save.
-  if (portfolio.status === "live") {
+  if (isFrozen(portfolio)) {
     return <PublishedLock portfolio={portfolio} />;
   }
 

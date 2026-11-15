@@ -83,9 +83,6 @@ class SectionService:
 
         if patch.image_asset_ids is not None:
             await self._apply_images(section, portfolio, patch.image_asset_ids)
-        await self._apply_attachment(
-            section, portfolio, "file_asset_id", patch.file_asset_id, patch.clear_file
-        )
 
         await self.session.flush()
         await self.session.refresh(section)
@@ -124,33 +121,6 @@ class SectionService:
         assets = AssetService(self.session)
         for asset_id in dropped:
             await assets.release(asset_id)
-
-    async def _apply_attachment(
-        self,
-        section: Section,
-        portfolio: Portfolio,
-        field: str,
-        asset_id: uuid.UUID | None,
-        clear: bool,
-    ) -> None:
-        replaced = getattr(section, field)
-
-        if clear:
-            setattr(section, field, None)
-            await AssetService(self.session).release(replaced)
-            return
-        if asset_id is None:
-            return
-
-        owns = await self.session.scalar(
-            select(Asset).where(Asset.id == asset_id, Asset.user_id == portfolio.user_id)
-        )
-        if owns is None:
-            # Another user's asset id is "not found", never "forbidden".
-            raise NotFound("That upload does not exist.", code="asset_not_found")
-        setattr(section, field, asset_id)
-        if replaced is not None and replaced != asset_id:
-            await AssetService(self.session).release(replaced)
 
     async def delete(self, portfolio: Portfolio, section_id: uuid.UUID) -> None:
         section = await self.get(portfolio, section_id)
@@ -239,5 +209,6 @@ async def reload_sections(session: AsyncSession, portfolio: Portfolio) -> None:
 
 def _dump_list(values: list) -> list:
     return [
-        item.model_dump(by_alias=True) if hasattr(item, "model_dump") else item for item in values
+        item.model_dump(by_alias=True, exclude_none=True) if hasattr(item, "model_dump") else item
+        for item in values
     ]

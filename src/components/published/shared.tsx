@@ -419,13 +419,7 @@ function useTiltPlate() {
  * collapsing the line, so two plates' captions stay comparable down a column.
  */
 export function captionCredit(section: Section): [string, string] {
-  const medium = coverOf(section)
-    ? "Reproduction"
-    : section.file
-      ? "Document"
-      : section.quote?.text
-        ? "Quotation"
-        : "Text";
+  const medium = coverOf(section) ? "Reproduction" : section.quote?.text ? "Quotation" : "Text";
   // There was a third, first: the tab the section filed under. A section is
   // filed under nothing but its own title now, which the plate already shows.
   return [medium, section.quote?.attribution?.trim() || "—"];
@@ -682,15 +676,13 @@ export function Media({
 }
 
 /**
- * The pull quote and the downloadable attachment, when a section has them.
+ * The pull quote, when a section has one.
  *
  * A quotation is set, not bordered: the 3px accent bar down the left edge is
  * the callout tell, so a catalogue indents the quotation against a hairline
  * and sets it in the display face instead.
  */
-export function SectionAside({ p, section }: { p: Portfolio; section: Section }) {
-  const subdomain = usePublishedSubdomain();
-  const record = useRecordClick();
+export function SectionAside({ section }: { section: Section }) {
   return (
     <>
       {section.quote?.text && (
@@ -703,18 +695,6 @@ export function SectionAside({ p, section }: { p: Portfolio; section: Section })
             <footer className="caption-credit mt-3">{section.quote.attribution}</footer>
           )}
         </blockquote>
-      )}
-      {section.file && (
-        <a
-          href={assetSrc(section.file)}
-          download={section.file.name}
-          onClick={() => record(subdomain, p.slug, section.id)}
-          className="btn btn-secondary min-h-[38px] self-start"
-          style={{ fontSize: 13 }}
-        >
-          <UiIcon id="download" size={16} />
-          {section.file.name}
-        </a>
       )}
     </>
   );
@@ -809,7 +789,7 @@ function useIsPreview() {
 /**
  * Where this page lives, from inside it.
  *
- * A preview is served from `/preview/<id>`, and the public address does not
+ * A preview is served from `/preview/page/<id>`, and the public address does not
  * resolve at all until the portfolio is published — the API answers 404 for
  * a draft on purpose. A section link that always pointed at
  * `/p/<subdomain>/<slug>` was therefore a dead end for exactly the drafts the

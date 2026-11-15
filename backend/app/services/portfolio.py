@@ -69,7 +69,6 @@ def section_out(section: Section, *, public: bool = False, contact: bool = True)
         hidden=section.hidden,
         on_resume=section.on_resume,
         images=[asset_out(image.asset, public=public) for image in section.images],
-        file=asset_out(section.file, public=public),
         blocks=blocks_out(section.blocks, contact=contact),
     )
 
@@ -128,6 +127,15 @@ async def assert_room_for_portfolios(session: AsyncSession, user: User, adding: 
         )
 
 
+def is_frozen(portfolio: Portfolio) -> bool:
+    """True while a visitor can read the page or the resume.
+
+    Either one being live freezes every write that could reach it, so
+    unpublishing one leaves the other's content untouched.
+    """
+    return portfolio.status == "live" or portfolio.resume_status == "live"
+
+
 class PortfolioService:
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
@@ -140,6 +148,7 @@ class PortfolioService:
             name=portfolio.name,
             slug=portfolio.slug,
             status=portfolio.status,
+            resume_status=portfolio.resume_status,
             summary=portfolio.summary,
             meta=describe_meta(len(portfolio.sections), portfolio.updated_at),
             theme=portfolio.theme,
@@ -193,6 +202,7 @@ class PortfolioService:
                 name=portfolio.name,
                 slug=portfolio.slug,
                 status=portfolio.status,
+                resume_status=portfolio.resume_status,
                 summary=portfolio.summary,
                 meta=describe_meta(total, portfolio.updated_at),
                 theme=portfolio.theme,
@@ -291,7 +301,6 @@ class PortfolioService:
                     quote=section.quote,
                     hidden=section.hidden,
                     on_resume=section.on_resume,
-                    file_asset_id=section.file_asset_id,
                     blocks=list(section.blocks or []),
                     images=[
                         SectionImage(asset_id=image.asset_id, position=image.position)
@@ -345,12 +354,12 @@ class PortfolioService:
         it, so while live only what never reaches the page may change - the
         template and style, which blocks print, the contact details.
         """
-        if portfolio.status == "live":
+        if is_frozen(portfolio):
             before = resume_from_stored(portfolio.resume).model_dump(exclude=RESUME_ONLY_FIELDS)
             after = resume.model_dump(exclude=RESUME_ONLY_FIELDS)
             if before != after:
                 raise Conflict(
-                    "Unpublish this page before you change what it shows.",
+                    "Unpublish this page and resume before you change what they show.",
                     code="portfolio_published",
                 )
         portfolio.resume = resume.model_dump(by_alias=True)
@@ -415,6 +424,16 @@ class PortfolioService:
     async def unpublish(self, portfolio: Portfolio) -> Portfolio:
         portfolio.status = "draft"
         portfolio.published_at = None
+        await self._touch(portfolio)
+        return portfolio
+
+    async def publish_resume(self, portfolio: Portfolio) -> Portfolio:
+        portfolio.resume_status = "live"
+        await self._touch(portfolio)
+        return portfolio
+
+    async def unpublish_resume(self, portfolio: Portfolio) -> Portfolio:
+        portfolio.resume_status = "draft"
         await self._touch(portfolio)
         return portfolio
 

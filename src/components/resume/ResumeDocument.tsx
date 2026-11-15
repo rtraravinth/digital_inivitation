@@ -1,8 +1,6 @@
 import type { CSSProperties, ReactNode } from "react";
 import { layerStyle, sheetLayers } from "@/lib/resume-backdrops";
 import {
-  BLOCK_LABEL,
-  SIDE_BLOCKS,
   bareUrl,
   contactItems,
   dateRange,
@@ -10,14 +8,23 @@ import {
   headlineOf,
   hrefFor,
   initialsOf,
-  sectionGroups,
+  isSidePart,
+  resumeParts,
   sheetMetrics,
   sheetParts,
   summaryOf,
-  visibleBlocks,
+  summaryShown,
   type ContactItem,
+  type ResumePart,
 } from "@/lib/resume";
-import { assetSrc, type Portfolio, type ResumeBlock } from "@/lib/types";
+import {
+  assetSrc,
+  isListBlock,
+  type Block,
+  type ResumeListBlock,
+  type Portfolio,
+  type Section,
+} from "@/lib/types";
 
 /* ── the resume sheet ─────────────────────────────────────────────────────
    Every template, one markup. Each template is the same document — a
@@ -32,19 +39,29 @@ import { assetSrc, type Portfolio, type ResumeBlock } from "@/lib/types";
    is in. Sizes are in mm and pt so the preview and the PDF agree.
    ──────────────────────────────────────────────────────────────────────── */
 
-export function ResumeDocument({ p, print = false }: { p: Portfolio; print?: boolean }) {
+export function ResumeDocument({
+  p,
+  print = false,
+}: {
+  p: Portfolio;
+  print?: boolean;
+}) {
   const r = p.resume;
   const t = sheetParts(r);
   const m = sheetMetrics(r);
-  const blocks = visibleBlocks(p);
+  // The page's own sections, in its order: each one's title, and under it
+  // the components with "Print on your resume" checked.
+  const parts = resumeParts(p);
+  const summary = summaryShown(p);
   const twoColumns = t.layout !== "one";
-  const main = twoColumns ? blocks.filter((b) => !SIDE_BLOCKS.has(b)) : blocks;
-  const side = twoColumns ? blocks.filter((b) => SIDE_BLOCKS.has(b)) : [];
+  const main = twoColumns ? parts.filter((x) => !isSidePart(x)) : parts;
+  const side = twoColumns ? parts.filter(isSidePart) : [];
   const photo = r.style.photo ? assetSrc(p.header.portrait) : undefined;
   const contact = contactItems(p);
   // A left column, or a solid one either side, holds the contact details and
   // the photo; otherwise they belong to the header.
-  const asideContact = twoColumns && (t.layout === "left" || t.aside === "solid");
+  const asideContact =
+    twoColumns && (t.layout === "left" || t.aside === "solid");
 
   const style = {
     "--r-accent": r.style.accent,
@@ -68,7 +85,19 @@ export function ResumeDocument({ p, print = false }: { p: Portfolio; print?: boo
     // eslint-disable-next-line @next/next/no-img-element
     <img className="r-photo" src={photo} alt="" />
   );
-  const blockProps = { p, orgFirst: t.entry === "org", chips: t.skills !== "lines" };
+  const partProps = {
+    p,
+    orgFirst: t.entry === "org",
+    chips: t.skills !== "lines",
+  };
+  const summaryEl = summary && (
+    <section className="r-block" data-block="summary">
+      <h2 className="r-h">Summary</h2>
+      <div className="r-content">
+        <p className="r-text">{summaryOf(p)}</p>
+      </div>
+    </section>
+  );
 
   return (
     <article
@@ -83,7 +112,10 @@ export function ResumeDocument({ p, print = false }: { p: Portfolio; print?: boo
       data-contact={t.contact}
       style={style}
     >
-      <header className="r-header" data-initials={initialsOf(p.header.name) || undefined}>
+      <header
+        className="r-header"
+        data-initials={initialsOf(p.header.name) || undefined}
+      >
         <div className="r-who">
           <h1 className="r-name">{p.header.name.trim() || "Your name"}</h1>
           {headlineOf(p) && <p className="r-headline">{headlineOf(p)}</p>}
@@ -96,28 +128,34 @@ export function ResumeDocument({ p, print = false }: { p: Portfolio; print?: boo
           {t.layout === "left" ? (
             <>
               <aside className="r-aside">
-                {asideContact && <AsideContact photo={photoEl} items={contact} />}
-                {side.map((b) => (
-                  <Block key={b} {...blockProps} block={b} narrow />
+                {asideContact && (
+                  <AsideContact photo={photoEl} items={contact} />
+                )}
+                {side.map((x) => (
+                  <Part key={x.section.id} {...partProps} part={x} narrow />
                 ))}
               </aside>
               <div className="r-main">
-                {main.map((b) => (
-                  <Block key={b} {...blockProps} block={b} />
+                {summaryEl}
+                {main.map((x) => (
+                  <Part key={x.section.id} {...partProps} part={x} />
                 ))}
               </div>
             </>
           ) : (
             <>
               <div className="r-main">
-                {main.map((b) => (
-                  <Block key={b} {...blockProps} block={b} />
+                {summaryEl}
+                {main.map((x) => (
+                  <Part key={x.section.id} {...partProps} part={x} />
                 ))}
               </div>
               <aside className="r-aside">
-                {asideContact && <AsideContact photo={photoEl} items={contact} />}
-                {side.map((b) => (
-                  <Block key={b} {...blockProps} block={b} narrow />
+                {asideContact && (
+                  <AsideContact photo={photoEl} items={contact} />
+                )}
+                {side.map((x) => (
+                  <Part key={x.section.id} {...partProps} part={x} narrow />
                 ))}
               </aside>
             </>
@@ -125,14 +163,16 @@ export function ResumeDocument({ p, print = false }: { p: Portfolio; print?: boo
         </div>
       ) : (
         <div className="r-body">
-          {blocks.map((b) => (
-            <Block key={b} {...blockProps} block={b} />
+          {summaryEl}
+          {parts.map((x) => (
+            <Part key={x.section.id} {...partProps} part={x} />
           ))}
         </div>
       )}
-      {blocks.length === 0 && !print && (
+      {parts.length === 0 && !summary && !print && (
         <p className="r-empty">
-          Add your experience, education and skills under Edit text, and they appear here.
+          Switch a section onto the resume in Edit content, and check “Print on
+          your resume” on what it should print.
         </p>
       )}
     </article>
@@ -142,7 +182,7 @@ export function ResumeDocument({ p, print = false }: { p: Portfolio; print?: boo
 /**
  * The sheet's background: top-of-page decoration, then the repeating
  * pattern, then the paper ground. On screen the sheet paints it. In print
- * `resume.css` clears it and `/resume/[id]` paints the same layers on the
+ * `resume.css` clears it and `/preview/resume/[id]` paints the same layers on the
  * page itself (`sheetLayers()`), which reaches every page's edges — the
  * sheet starts below each page's top margin and stops where its text does.
  */
@@ -150,7 +190,13 @@ function sheetBackground(r: Portfolio["resume"]) {
   return layerStyle(sheetLayers(r));
 }
 
-function AsideContact({ photo, items }: { photo: ReactNode; items: ContactItem[] }) {
+function AsideContact({
+  photo,
+  items,
+}: {
+  photo: ReactNode;
+  items: ContactItem[];
+}) {
   return (
     <>
       {photo}
@@ -190,48 +236,266 @@ function ContactGlyph({ kind }: { kind: ContactItem["kind"] }) {
         <path d="m3 7 9 6 9-6" />
       </>
     ),
-    phone: <path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2Z" />,
+    phone: (
+      <path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2Z" />
+    ),
     location: (
       <>
         <path d="M12 21s-7-6.2-7-11a7 7 0 0 1 14 0c0 4.8-7 11-7 11Z" />
         <circle cx="12" cy="10" r="2.5" />
       </>
     ),
-    link: <path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1" />,
+    link: (
+      <path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1" />
+    ),
   };
   return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
       {d[kind]}
     </svg>
   );
 }
 
-function Block({
-  p,
-  block,
+/**
+ * One of the page's sections on the resume: its title, then each checked
+ * component in the section's order. A component's own heading goes over it
+ * as a subheading, unless it only repeats the section's title.
+ */
+function Part({
+  part,
   orgFirst,
   chips,
   narrow = false,
 }: {
-  p: Portfolio;
-  block: ResumeBlock;
+  part: ResumePart;
   orgFirst: boolean;
   chips: boolean;
   narrow?: boolean;
 }) {
-  const r = p.resume;
+  const { section: s, blocks } = part;
+  const title = s.title.trim();
+  return (
+    <section
+      className="r-block"
+      data-block={blocks.length === 1 ? blocks[0].type : "section"}
+    >
+      {title && <h2 className="r-h">{title}</h2>}
+      {blocks.length > 0 && (
+        <div className="r-content">
+          {blocks.map((b) => {
+            const heading = b.title.trim();
+            return (
+              <div key={b.id} className="r-component">
+                {heading && heading.toLowerCase() !== title.toLowerCase() && (
+                  <h3 className="r-sub-h">{heading}</h3>
+                )}
+                {isListBlock(b) ? (
+                  <ListBody
+                    block={b}
+                    orgFirst={orgFirst}
+                    chips={chips}
+                    narrow={narrow}
+                  />
+                ) : (
+                  <ComponentBody section={s} block={b} orgFirst={orgFirst} />
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </section>
+  );
+}
+
+/** A page component's words, set as resume text. */
+function ComponentBody({
+  section: s,
+  block: b,
+  orgFirst,
+}: {
+  section: Section;
+  block: Block;
+  orgFirst: boolean;
+}) {
+  switch (b.type) {
+    case "text":
+      return <p className="r-text">{s.description.trim()}</p>;
+    case "links":
+      return (
+        <ul className="r-small-list">
+          {s.links
+            .filter((l) => l.url.trim())
+            .map((l) => (
+              <li key={l.id}>
+                {l.label.trim() && (
+                  <span className="r-strong">{l.label.trim()}</span>
+                )}
+                <a className="r-faint" href={hrefFor(l.url)}>
+                  {bareUrl(l.url)}
+                </a>
+              </li>
+            ))}
+        </ul>
+      );
+    case "quote":
+      return (
+        <p className="r-text">
+          “{s.quote?.text.trim()}”
+          {s.quote?.attribution.trim() && (
+            <span className="r-faint"> — {s.quote.attribution.trim()}</span>
+          )}
+        </p>
+      );
+    case "timeline":
+      return (
+        <div className="r-list">
+          {b.items
+            .filter((i) => i.title.trim() || i.text.trim())
+            .map((i) => (
+              <Entry
+                key={i.id}
+                ivy={orgFirst}
+                title={i.title}
+                org=""
+                place=""
+                when={i.date.trim()}
+              >
+                {i.text.trim() && (
+                  <p className="r-text r-detail">{i.text.trim()}</p>
+                )}
+              </Entry>
+            ))}
+        </div>
+      );
+    case "testimonials":
+      return (
+        <ul className="r-small-list">
+          {b.items
+            .filter((i) => i.quote.trim())
+            .map((i) => (
+              <li key={i.id}>
+                <span className="r-text">“{i.quote.trim()}”</span>
+                {(i.name.trim() || i.role.trim()) && (
+                  <span className="r-faint">
+                    {[i.name.trim(), i.role.trim()].filter(Boolean).join(", ")}
+                  </span>
+                )}
+              </li>
+            ))}
+        </ul>
+      );
+    case "clients":
+      return (
+        <p className="r-text">
+          {b.items
+            .map((i) => i.name.trim())
+            .filter(Boolean)
+            .join(" · ")}
+        </p>
+      );
+    case "stats":
+      return (
+        <ul className="r-small-list">
+          {b.items
+            .filter((i) => i.value.trim() || i.label.trim())
+            .map((i) => (
+              <li key={i.id}>
+                <span className="r-strong">{i.value.trim()}</span>
+                {i.label.trim() && (
+                  <span className="r-faint">{i.label.trim()}</span>
+                )}
+              </li>
+            ))}
+        </ul>
+      );
+    case "tabs":
+    case "services":
+    case "faq": {
+      const rows =
+        b.type === "tabs"
+          ? b.items.map((i) => ({
+              id: i.id,
+              head: i.label,
+              side: "",
+              text: i.text,
+            }))
+          : b.type === "services"
+            ? b.items.map((i) => ({
+                id: i.id,
+                head: i.title,
+                side: i.price,
+                text: i.text,
+              }))
+            : b.items.map((i) => ({
+                id: i.id,
+                head: i.question,
+                side: "",
+                text: i.answer,
+              }));
+      return (
+        <ul className="r-small-list">
+          {rows
+            .filter((r) => r.head.trim() || r.text.trim())
+            .map((r) => (
+              <li key={r.id}>
+                <span className="r-strong">{r.head.trim()}</span>
+                {r.side.trim() && (
+                  <span className="r-faint">{r.side.trim()}</span>
+                )}
+                {r.text.trim() && (
+                  <span className="r-text r-detail">{r.text.trim()}</span>
+                )}
+              </li>
+            ))}
+        </ul>
+      );
+    }
+    case "contact":
+      return (
+        <p className="r-text">
+          {[
+            b.text.trim(),
+            [b.email.trim(), b.phone.trim(), b.location.trim()]
+              .filter(Boolean)
+              .join(" · "),
+          ]
+            .filter(Boolean)
+            .join("\n")}
+        </p>
+      );
+    default:
+      return null;
+  }
+}
+
+/** One list component's own entries, in the template's own markup. */
+function ListBody({
+  block,
+  orgFirst,
+  chips,
+  narrow,
+}: {
+  block: ResumeListBlock;
+  orgFirst: boolean;
+  chips: boolean;
+  narrow: boolean;
+}) {
   const ivy = orgFirst;
 
-  let body: ReactNode = null;
-  switch (block) {
-    case "summary":
-      body = <p className="r-text">{summaryOf(p)}</p>;
-      break;
-
+  switch (block.type) {
     case "experience":
-      body = (
+      return (
         <div className="r-list">
-          {r.experience
+          {block.items
             .filter((e) => e.role.trim() || e.company.trim())
             .map((e) => (
               <Entry
@@ -255,90 +519,64 @@ function Block({
             ))}
         </div>
       );
-      break;
 
     case "education":
-      body = (
+      return (
         <div className="r-list">
-          {r.education
+          {block.items
             .filter((e) => e.degree.trim() || e.school.trim())
             .map((e) => (
-              <Entry key={e.id} ivy={ivy} title={e.degree} org={e.school} place={e.location} when={dateRange(e.start, e.end)}>
-                {e.detail.trim() && <p className="r-text r-detail">{e.detail.trim()}</p>}
+              <Entry
+                key={e.id}
+                ivy={ivy}
+                title={e.degree}
+                org={e.school}
+                place={e.location}
+                when={dateRange(e.start, e.end)}
+              >
+                {e.detail.trim() && (
+                  <p className="r-text r-detail">{e.detail.trim()}</p>
+                )}
               </Entry>
             ))}
         </div>
       );
-      break;
-
-    case "projects":
-      // The page's own sections, as entries under one heading.
-      return (
-        <>
-          {sectionGroups(p).map((g) => (
-            <section key={g.tab} className="r-block" data-block="projects">
-              <h2 className="r-h">{g.tab}</h2>
-              <div className="r-content">
-                <div className="r-list">
-                  {g.items.map((s) => (
-                    <div key={s.id} className="r-entry">
-                      <div className="r-what">
-                        <div className="r-entry-head">
-                          <h3 className="r-title">{s.title}</h3>
-                          {s.url && (
-                            <a className="r-meta" href={hrefFor(s.url)}>
-                              {bareUrl(s.url)}
-                            </a>
-                          )}
-                        </div>
-                        {s.description && <p className="r-text r-detail">{s.description}</p>}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </section>
-          ))}
-        </>
-      );
 
     case "skills": {
-      const groups = r.skills.filter((g) => g.items.some((i) => i.trim()));
-      body =
-        narrow || chips ? (
-          <div className="r-skill-groups">
-            {groups.map((g) => (
-              <div key={g.id}>
-                {g.name.trim() && <h3 className="r-skill-name">{g.name}</h3>}
-                <ul className="r-chips">
-                  {g.items
-                    .filter((i) => i.trim())
-                    .map((i) => (
-                      <li key={i} className="r-chip">
-                        {i}
-                      </li>
-                    ))}
-                </ul>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <ul className="r-skills">
-            {groups.map((g) => (
-              <li key={g.id} className="r-skill-line">
-                {g.name.trim() && <b>{g.name.trim()}: </b>}
-                {g.items.filter((i) => i.trim()).join(", ")}
-              </li>
-            ))}
-          </ul>
-        );
-      break;
+      const groups = block.items.filter((g) => g.items.some((i) => i.trim()));
+      return narrow || chips ? (
+        <div className="r-skill-groups">
+          {groups.map((g) => (
+            <div key={g.id}>
+              {g.name.trim() && <h3 className="r-skill-name">{g.name}</h3>}
+              <ul className="r-chips">
+                {g.items
+                  .filter((i) => i.trim())
+                  .map((i) => (
+                    <li key={i} className="r-chip">
+                      {i}
+                    </li>
+                  ))}
+              </ul>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <ul className="r-skills">
+          {groups.map((g) => (
+            <li key={g.id} className="r-skill-line">
+              {g.name.trim() && <b>{g.name.trim()}: </b>}
+              {g.items.filter((i) => i.trim()).join(", ")}
+            </li>
+          ))}
+        </ul>
+      );
     }
 
     case "certifications":
-      body = (
+      return (
         <ul className="r-small-list">
-          {r.certifications
+          {block.items
             .filter((c) => c.name.trim())
             .map((c) => (
               <li key={c.id}>
@@ -350,18 +588,21 @@ function Block({
                   <span className="r-strong">{c.name}</span>
                 )}
                 {(c.issuer.trim() || c.date.trim()) && (
-                  <span className="r-faint">{[c.issuer.trim(), c.date.trim()].filter(Boolean).join(" · ")}</span>
+                  <span className="r-faint">
+                    {[c.issuer.trim(), c.date.trim()]
+                      .filter(Boolean)
+                      .join(" · ")}
+                  </span>
                 )}
               </li>
             ))}
         </ul>
       );
-      break;
 
     case "languages":
-      body = (
+      return (
         <ul className="r-small-list r-languages">
-          {r.languages
+          {block.items
             .filter((l) => l.name.trim())
             .map((l) => (
               <li key={l.id}>
@@ -371,33 +612,30 @@ function Block({
             ))}
         </ul>
       );
-      break;
 
     case "awards":
-      body = (
+      return (
         <ul className="r-small-list">
-          {r.awards
+          {block.items
             .filter((a) => a.title.trim())
             .map((a) => (
               <li key={a.id}>
                 <span className="r-strong">{a.title}</span>
                 {(a.issuer.trim() || a.date.trim()) && (
-                  <span className="r-faint">{[a.issuer.trim(), a.date.trim()].filter(Boolean).join(" · ")}</span>
+                  <span className="r-faint">
+                    {[a.issuer.trim(), a.date.trim()]
+                      .filter(Boolean)
+                      .join(" · ")}
+                  </span>
                 )}
-                {a.detail.trim() && <span className="r-text r-detail">{a.detail.trim()}</span>}
+                {a.detail.trim() && (
+                  <span className="r-text r-detail">{a.detail.trim()}</span>
+                )}
               </li>
             ))}
         </ul>
       );
-      break;
   }
-
-  return (
-    <section className="r-block" data-block={block}>
-      <h2 className="r-h">{BLOCK_LABEL[block]}</h2>
-      <div className="r-content">{body}</div>
-    </section>
-  );
 }
 
 /**
@@ -424,7 +662,13 @@ function Entry({
   children?: ReactNode;
 }) {
   const first = ivy ? org.trim() || title.trim() : title.trim() || org.trim();
-  const second = ivy ? (org.trim() ? title.trim() : "") : title.trim() ? org.trim() : "";
+  const second = ivy
+    ? org.trim()
+      ? title.trim()
+      : ""
+    : title.trim()
+      ? org.trim()
+      : "";
 
   return (
     <div className={`r-entry${when ? " has-when" : ""}`}>
@@ -432,7 +676,9 @@ function Entry({
       <div className="r-what">
         <div className="r-entry-head">
           <h3 className="r-title">{first}</h3>
-          {ivy ? place.trim() && <span className="r-meta">{place.trim()}</span> : when && <span className="r-meta">{when}</span>}
+          {ivy
+            ? place.trim() && <span className="r-meta">{place.trim()}</span>
+            : when && <span className="r-meta">{when}</span>}
         </div>
         {(second || (!ivy && place.trim()) || (ivy && when)) && (
           <div className="r-entry-head r-sub-line">

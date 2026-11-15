@@ -196,7 +196,9 @@ async def test_the_showcase_seed_imports_every_picture_and_component(auth_client
     assert len(sections) == len(showcase[0]["sections"])
 
     kitchens = sections["Northwell Kitchens"]
-    assert kitchens["file"]["mime"] == "application/pdf"
+    # A section offers no file to download any more; an export that still
+    # carries one imports without it.
+    assert "file" not in kitchens
     held = {image["id"] for image in kitchens["images"]}
     for title in ("Northwell Kitchens", "Photographs"):
         for block in sections[title]["blocks"]:
@@ -207,6 +209,9 @@ async def test_the_showcase_seed_imports_every_picture_and_component(auth_client
 
     kinds = {b["type"] for s in full["sections"] for b in s["blocks"]}
     assert kinds == {
+        "text",
+        "links",
+        "quote",
         "gallery",
         "timeline",
         "experience",
@@ -483,10 +488,31 @@ async def test_an_older_exports_page_lists_become_sections(auth_client):
     # Resume order, ahead of the page's own; awards was on but empty, and
     # languages had entries but was never on the page.
     assert [s["title"] for s in detail["sections"]] == ["Experience", "Skills", "A project"]
+    # The section is how the list reaches the resume, so it is on the resume,
+    # with its list's "Print on your resume" checked.
     assert detail["sections"][0]["blocks"] == [
-        {"id": "list-experience", "type": "experience", "title": "", "look": "timeline"}
+        {
+            "id": "list-experience",
+            "type": "experience",
+            "title": "",
+            "look": "timeline",
+            "onResume": True,
+            # The entries it used to draw from the resume are its own now.
+            "items": [
+                {
+                    "id": "e",
+                    "role": "Founder",
+                    "company": "Northwell",
+                    "location": "",
+                    "start": "",
+                    "end": "",
+                    "current": False,
+                    "bullets": [],
+                }
+            ],
+        }
     ]
-    assert detail["sections"][0]["onResume"] is False
+    assert detail["sections"][0]["onResume"] is True
     assert "pageBlocks" not in detail["resume"]
 
 

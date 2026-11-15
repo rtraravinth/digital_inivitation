@@ -10,6 +10,7 @@ from __future__ import annotations
 import base64
 import binascii
 import re
+import uuid
 from typing import Any
 
 from pydantic import BaseModel, TypeAdapter, ValidationError
@@ -197,44 +198,48 @@ class TransferService:
             portrait_asset_id=await self._restore_asset(user, header_raw.get("portrait")),
         )
 
-        portfolio.sections = [
-            Section(
-                position=index,
-                title=_text(section.get("title"), 500),
-                description=_text(section.get("description"), 20_000),
-                tab=_tab_of(section),
-                links=_valid(section.get("links"), LinkItem, 60),
-                quote=_quote_of(section.get("quote")),
-                hidden=bool(section.get("hidden")),
-                on_resume=bool(section.get("onResume", True)),
-                file_asset_id=await self._restore_asset(user, section.get("file")),
-                blocks=_blocks_of(section),
-                images=[
-                    SectionImage(asset_id=asset_id, position=position)
-                    for position, asset_id in enumerate(await self._restore_images(user, section))
-                ],
+        portfolio.sections = []
+        for index, section in enumerate(sections_raw[:SECTIONS_MAX]):
+            restored = await self._restore_images(user, section)
+            portfolio.sections.append(
+                Section(
+                    position=index,
+                    title=_text(section.get("title"), 500),
+                    description=_text(section.get("description"), 20_000),
+                    tab=_tab_of(section),
+                    links=_valid(section.get("links"), LinkItem, 60),
+                    quote=_quote_of(section.get("quote")),
+                    hidden=bool(section.get("hidden")),
+                    on_resume=bool(section.get("onResume", True)),
+                    file_asset_id=await self._restore_asset(user, section.get("file")),
+                    blocks=_regallery(_blocks_of(section), restored),
+                    images=[
+                        SectionImage(asset_id=asset_id, position=position)
+                        for position, (_, asset_id) in enumerate(restored)
+                    ],
+                )
             )
-            for index, section in enumerate(sections_raw[:SECTIONS_MAX])
-        ]
 
         self.session.add(portfolio)
         await self.session.flush()
         return portfolio
 
-    async def _restore_images(self, user: User, section: dict[str, Any]) -> list:
+    async def _restore_images(self, user: User, section: dict[str, Any]) -> list[tuple[str, Any]]:
         """A section's pictures, from ``images`` or an older export's single
-        ``image``. Unreadable ones drop out; repeats are kept once."""
+        ``image``, each as (the id the payload gave it, the stored asset's
+        id). Unreadable ones drop out; repeats are kept once."""
         raw = section.get("images")
         if not isinstance(raw, list):
             raw = [section.get("image")]
-        restored = []
+        restored: list[tuple[str, Any]] = []
         for item in raw:
             if len(restored) >= SECTION_IMAGES_MAX:
                 # Stop before decoding and storing pictures that would be cut.
                 break
             asset_id = await self._restore_asset(user, item)
-            if asset_id is not None and asset_id not in restored:
-                restored.append(asset_id)
+            if asset_id is not None and all(asset_id != kept for _, kept in restored):
+                given = item.get("id") if isinstance(item, dict) else None
+                restored.append((str(given or asset_id), asset_id))
         return restored
 
     async def _restore_asset(self, user: User, raw: Any):
@@ -247,7 +252,7 @@ class TransferService:
         if not isinstance(raw, dict):
             return None
 
-        asset_id = raw.get("id")
+        asset_id = _uuid_or_none(raw.get("id"))
         if asset_id:
             owned = await self.session.scalar(
                 select(Asset).where(Asset.id == asset_id, Asset.user_id == user.id)
@@ -353,6 +358,32 @@ def _blocks_of(section: dict[str, Any]) -> list[dict[str, Any]]:
         except ValidationError:
             continue
     return kept[:SECTION_BLOCKS_MAX]
+
+
+def _uuid_or_none(raw: Any) -> uuid.UUID | None:
+    """An asset id worth looking up. A payload may name its pictures with
+    any string (the seed does, so its galleries can name them); only a UUID
+    can be a stored asset, and the database refuses to compare anything else."""
+    try:
+        return uuid.UUID(str(raw)) if raw else None
+    except ValueError:
+        return None
+
+
+def _regallery(
+    blocks: list[dict[str, Any]], restored: list[tuple[str, Any]]
+) -> list[dict[str, Any]]:
+    """Point each gallery at the pictures as stored.
+
+    A gallery names pictures by id, and a picture decoded from a data URI is
+    stored under a new one, so the names in the payload would draw nothing.
+    A name with no restored picture is dropped, as the editor would.
+    """
+    renamed = {given: str(stored) for given, stored in restored}
+    for block in blocks:
+        if block.get("type") == "gallery":
+            block["imageIds"] = [renamed[i] for i in block.get("imageIds", []) if i in renamed]
+    return blocks
 
 
 def _footer_of(raw: Any) -> dict[str, Any]:

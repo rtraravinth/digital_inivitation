@@ -48,7 +48,7 @@ each other's rows. Uploads go to a temporary directory, never your `media/`.
 .venv/Scripts/python -m app.cli routes
 ```
 
-`seed` loads the five demo portfolios. Their content is not maintained here —
+`seed` loads the six demo portfolios. Their content is not maintained here —
 `app/seed_data.json` is dumped from the frontend's own `src/lib/seed.ts`:
 
 ```bash

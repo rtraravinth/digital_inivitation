@@ -174,7 +174,7 @@ field and the error codes are `subdomain` everywhere now, migration
   `briefcase` glyph, display name "Profile". Do not add a LinkedIn icon. The
   reasoning is in the `icons.tsx` file header, along with why twenty-three
   solid brand marks sit beside seven stroked generics and stay that way.
-- `src/lib/seed.ts` — the five seeded portfolios. `backend/scripts/dump_seed.mjs`
+- `src/lib/seed.ts` — the six seeded portfolios; `showcase` fills every field and component, with sample pictures from `seed-images.ts`. `backend/scripts/dump_seed.mjs`
   transpiles this file and writes `backend/app/seed_data.json`, so the seed is
   not maintained twice; re-run it whenever this changes.
 - `src/components/Editor.tsx` — artboards 4b (desktop document) and 4d (mobile),

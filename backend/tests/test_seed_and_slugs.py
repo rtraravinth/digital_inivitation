@@ -21,15 +21,16 @@ def seed_payload() -> list[dict]:
     return json.loads(SEED_FILE.read_text(encoding="utf-8"))
 
 
-def test_the_seed_fixture_exists_and_holds_the_five_portfolios():
+def test_the_seed_fixture_exists_and_holds_the_six_portfolios():
     payload = seed_payload()
-    assert len(payload) == 5
+    assert len(payload) == 6
     assert {p["slug"] for p in payload} == {
         "full",
         "investors",
         "advisory",
         "writing",
         "board",
+        "showcase",
     }
 
 
@@ -131,12 +132,19 @@ async def test_the_seed_imports_and_reads_back(auth_client):
         "/api/v1/import", json={"mode": "replace", "portfolios": seed_payload()}
     )
     assert response.status_code == 200
-    assert response.json()["imported"] == 5
+    assert response.json()["imported"] == 6
     assert response.json()["renamed"] == {}
 
     rows = (await auth_client.get("/api/v1/portfolios")).json()
-    assert len(rows) == 5
-    assert {row["slug"] for row in rows} == {"full", "investors", "advisory", "writing", "board"}
+    assert len(rows) == 6
+    assert {row["slug"] for row in rows} == {
+        "full",
+        "investors",
+        "advisory",
+        "writing",
+        "board",
+        "showcase",
+    }
     # Every seeded portfolio has content; an empty one would mean the import
     # silently dropped its sections.
     assert all(row["sectionCount"] > 0 for row in rows)

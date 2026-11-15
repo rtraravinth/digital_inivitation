@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from datetime import timedelta
 
+import pytest
 from sqlalchemy import select, update
 
 from app.models import AccountProfile, AccountSettings, AuthSession, User
@@ -356,3 +357,34 @@ async def test_a_bad_subdomain_shape_is_422(client):
     for bad in ("a", "has space", "UPPER-ONLY-!", "-leading", "trailing-"):
         response = await sign_in(client, firebase_token("shape@example.com"), subdomain=bad)
         assert response.status_code == 422, bad
+
+
+# The refused insert rolls back the test's one shared transaction (conftest's
+# db_session) before the fixture's own rollback, which SQLAlchemy reports.
+# The app's real per-request sessions have no outer transaction to lose.
+@pytest.mark.filterwarnings("ignore:transaction already deassociated:sqlalchemy.exc.SAWarning")
+async def test_two_sign_ups_racing_for_one_subdomain_get_subdomain_taken(
+    client, registered, monkeypatch
+):
+    """Two sign-ups can both check a subdomain before either stores it. The
+    database's unique constraint refuses the second, and it gets the same
+    answer the check would have given — not a generic conflict."""
+
+    async def checked_before_the_other_stored(*_args, **_kwargs) -> None:
+        return None
+
+    monkeypatch.setattr(
+        "app.services.auth.assert_subdomain_available", checked_before_the_other_stored
+    )
+    response = await sign_in(client, firebase_token("racer@example.com"), subdomain="rohan")
+    assert response.status_code == 409
+    assert response.json()["error"]["code"] == "subdomain_taken"
+    assert response.json()["error"]["message"] == "That subdomain is already taken."
+
+
+async def test_logout_tells_the_browser_to_forget_everything(auth_client):
+    """Sign-out leaves nothing of the account in the browser: the HTTP cache,
+    cookies (the httpOnly session cookie included) and every storage."""
+    response = await auth_client.post("/api/v1/auth/logout")
+    assert response.status_code == 204
+    assert response.headers["clear-site-data"] == '"cache", "cookies", "storage"'

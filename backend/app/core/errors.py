@@ -225,7 +225,13 @@ def install_error_handlers(app: FastAPI) -> None:
     @app.exception_handler(IntegrityError)
     async def _integrity(_: Request, exc: IntegrityError) -> JSONResponse:
         # A constraint reached the database that a service should have caught.
-        # Log the real one; tell the client only that it conflicts.
+        # Some are races a service cannot close — two sign-ups checking the
+        # same subdomain at once both see it free — so those get the answer
+        # the service's own check gives. Anything else: log the real one and
+        # tell the client only that it conflicts.
+        known = _CONSTRAINT_ERRORS.get(constraint_name(exc) or "")
+        if known is not None:
+            return _render(Conflict(known[0], code=known[1]))
         logger.warning("integrity error: %s", exc.orig, exc_info=exc)
         return _render(
             Conflict(
@@ -237,6 +243,27 @@ def install_error_handlers(app: FastAPI) -> None:
     async def _unhandled(_: Request, exc: Exception) -> JSONResponse:
         logger.exception("unhandled exception", exc_info=exc)
         return _render(AppError("Something went wrong.", code="internal_error"))
+
+
+#: Unique constraints whose violation is an ordinary answer, not a bug: the
+#: same message and code as the service check that normally catches it first.
+_CONSTRAINT_ERRORS: dict[str, tuple[str, str]] = {
+    "uq_account_profiles_subdomain": ("That subdomain is already taken.", "subdomain_taken"),
+}
+
+
+def constraint_name(exc: IntegrityError) -> str | None:
+    """The violated constraint's name, from the driver's own error.
+
+    asyncpg puts it on the exception SQLAlchemy wraps; the message text is a
+    fallback for a driver that does not, matched only against known names.
+    """
+    cause = getattr(exc.orig, "__cause__", None) or exc.orig
+    name = getattr(cause, "constraint_name", None)
+    if isinstance(name, str) and name:
+        return name
+    text = str(exc.orig)
+    return next((known for known in _CONSTRAINT_ERRORS if known in text), None)
 
 
 _DEFAULT_MESSAGES = {

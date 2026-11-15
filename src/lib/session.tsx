@@ -113,6 +113,19 @@ export async function exchange(
   adopt(await api.post<AuthResponse>("/auth/firebase", { idToken, ...newAccount }));
 }
 
+/**
+ * Sign out and leave nothing of the account in this browser.
+ *
+ * The API's logout answers with `Clear-Site-Data`, which makes the browser
+ * wipe the cache, cookies and storage for the API's origin — this site's own
+ * origin in production, where both sit behind one address. The same is done
+ * here by hand for this origin, which covers development (the API on another
+ * port) and browsers that ignore the header: local and session storage, the
+ * Cache Storage API, IndexedDB and every cookie script can reach (the session
+ * cookie is httpOnly, and the server clears that). Then a full navigation to
+ * the sign-in page, so nothing held in memory — portfolios, account
+ * settings, the access token — survives either.
+ */
 export async function signOut() {
   try {
     await api.post("/auth/logout");
@@ -121,6 +134,43 @@ export async function signOut() {
   }
   setAccessToken(null);
   emit({ user: null, status: "out" });
+  await clearBrowserData();
+  window.location.replace("/signin");
+}
+
+async function clearBrowserData() {
+  // Each step on its own: a browser that refuses one must not keep the rest.
+  const steps: Array<() => unknown> = [
+    () => window.localStorage.clear(),
+    () => window.sessionStorage.clear(),
+    async () => {
+      if (!("caches" in window)) return;
+      for (const name of await caches.keys()) await caches.delete(name);
+    },
+    async () => {
+      // Firebase is in memory here (`inMemoryPersistence`), but anything a
+      // library put in IndexedDB goes too.
+      if (!("indexedDB" in window) || typeof indexedDB.databases !== "function") return;
+      for (const db of await indexedDB.databases()) if (db.name) indexedDB.deleteDatabase(db.name);
+    },
+    async () => {
+      if (!("serviceWorker" in navigator)) return;
+      for (const registration of await navigator.serviceWorker.getRegistrations()) await registration.unregister();
+    },
+    () => {
+      for (const cookie of document.cookie.split(";")) {
+        const name = cookie.split("=")[0]?.trim();
+        if (name) document.cookie = `${name}=; Max-Age=0; path=/`;
+      }
+    },
+  ];
+  for (const step of steps) {
+    try {
+      await step();
+    } catch {
+      // Blocked storage (a private window, a strict setting) is already empty.
+    }
+  }
 }
 
 export function useSession() {

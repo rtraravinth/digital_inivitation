@@ -31,7 +31,7 @@ npm run build
 npm run lint
 npm run typecheck
 npm run knip
-cd backend && .venv/bin/python -m pytest    # 486 tests (.venv/Scripts on Windows)
+cd backend && .venv/bin/python -m pytest    # 491 tests (.venv/Scripts on Windows)
 ```
 
 **CI runs all of these on every pull request** (`.github/workflows/ci.yml`),
@@ -883,6 +883,15 @@ TOTP columns and recovery codes; there is no password route.
   before it propagates. The app's test harness shares one transaction and
   cannot see this, so `test_keep_writes_commits_before_the_error_and_others_do_not`
   drives `TransactionRoute` on its own app.
+- **Signing out leaves nothing in the browser.** `POST /auth/logout` and a
+  successful `DELETE /account` answer with `Clear-Site-Data: "cache",
+  "cookies", "storage"` (`CLEAR_SITE_DATA` in `api/v1/auth.py`), which wipes
+  the API origin — the app's own in production, one address. `signOut()` in
+  `lib/session.tsx` repeats the storage half by hand for this origin (local
+  and session storage, Cache Storage, IndexedDB, service workers, script
+  cookies — development's API is another port, and some browsers ignore the
+  header), then does a full navigation to `/signin` so nothing in memory
+  survives. That includes the theme and list/grid preferences, by request.
 - **`users.email` is nullable**: a phone-only account has none.
 - **Tests fake the verifier**, overriding `get_firebase_verifier` with
   `fake_verify` (`tests/factories.py`); `firebase_token(email, …)` builds a
@@ -947,6 +956,13 @@ it, but two rules matter from this side:
   every field is validated or dropped, `layout` key by key, and it always
   lands as a draft. Only `trusted=True` (the CLI and the seed) keeps a page's
   published state.
+- **A subdomain is unique in the database, not only in the check.**
+  `assert_subdomain_available()` answers 409 `subdomain_taken` before a
+  sign-up or rename writes; two that check at the same instant both pass
+  it, and `uq_account_profiles_subdomain` refuses the second. The
+  `IntegrityError` handler (`_CONSTRAINT_ERRORS` in `core/errors.py`) gives
+  that the same `subdomain_taken` answer instead of a generic conflict. Add
+  a constraint there when its violation is an answer, not a bug.
 - **A URL that can run code is stored as ""** (`SafeUrl` in
   `schemas/common.py`): only http, https, mailto and tel, or no scheme.
   Emptied rather than refused, so an old row cannot break a read.
@@ -1078,7 +1094,7 @@ deleted.
 - **Slugs are per account.** The subdomain in front of a slug is the
   namespace, so two accounts can both have `/founder`; one account cannot
   have two. The create dialog surfaces the 409 as a message.
-- **The frontend has no test runner.** The backend has 486 pytest tests;
+- **The frontend has no test runner.** The backend has 491 pytest tests;
   changes here are checked with `npm run lint`, `npm run build` and by
   actually opening the app.
 

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import pytest
 from sqlalchemy import func, select
 
 from app.models import Portfolio, User
@@ -224,3 +225,48 @@ async def test_deleting_an_account_needs_a_recent_sign_in(auth_client, db_sessio
     assert refused.status_code == 403
     assert refused.json()["error"]["code"] == "reauth_required"
     assert (await auth_client.get("/api/v1/account")).status_code == 200
+
+
+# The refused insert rolls back the test's one shared transaction (conftest's
+# db_session) before the fixture's own rollback, which SQLAlchemy reports.
+# The app's real per-request sessions have no outer transaction to lose.
+@pytest.mark.filterwarnings("ignore:transaction already deassociated:sqlalchemy.exc.SAWarning")
+async def test_two_renames_racing_for_one_subdomain_get_subdomain_taken(
+    auth_client, other_auth_client, monkeypatch
+):
+    """The rename path has the same race as sign-up, and the same answer."""
+    assert (
+        await auth_client.patch("/api/v1/account/profile", json={"subdomain": "rohan"})
+    ).status_code == 200
+
+    async def checked_before_the_other_stored(*_args, **_kwargs) -> None:
+        return None
+
+    monkeypatch.setattr(
+        "app.services.account.assert_subdomain_available", checked_before_the_other_stored
+    )
+    response = await other_auth_client.patch("/api/v1/account/profile", json={"subdomain": "rohan"})
+    assert response.status_code == 409
+    assert response.json()["error"]["code"] == "subdomain_taken"
+
+
+async def test_deleting_the_account_tells_the_browser_to_forget_everything(auth_client):
+    response = await auth_client.delete("/api/v1/account")
+    assert response.status_code == 204
+    assert response.headers["clear-site-data"] == '"cache", "cookies", "storage"'
+
+
+async def test_a_refused_deletion_clears_nothing(auth_client, db_session):
+    """Only a deletion that happened wipes the browser."""
+    from datetime import UTC, datetime, timedelta
+
+    from sqlalchemy import update
+
+    from app.models import AuthSession
+
+    await db_session.execute(
+        update(AuthSession).values(signed_in_at=datetime.now(UTC) - timedelta(hours=2))
+    )
+    response = await auth_client.delete("/api/v1/account")
+    assert response.status_code == 403
+    assert "clear-site-data" not in response.headers

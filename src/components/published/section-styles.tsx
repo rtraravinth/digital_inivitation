@@ -2,9 +2,10 @@
 
 import { AnimatePresence, motion } from "motion/react";
 import { Fragment, useCallback, useId, useState, type KeyboardEvent, type ReactNode } from "react";
+import { Inline } from "@/lib/points";
 import { coverOf, type Portfolio, type Section, type SectionStyle } from "@/lib/types";
 import { Photo, Reveal, nn, reducedNow, useMotionLevel } from "./fx";
-import { SectionAside, SectionLinks, SectionTitleLink, UiIcon, gridCols, headline } from "./shared";
+import { SectionAside, SectionLinks, SectionTitleLink, TextHeading, UiIcon, gridCols, headline } from "./shared";
 
 /* ── section styles ─────────────────────────────────────────────────────────
    The shape the page's plain sections take, picked once for the page in the
@@ -85,7 +86,10 @@ const BULLET_RE = /^\s*[•\-*–]\s+/;
  * Present", and where people type dates by hand. Only a short first line that
  * names a year (or "Present") counts; anything else stays the body.
  */
-function entryMeta(s: Section): { date: string; sub: string; body: string } {
+function entryMeta(s: Section): { date: string; sub: string; body: string; rich: boolean } {
+  // A resume role's points carry bold and italic marks (lib/points.tsx); a
+  // plain section's description is drawn as typed, asterisks and all.
+  const rich = s.id.startsWith("resume-experience-");
   const lines = s.description.split("\n");
   const first = (lines[0] ?? "").trim();
   const rest = lines.slice(1).join("\n").trim();
@@ -95,13 +99,14 @@ function entryMeta(s: Section): { date: string; sub: string; body: string } {
       date: parts.filter((t) => DATE_RE.test(t)).join(" · "),
       sub: parts.filter((t) => !DATE_RE.test(t)).join(" · "),
       body: rest,
+      rich,
     };
   }
   // A resume role with no dates still leads with its organisation.
   if (s.id.startsWith("resume-") && rest && first && !BULLET_RE.test(first)) {
-    return { date: "", sub: first, body: rest };
+    return { date: "", sub: rich ? first.replace(/\*+/g, "") : first, body: rest, rich };
   }
-  return { date: "", sub: "", body: s.description.trim() };
+  return { date: "", sub: "", body: s.description.trim(), rich };
 }
 
 function isCurrent(date: string) {
@@ -109,10 +114,11 @@ function isCurrent(date: string) {
 }
 
 /** Items for a chip row: split on the separators people actually type. */
-function chipsOf(text: string): string[] {
+function chipsOf(text: string, rich = false): string[] {
   return text
     .split(/\s*(?:[·,;|\n•]|\s-\s)\s*/)
     .map((t) => t.replace(BULLET_RE, "").trim())
+    .map((t) => (rich ? t.replace(/\*+/g, "").trim() : t))
     .filter(Boolean);
 }
 
@@ -121,7 +127,7 @@ function chipsOf(text: string): string[] {
  * bullet become a real list with the accent's marks; everything else keeps
  * its line breaks.
  */
-function Body({ text, className = "" }: { text: string; className?: string }) {
+function Body({ text, rich = false, className = "" }: { text: string; rich?: boolean; className?: string }) {
   if (!text) return null;
   const groups: Array<{ kind: "p" | "ul"; lines: string[] }> = [];
   for (const raw of text.split("\n")) {
@@ -138,9 +144,17 @@ function Body({ text, className = "" }: { text: string; className?: string }) {
         g.kind === "ul" ? (
           <ul key={i} className="ss-bullets m-0 flex list-none flex-col gap-1.5 p-0">
             {g.lines.map((l, j) => (
-              <li key={j}>{l.replace(BULLET_RE, "")}</li>
+              <li key={j}>{rich ? <Inline text={l.replace(BULLET_RE, "")} /> : l.replace(BULLET_RE, "")}</li>
             ))}
           </ul>
+        ) : rich ? (
+          <p key={i} className="m-0">
+            {g.lines.map((l, j) => (
+              <span key={j} className="block">
+                <Inline text={l.trim()} />
+              </span>
+            ))}
+          </p>
         ) : (
           <p key={i} className="m-0 whitespace-pre-line">
             {g.lines.join("\n")}
@@ -194,7 +208,8 @@ function GridStyle({ p, sections }: { p: Portfolio; sections: Section[] }) {
                   className="font-heading text-[21px] leading-[1.2] tracking-[-0.01em] hover:underline"
                 />
                 {m.sub && <span className="ss-sub text-[14px]">{m.sub}</span>}
-                <Body text={m.body} className="text-muted text-[15px] leading-[1.6]" />
+                <TextHeading section={s} />
+                <Body text={m.body} rich={m.rich} className="text-muted text-[15px] leading-[1.6]" />
                 <div className="mt-auto pt-1">
                   <Extras p={p} section={s} />
                 </div>
@@ -232,7 +247,8 @@ function TimelineStyle({ p, sections }: { p: Portfolio; sections: Section[] }) {
                 {now && <span className="ss-now">Now</span>}
               </div>
               {m.sub && <span className="ss-sub text-[15px] font-medium">{m.sub}</span>}
-              <Body text={m.body} className="text-muted text-[15px] leading-[1.6]" />
+              <TextHeading section={s} />
+              <Body text={m.body} rich={m.rich} className="text-muted text-[15px] leading-[1.6]" />
               {coverOf(s) && (
                 <div className="relative mt-1 aspect-[16/7] overflow-hidden rounded-[calc(var(--fc-radius)*0.6)]">
                   <Photo asset={coverOf(s)!} className="absolute inset-0 h-full w-full object-cover" />
@@ -317,7 +333,8 @@ function CarouselStyle({ p, sections, label }: { p: Portfolio; sections: Section
                 </div>
                 <div className="flex flex-1 flex-col gap-3 p-5">
                   {m.sub && <span className="ss-sub text-[14px]">{m.sub}</span>}
-                  <Body text={m.body} className="ss-clamp text-muted text-[14.5px] leading-[1.6]" />
+                  <TextHeading section={s} />
+                  <Body text={m.body} rich={m.rich} className="ss-clamp text-muted text-[14.5px] leading-[1.6]" />
                   <div className="mt-auto">
                     <Extras p={p} section={s} />
                   </div>
@@ -412,7 +429,8 @@ function SideTabsStyle({ p, sections, label }: { p: Portfolio; sections: Section
                 {when}
               </span>
             )}
-            <Body text={m.body} className="text-[16px] leading-[1.7]" />
+            <TextHeading section={s} />
+            <Body text={m.body} rich={m.rich} className="text-[16px] leading-[1.7]" />
             {coverOf(s) && (
               <div className="fc-card relative mt-2 aspect-[16/8] overflow-hidden">
                 <Photo asset={coverOf(s)!} className="absolute inset-0 h-full w-full object-cover" />
@@ -448,7 +466,8 @@ function ListStyle({ p, sections }: { p: Portfolio; sections: Section[] }) {
                 className="font-heading text-[18px] leading-[1.3] tracking-[-0.005em] hover:underline md:text-[19px]"
               />
               {m.sub && <span className="ss-sub text-[14px]">{m.sub}</span>}
-              <Body text={m.body} className="text-muted max-w-[72ch] text-[15px] leading-[1.6]" />
+              <TextHeading section={s} />
+              <Body text={m.body} rich={m.rich} className="text-muted max-w-[72ch] text-[15px] leading-[1.6]" />
               <Extras p={p} section={s} />
             </div>
             {m.date && <span className="mono-label md:pt-1.5 md:text-right">{m.date}</span>}
@@ -490,7 +509,8 @@ function SpotlightStyle({ p, sections }: { p: Portfolio; sections: Section[] }) 
                 <SectionTitleLink p={p} section={s} className="hover:underline" />
               </h3>
               {m.sub && <span className="ss-sub text-[16px]">{m.sub}</span>}
-              <Body text={m.body} className="text-muted text-[16px] leading-[1.7]" />
+              <TextHeading section={s} />
+              <Body text={m.body} rich={m.rich} className="text-muted text-[16px] leading-[1.7]" />
               <Extras p={p} section={s} />
             </Reveal>
           </article>
@@ -528,7 +548,10 @@ function ChipsStyle({ p, sections }: { p: Portfolio; sections: Section[] }) {
                   ))}
                 </ul>
               ) : (
-                <Body text={m.body} className="text-muted text-[15px] leading-[1.6]" />
+                <>
+                  <TextHeading section={s} />
+                  <Body text={m.body} rich={m.rich} className="text-muted text-[15px] leading-[1.6]" />
+                </>
               )}
               <div className="mt-auto">
                 <Extras p={p} section={s} />
@@ -560,7 +583,8 @@ export function suggestStyle(sections: Section[]): PickedStyle {
     sections.length > 1 &&
     pictured === 0 &&
     sections.every((s) => {
-      const chips = chipsOf(entryMeta(s).body);
+      const em = entryMeta(s);
+      const chips = chipsOf(em.body, em.rich);
       return chips.length > 1 && chips.every((c) => c.length <= 40);
     })
   )

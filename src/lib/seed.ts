@@ -104,6 +104,8 @@ const RAW: SeedPortfolio[] = [
           start: "Jan 2019",
           end: "",
           current: true,
+          heading: "",
+          formatted: false,
           bullets: [
             "Built a cloud-kitchen company to eleven brands across four facilities and 42 people",
             "Reached profitability in 2022 by cutting food cost from 38% to 29% of revenue",
@@ -118,6 +120,8 @@ const RAW: SeedPortfolio[] = [
           start: "Apr 2023",
           end: "",
           current: true,
+          heading: "",
+          formatted: false,
           bullets: [
             "Cold-chain logistics for small food businesses that cannot run their own fleet",
             "Signed 30 restaurant clients in the first year with no sales team",
@@ -131,6 +135,8 @@ const RAW: SeedPortfolio[] = [
           start: "2020",
           end: "",
           current: true,
+          heading: "",
+          formatted: false,
           bullets: [
             "Fee-only adviser to sixty households; no commissions and no product sales",
             "Write The Slow Compounding, a fortnightly letter with 14,200 subscribers",
@@ -144,6 +150,8 @@ const RAW: SeedPortfolio[] = [
           start: "Jul 2015",
           end: "Dec 2018",
           current: false,
+          heading: "",
+          formatted: false,
           bullets: [
             "Diligence on 20+ consumer and food-service deals; led two seed investments",
           ],
@@ -631,6 +639,8 @@ const RAW: SeedPortfolio[] = [
           start: "Jan 2019",
           end: "",
           current: true,
+          heading: "",
+          formatted: false,
           bullets: [
             "Grew a cloud kitchen to eleven brands, four facilities and 42 people",
             "Cut food cost from 38% to 29% of revenue and reached profit in 2022",
@@ -644,6 +654,8 @@ const RAW: SeedPortfolio[] = [
           start: "Apr 2023",
           end: "",
           current: true,
+          heading: "",
+          formatted: false,
           bullets: ["Cold-chain logistics for thirty restaurants in its first year"],
         },
         {
@@ -654,6 +666,8 @@ const RAW: SeedPortfolio[] = [
           start: "Jul 2015",
           end: "Dec 2018",
           current: false,
+          heading: "",
+          formatted: false,
           bullets: ["Diligence on 20+ consumer deals; led two seed investments"],
         },
       ],

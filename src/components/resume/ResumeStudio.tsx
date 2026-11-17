@@ -27,6 +27,7 @@ import {
   templateOf,
   type TemplateCategory,
 } from "@/lib/resume";
+import { sampleResume } from "@/lib/resume-sample";
 import { RESUME_BACKDROPS, backdropLayers, layerStyle, patternColour } from "@/lib/resume-backdrops";
 import { usePortfolios } from "@/lib/store";
 import { isFrozen } from "@/lib/types";
@@ -433,12 +434,15 @@ function BlockRail({ p, onChange }: { p: Portfolio; onChange: (recipe: (r: Resum
 
 /* ── template picker ──────────────────────────────────────────────────── */
 
-/** A template's thumbnail is the author's own resume in it, at a glance. */
+/** A template's thumbnail is a filled-in sample resume under the author's
+ *  name (lib/resume-sample.ts), so every template shows how it sets roles,
+ *  dates, skills and the rest even while the author's resume is empty. */
 function TemplatePicker({ p, onPick }: { p: Portfolio; onPick: (id: ResumeTemplateId) => void }) {
   const reduced = useReducedMotion();
   const current = p.resume.style.template;
   const [filter, setFilter] = useState<TemplateCategory | "all">("all");
   const shown = filter === "all" ? RESUME_TEMPLATES : RESUME_TEMPLATES.filter((t) => t.categories.includes(filter));
+  const sample = sampleResume(p);
   const thumbW = 150;
   const scale = thumbW / (PAPERS.a4.w * MM);
 
@@ -479,8 +483,8 @@ function TemplatePicker({ p, onPick }: { p: Portfolio; onPick: (id: ResumeTempla
         {shown.map((t, i) => {
           const on = t.id === current;
           const look: Portfolio = {
-            ...p,
-            resume: { ...p.resume, style: { ...p.resume.style, template: t.id, paper: "a4", columns: "auto", ...TEMPLATE_DEFAULTS[t.id] } },
+            ...sample,
+            resume: { ...sample.resume, style: { ...sample.resume.style, template: t.id, paper: "a4", columns: "auto", ...TEMPLATE_DEFAULTS[t.id] } },
           };
           return (
             <motion.button

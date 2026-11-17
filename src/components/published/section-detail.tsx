@@ -14,6 +14,7 @@ import {
   headline,
   usePageHref,
   visibleSections,
+  TextHeading,
 } from "./shared";
 
 /* ── 1d Section detail — the caption lift ─────────────────────────────────
@@ -130,6 +131,7 @@ export function SectionDetail({ p, section }: { p: Portfolio; section: Section }
             <div className="caption-credit">
               {medium} · {credit}
             </div>
+            <TextHeading section={section} />
             {section.description && (
               <p className="m-0 max-w-[62ch] whitespace-pre-line text-[16px] leading-[1.65] text-muted">
                 {section.description}

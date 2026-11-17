@@ -40,6 +40,7 @@ import {
   usePublishedSubdomain,
   usePublishedPrivacy,
   useRecordClick,
+  TextHeading,
 } from "./shared";
 
 /* ── components on the published page ─────────────────────────────────────
@@ -163,6 +164,7 @@ export function FeatureBand({
           <h2 id={`band-${section.id}`} className="m-0" style={{ ...headline("clamp(30px, 4vw, 52px)"), lineHeight: 1.03 }}>
             <SectionTitleLink p={p} section={section} className="font-heading fc-title-link" />
           </h2>
+          <TextHeading section={section} />
           {section.description && (
             <p className="text-muted m-0 max-w-[60ch] text-[16.5px] leading-[1.7] whitespace-pre-line">{section.description}</p>
           )}

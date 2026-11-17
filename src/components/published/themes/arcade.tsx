@@ -27,6 +27,7 @@ import {
   headline,
   tabs,
   useTabFilter,
+  TextHeading,
 } from "../shared";
 import { FeatureBand, FooterBody, footerHeadline, footerNote, splitFeatures } from "../components";
 import { StyledSections } from "../section-styles";
@@ -434,6 +435,7 @@ function Card({ p, section }: { p: Portfolio; section: Section }) {
               section={section}
               className="font-heading text-[21px] leading-[1.15] tracking-[0.01em] uppercase hover:underline"
             />
+            <TextHeading section={section} />
             {section.description && (
               <p className="whitespace-pre-line text-muted m-0 text-[15px] leading-[1.6]">{section.description}</p>
             )}

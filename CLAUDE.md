@@ -275,7 +275,10 @@ replaced.
   (`withoutComponent()`). `normalize()` gives a section stored before this
   the components its filled fields need, with derived ids. They never make
   a section a band — `shownBlocks()` skips them, and the theme's card
-  draws the fields — and they take no heading. `SECTION_BLOCKS_MAX` is 15
+  draws the fields. Links and Quote take no heading; Text takes an
+  optional one (the block's `title`), drawn under the section's title and
+  over the description by `TextHeading` in `published/shared.tsx`, and
+  printed on the resume like any component's heading. `SECTION_BLOCKS_MAX` is 15
   on both sides to make room for them.
 - **A section has no file to download.** It went with migration
   `a1d4f7c9e2b6`, which drops `sections.file_asset_id`. The uploads it
@@ -567,6 +570,12 @@ separately.
   instead, it stops where its text does — on page 2, partway down. The
   `band` header reaches the paper's top edge with negative margins of
   `--r-my` / `--r-mx`.
+- **The template picker's thumbnails draw a sample resume, not the
+  author's.** `sampleResume()` (`lib/resume-sample.ts`) keeps the author's
+  name, headline, portrait and style and supplies filled-in roles,
+  education, skills, certifications, languages and an award, so all
+  thirty-two thumbnails differ even while the resume is empty. The sheet
+  beside the picker is always the real content.
 - **Columns and Background are style, not template.** `style.columns`
   (`auto` follows the template) is laid over the template's parts by
   `sheetParts()`, which everything that draws a sheet reads instead of

@@ -889,3 +889,11 @@ export function SectionTitleLink({
     </Link>
   );
 }
+
+/** The Text component's optional heading, over the section's description.
+ *  The section's own title stays the card's title; this sits under it. */
+export function TextHeading({ section, className = "" }: { section: Section; className?: string }) {
+  const heading = section.blocks.find((b) => b.type === "text")?.title.trim();
+  if (!heading) return null;
+  return <h3 className={`m-0 font-heading text-[17px] leading-snug ${className}`}>{heading}</h3>;
+}

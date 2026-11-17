@@ -1,4 +1,5 @@
 import type { CSSProperties, ReactNode } from "react";
+import { Inline, pointGroups } from "@/lib/points";
 import { layerStyle, sheetLayers } from "@/lib/resume-backdrops";
 import {
   bareUrl,
@@ -506,14 +507,25 @@ function ListBody({
                 place={e.location}
                 when={dateRange(e.start, e.end, e.current)}
               >
-                {e.bullets.some((b) => b.trim()) && (
-                  <ul className="r-bullets">
-                    {e.bullets
-                      .filter((b) => b.trim())
-                      .map((b, i) => (
-                        <li key={i}>{b.trim().replace(/^[-•*]\s*/, "")}</li>
+                {e.heading.trim() && e.bullets.some((b) => b.trim()) && <p className="r-text r-points-heading">{e.heading.trim()}</p>}
+                {pointGroups(e.bullets).map((g, i) =>
+                  g.bullet ? (
+                    <ul key={i} className="r-bullets">
+                      {g.lines.map((l, j) => (
+                        <li key={j}>
+                          <Inline text={l} />
+                        </li>
                       ))}
-                  </ul>
+                    </ul>
+                  ) : (
+                    <p key={i} className="r-text r-point-text">
+                      {g.lines.map((l, j) => (
+                        <span key={j} className="block">
+                          <Inline text={l} />
+                        </span>
+                      ))}
+                    </p>
+                  ),
                 )}
               </Entry>
             ))}

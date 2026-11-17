@@ -1,11 +1,12 @@
 "use client";
 
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
-import { useId, useState, type ReactNode } from "react";
+import { useId, useLayoutEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { TagEditor } from "../TagEditor";
 import { IconButton } from "../ui";
 import { Glyph } from "@/lib/glyphs";
 import { dateRange } from "@/lib/resume";
+import { POINT_BULLET_RE } from "@/lib/types";
 import { newId, usePortfolios } from "@/lib/store";
 import type {
   Award,
@@ -92,7 +93,7 @@ export function ResumeListRows({ block, onChange }: { block: ResumeListBlock; on
           hint="Most recent first. Start each point with what you did, end it with the result."
           items={block.items}
           onItems={(items) => onChange({ ...block, items })}
-          make={() => ({ id: newId(), role: "", company: "", location: "", start: "", end: "", current: false, bullets: [] })}
+          make={() => ({ id: newId(), role: "", company: "", location: "", start: "", end: "", current: false, heading: "", bullets: [], formatted: true })}
           addLabel="Add a role"
           max={40}
           summary={(e) => ({
@@ -114,17 +115,11 @@ export function ResumeListRows({ block, onChange }: { block: ResumeListBlock; on
                 <input type="checkbox" checked={e.current} onChange={(ev) => edit({ current: ev.target.checked })} className="h-4 w-4 accent-[var(--color-ink)]" />
                 I work here now
               </label>
+              <Field label="Heading over the points (optional)" span>
+                {(id) => <input id={id} className="input" value={e.heading} maxLength={120} placeholder="Key achievements" onChange={(ev) => edit({ heading: ev.target.value })} />}
+              </Field>
               <Field label="What you did — one point per line" span>
-                {(id) => (
-                  <textarea
-                    id={id}
-                    className="input"
-                    rows={5}
-                    value={e.bullets.join("\n")}
-                    placeholder={"Led a team of 6 to rebuild checkout\nCut drop-off by 18% in two quarters"}
-                    onChange={(ev) => edit({ bullets: ev.target.value.split("\n").slice(0, 20) })}
-                  />
-                )}
+                {(id) => <PointsField id={id} lines={e.bullets} onLines={(bullets) => edit({ bullets, formatted: true })} />}
               </Field>
             </div>
           )}
@@ -251,6 +246,159 @@ export function ResumeListRows({ block, onChange }: { block: ResumeListBlock; on
 }
 
 /* ── pieces ─────────────────────────────────────────────────────────────── */
+
+const BULLET = "• ";
+const MAX_POINT_LINES = 20;
+
+/**
+ * A role's points: a textarea under a three-button toolbar — bullets, bold,
+ * italic — whose marks are plain text (lib/points.tsx reads them). A new
+ * line after a bullet is a bullet, and the first thing typed into an empty
+ * box starts one, so a list is still what you get without touching the
+ * toolbar; the bullet button takes the mark off the lines selected.
+ */
+function PointsField({ id, lines, onLines }: { id: string; lines: string[]; onLines: (lines: string[]) => void }) {
+  const ref = useRef<HTMLTextAreaElement>(null);
+  const caret = useRef<[number, number] | null>(null);
+  const value = lines.join("\n");
+
+  // Put the selection back where the edit left it, once the new value is in.
+  useLayoutEffect(() => {
+    const el = ref.current;
+    const at = caret.current;
+    if (!el || !at) return;
+    caret.current = null;
+    el.setSelectionRange(at[0], at[1]);
+  });
+
+  const commit = (next: string, start: number, end = start) => {
+    caret.current = [start, end];
+    onLines(next.split("\n").slice(0, MAX_POINT_LINES));
+    ref.current?.focus();
+  };
+
+  const toggleBullets = () => {
+    const el = ref.current;
+    if (!el) return;
+    const { selectionStart: s, selectionEnd: e } = el;
+    const from = value.lastIndexOf("\n", s - 1) + 1;
+    const nl = value.indexOf("\n", e > s && value[e - 1] === "\n" ? e - 1 : e);
+    const to = nl === -1 ? value.length : nl;
+    const block = value.slice(from, to).split("\n");
+    const marked = block.filter((l) => l.trim()).every((l) => POINT_BULLET_RE.test(l)) && block.some((l) => l.trim());
+    const next = block
+      .map((l) => {
+        if (marked) return l.replace(POINT_BULLET_RE, "");
+        if (POINT_BULLET_RE.test(l) || (!l.trim() && block.length > 1)) return l;
+        return BULLET + l.replace(/^\s+/, "");
+      })
+      .join("\n");
+    commit(value.slice(0, from) + next + value.slice(to), from, from + next.length);
+  };
+
+  const wrap = (mark: "**" | "*") => {
+    const el = ref.current;
+    if (!el) return;
+    const { selectionStart: s, selectionEnd: e } = el;
+    const n = mark.length;
+    const before = value.slice(Math.max(0, s - n), s);
+    const after = value.slice(e, e + n);
+    // Italic's "*" is half of bold's "**": only a lone asterisk counts.
+    const lone = n === 2 || (value[s - 2] !== "*" && value[e + 1] !== "*");
+    if (before === mark && after === mark && lone) {
+      commit(value.slice(0, s - n) + value.slice(s, e) + value.slice(e + n), s - n, e - n);
+      return;
+    }
+    const picked = value.slice(s, e);
+    // Never across lines: a mark only holds within one.
+    const text = picked.includes("\n") ? picked.slice(0, picked.indexOf("\n")) : picked;
+    const end = s + text.length;
+    commit(value.slice(0, s) + mark + text + mark + value.slice(end), s + n, end + n);
+  };
+
+  const onKeyDown = (ev: KeyboardEvent<HTMLTextAreaElement>) => {
+    const mod = ev.metaKey || ev.ctrlKey;
+    if (mod && !ev.shiftKey && !ev.altKey && (ev.key === "b" || ev.key === "i")) {
+      ev.preventDefault();
+      wrap(ev.key === "b" ? "**" : "*");
+      return;
+    }
+    if (ev.key !== "Enter" || mod || ev.shiftKey || ev.altKey || ev.nativeEvent.isComposing) return;
+    const el = ev.currentTarget;
+    const { selectionStart: s, selectionEnd: e } = el;
+    const from = value.lastIndexOf("\n", s - 1) + 1;
+    if (!POINT_BULLET_RE.test(value.slice(from, s))) return;
+    ev.preventDefault();
+    const nl = value.indexOf("\n", e);
+    const whole = value.slice(from, nl === -1 ? value.length : nl);
+    if (!whole.replace(POINT_BULLET_RE, "").trim()) {
+      // Enter on an empty bullet ends the list, as in any editor.
+      commit(value.slice(0, from) + value.slice(s), from);
+      return;
+    }
+    if (lines.length >= MAX_POINT_LINES) return;
+    commit(value.slice(0, s) + "\n" + BULLET + value.slice(e), s + 1 + BULLET.length);
+  };
+
+  return (
+    <div className="flex flex-col gap-1.5">
+      <div role="toolbar" aria-label="Format the points" aria-controls={id} className="flex items-center gap-1">
+        <FormatButton label="Bullet points" onClick={toggleBullets}>
+          <svg aria-hidden width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+            <path d="M9 6h11M9 12h11M9 18h11" />
+            <circle cx="4" cy="6" r="1" fill="currentColor" />
+            <circle cx="4" cy="12" r="1" fill="currentColor" />
+            <circle cx="4" cy="18" r="1" fill="currentColor" />
+          </svg>
+        </FormatButton>
+        <FormatButton label="Bold (Ctrl+B)" onClick={() => wrap("**")}>
+          <span className="text-[14px] font-bold">B</span>
+        </FormatButton>
+        <FormatButton label="Italic (Ctrl+I)" onClick={() => wrap("*")}>
+          <span className="font-serif text-[15px] italic">I</span>
+        </FormatButton>
+        <span className="ml-auto text-[12px] text-muted">**bold** · *italic*</span>
+      </div>
+      <textarea
+        ref={ref}
+        id={id}
+        className="input"
+        rows={5}
+        value={value}
+        placeholder={"• Led a team of 6 to rebuild checkout\n• Cut drop-off by **18%** in two quarters"}
+        onKeyDown={onKeyDown}
+        onChange={(ev) => {
+          let next = ev.target.value;
+          let at = ev.target.selectionStart;
+          // The first thing typed into an empty box starts a bullet.
+          if (!value && next.trim() && !POINT_BULLET_RE.test(next)) {
+            next = BULLET + next;
+            at += BULLET.length;
+          }
+          if (next !== ev.target.value) caret.current = [at, at];
+          onLines(next.split("\n").slice(0, MAX_POINT_LINES));
+        }}
+      />
+    </div>
+  );
+}
+
+function FormatButton({ label, onClick, children }: { label: string; onClick: () => void; children: ReactNode }) {
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      title={label}
+      // Keep the textarea's selection: a click would otherwise take focus first.
+      onMouseDown={(ev) => ev.preventDefault()}
+      onClick={onClick}
+      className="grid h-8 w-8 cursor-pointer place-items-center rounded-md transition-colors hover:bg-[var(--color-neutral-200)]"
+      style={{ color: "var(--color-ink)", boxShadow: "inset 0 0 0 1px var(--color-divider)" }}
+    >
+      {children}
+    </button>
+  );
+}
 
 function Field({ label, span, children }: { label: string; span?: boolean; children: (id: string) => ReactNode }) {
   const id = useId();

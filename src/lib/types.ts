@@ -1001,6 +1001,7 @@ function sectionOf(
     // e8b4d1a7c3f2 did the same to stored rows).
     const items = isListBlock(b) && !Array.isArray(b.items) ? (oldLists?.[b.type] ?? []) : undefined;
     const withFlag = { ...b, ...(items ? { items } : {}), onResume: printed(b) } as Block;
+    if (withFlag.type === "experience") return { ...withFlag, items: (withFlag.items ?? []).map(experienceOf) };
     return withFlag.type === "gallery" ? { ...withFlag, layout: withFlag.layout ?? "mosaic", imageIds: withFlag.imageIds ?? [] } : withFlag;
   });
   const loose = images.slice(1).flatMap((a) => (a.id ? [a.id] : []));
@@ -1438,8 +1439,36 @@ export type ExperienceItem = {
   start: string;
   end: string;
   current: boolean;
+  /** An optional heading over the points, "Key achievements". */
+  heading: string;
+  /** The points, one line each: `• ` starts a bullet, a line without one is
+   *  plain text, `**bold**` and `*italic*` inside a line. Before `formatted`
+   *  every line was a bullet with no mark; `experienceOf()` converts those. */
   bullets: string[];
+  /** The lines carry their own marks. Stored without it: an older role,
+   *  whose every line is a bullet. */
+  formatted: boolean;
 };
+
+/** A line's bullet mark, as typed or as the toolbar writes it. */
+export const POINT_BULLET_RE = /^\s*[•\-*–]\s+/;
+
+/** A role as stored at any age: an older role's lines all become bullets. */
+function experienceOf(e: Partial<ExperienceItem> & { id: string }): ExperienceItem {
+  const lines = e.bullets ?? [];
+  return {
+    id: e.id,
+    role: e.role ?? "",
+    company: e.company ?? "",
+    location: e.location ?? "",
+    start: e.start ?? "",
+    end: e.end ?? "",
+    current: !!e.current,
+    heading: e.heading ?? "",
+    bullets: e.formatted ? lines : lines.map((b) => (b.trim() && !POINT_BULLET_RE.test(b) ? `• ${b.trim()}` : b)),
+    formatted: true,
+  };
+}
 export type EducationItem = {
   id: string;
   degree: string;
@@ -1553,7 +1582,7 @@ function normalizeResume(raw: Partial<Resume> | null | undefined): Resume {
   return {
     ...r,
     publicContact: { ...base.publicContact, ...(r.publicContact ?? {}) },
-    experience: (r.experience ?? []).map((e) => ({ ...e, bullets: e.bullets ?? [], current: !!e.current })),
+    experience: (r.experience ?? []).map(experienceOf),
     education: r.education ?? [],
     skills: (r.skills ?? []).map((g) => ({ ...g, items: g.items ?? [] })),
     certifications: r.certifications ?? [],

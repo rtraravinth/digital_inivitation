@@ -24,6 +24,7 @@ import {
   allDates,
   allNumbers,
   headline,
+  TextHeading,
 } from "../shared";
 import { FeatureBand, FooterBody, footerHeadline, footerNote, runsOf } from "../components";
 import { StyledSections } from "../section-styles";
@@ -341,6 +342,7 @@ function StackCard({
             section={section}
             className="font-heading text-[26px] leading-[1.15] hover:underline md:text-[34px]"
           />
+          <TextHeading section={section} />
           {section.description && (
             <p className="whitespace-pre-line text-muted m-0 text-[16px] leading-[1.7]">{section.description}</p>
           )}

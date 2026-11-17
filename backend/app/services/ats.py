@@ -732,6 +732,14 @@ def prints_on_resume(block: dict, hidden: set[str]) -> bool:
     return kind in _PRINTS_BY_DEFAULT
 
 
+_POINT_MARK = re.compile(r"^\s*[•\-*–]\s+")
+
+
+def _plain_point(line: str) -> str:
+    """A role's point as words: its bullet, bold and italic marks taken off."""
+    return _POINT_MARK.sub("", line).replace("*", "").strip()
+
+
 def _items_text(block: dict) -> list[str]:
     """The words a page component prints on the resume."""
     fields = (
@@ -801,6 +809,8 @@ def resume_text(header: dict, resume: dict, sections: list[dict]) -> ResumeText:
             if not printing:
                 continue
             if kind == "text":
+                if b.get("title"):
+                    out.other.append(b["title"])
                 out.other.append(s.get("description") or "")
             elif kind == "links":
                 out.other += [
@@ -816,7 +826,9 @@ def resume_text(header: dict, resume: dict, sections: list[dict]) -> ResumeText:
     for role in entries["experience"]:
         out.experience.append(role)
         out.titles.append(role.get("role") or "")
-        out.bullets.extend(b for b in role.get("bullets") or [] if b.strip())
+        out.bullets.extend(t for b in role.get("bullets") or [] if (t := _plain_point(b)))
+        if role.get("heading"):
+            out.other.append(role["heading"])
         out.other.append(f"{role.get('company') or ''} {role.get('location') or ''}")
     out.education = [
         f"{e.get('degree') or ''} {e.get('school') or ''} {e.get('detail') or ''}"

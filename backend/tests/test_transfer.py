@@ -507,7 +507,9 @@ async def test_an_older_exports_page_lists_become_sections(auth_client):
                     "start": "",
                     "end": "",
                     "current": False,
+                    "heading": "",
                     "bullets": [],
+                    "formatted": False,
                 }
             ],
         }

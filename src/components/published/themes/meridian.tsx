@@ -30,6 +30,7 @@ import {
   pad,
   tabs,
   useTabFilter,
+  TextHeading,
 } from "../shared";
 import { FeatureBand, FooterBody, footerHeadline, footerNote, runsOf, splitFeatures } from "../components";
 import { StyledSections } from "../section-styles";
@@ -472,6 +473,7 @@ function Entry({ p, section }: { p: Portfolio; section: Section }) {
           section={section}
           className="font-heading text-[22px] leading-[1.2] hover:underline md:text-[25px]"
         />
+        <TextHeading section={section} />
         {section.description && (
           <p className="whitespace-pre-line text-muted m-0 text-[15px] leading-[1.65]">{section.description}</p>
         )}

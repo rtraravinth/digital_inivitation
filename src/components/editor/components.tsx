@@ -711,9 +711,10 @@ export function ComponentPanel({
         </>
       }
     >
-      {/* A field component is the section's own field, under the section's
-          own title; a heading of its own would be a second title. */}
-      {isFieldBlock(block) ? null : (
+      {/* Links and Quote are the section's own fields, under the section's
+          own title; a heading of their own would be a second title. Text
+          takes one, drawn over the description. */}
+      {isFieldBlock(block) && block.type !== "text" ? null : (
         <div className="field">
           <label htmlFor={`${block.id}-title`}>Heading (optional)</label>
           <input
@@ -864,7 +865,8 @@ function FieldPanel({
   );
 }
 
-const HEADING_HINT: Record<Exclude<BlockType, FieldBlock["type"]>, string> = {
+const HEADING_HINT: Record<Exclude<BlockType, "links" | "quote">, string> = {
+  text: "Overview",
   experience: "Where I’ve worked",
   education: "Education",
   skills: "What I’m good at",

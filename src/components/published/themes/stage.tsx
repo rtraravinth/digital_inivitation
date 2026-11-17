@@ -28,6 +28,7 @@ import {
   allNumbers,
   headline,
   visibleSections,
+  TextHeading,
 } from "../shared";
 import { FeatureBand, FooterBody, footerHeadline, footerNote, menuOf, runsOf, type Run } from "../components";
 import { StyledSections, pickedStyle } from "../section-styles";
@@ -387,6 +388,7 @@ function Poster({ p, section, number }: { p: Portfolio; section: Section; number
           </div>
         </div>
       </Tilt>
+      <TextHeading section={section} />
       {section.description && (
         <p className="whitespace-pre-line text-muted m-0 line-clamp-3 text-[14px] leading-[1.6]">{section.description}</p>
       )}

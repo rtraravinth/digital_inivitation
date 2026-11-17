@@ -28,7 +28,15 @@ class ExperienceItem(StrictCamelModel):
     #: "Present" without typing it, and a later ATS check can tell a current
     #: role from one whose end date was simply left blank.
     current: bool = False
+    #: An optional heading over the points, "Key achievements".
+    heading: str = Field(default="", max_length=120)
+    #: One line each. Once ``formatted``, a line starting "• " is a bullet,
+    #: any other is plain text, and ``**bold**`` / ``*italic*`` mark words
+    #: inside a line (the editor's toolbar writes them).
     bullets: list[str] = Field(default_factory=list, max_length=20)
+    #: False for a role stored before the marks, whose every line is a bullet;
+    #: the frontend converts it on read.
+    formatted: bool = False
 
 
 class EducationItem(StrictCamelModel):

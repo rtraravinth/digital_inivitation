@@ -3,7 +3,14 @@
 from __future__ import annotations
 
 from app.schemas.blocks import fix_resume_switches
-from app.services.ats import ResumeText, check, extract_terms, job_title, required_years
+from app.services.ats import (
+    ResumeText,
+    check,
+    extract_terms,
+    job_title,
+    required_years,
+    resume_text,
+)
 
 JD = """Senior Product Designer
 We are looking for a Senior Product Designer to join our payments team.
@@ -206,3 +213,37 @@ async def test_the_description_is_not_stored(auth_client, portfolio):
     await auth_client.post(url, json={"jobDescription": JD + " zebracorn"})
     again = await auth_client.get(f"/api/v1/portfolios/{portfolio['id']}")
     assert "zebracorn" not in again.text
+
+
+async def test_a_roles_marks_are_kept_and_read_as_words(auth_client, portfolio):
+    """A role's heading and its bullet, bold and italic marks are stored as
+    typed; the check reads the words, not the asterisks."""
+    section = portfolio["sections"][0]
+    role = {
+        "id": "r1",
+        "role": "Product Designer",
+        "company": "Acme",
+        "heading": "Key achievements",
+        "formatted": True,
+        "bullets": ["• Led **design systems** across 4 products", "Ran *user research*"],
+    }
+    response = await auth_client.patch(
+        f"/api/v1/portfolios/{portfolio['id']}/sections/{section['id']}",
+        json={"blocks": [{"id": "ex", "type": "experience", "items": [role]}]},
+    )
+    assert response.status_code == 200, response.text
+    stored = response.json()["blocks"][0]["items"][0]
+    assert stored["heading"] == "Key achievements"
+    assert stored["formatted"] is True
+    assert stored["bullets"] == role["bullets"]
+
+    sections = [
+        {
+            **section,
+            "onResume": True,
+            "blocks": [{"id": "ex", "type": "experience", "onResume": True, "items": [role]}],
+        }
+    ]
+    text = resume_text({}, {}, sections)
+    assert text.bullets == ["Led design systems across 4 products", "Ran user research"]
+    assert "Key achievements" in text.other

@@ -202,6 +202,13 @@
 .resume .r-text {
   white-space: pre-line;
 }
+.resume .r-points-heading {
+  margin-top: 0.35em;
+  font-weight: 600;
+}
+.resume .r-point-text {
+  margin-top: 0.35em;
+}
 .resume .r-detail {
   margin-top: 0.25em;
   color: var(--r-muted);

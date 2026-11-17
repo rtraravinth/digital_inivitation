@@ -714,7 +714,11 @@ function listEntries(block: ResumeListBlock): ListEntry[] {
             title: e.role.trim() || e.company.trim(),
             sub: line(e.role.trim() ? e.company : "", e.location),
             date: dateRange(e.start, e.end, e.current),
-            lines: e.bullets.map((b) => b.trim().replace(/^[-•*]\s*/, "")).filter(Boolean),
+            // Marks kept: `• ` bullets, bold and italic (lib/points.tsx), with
+            // the heading as a bold line over them.
+            lines: e.bullets.some((b) => b.trim())
+              ? [...(e.heading.trim() ? [`**${e.heading.trim()}**`] : []), ...e.bullets.map((b) => b.trim()).filter(Boolean)]
+              : [],
           }),
         );
     case "education":
@@ -783,7 +787,13 @@ export function listSections(block: ResumeListBlock): Section[] {
     return entries.length > 0 ? [stand("all", "", entries.map((e) => (e.sub ? `${e.title} — ${e.sub}` : e.title)).join(" · "))] : [];
   }
   return entries.map((e) =>
-    stand(e.id, e.title, [line(e.sub, e.date), ...e.lines.map((l) => (e.lines.length > 1 ? `• ${l}` : l))].filter(Boolean).join("\n"), e.url),
+    stand(
+      e.id,
+      e.title,
+      // A role's lines carry their own bullet marks; elsewhere, several lines are a list.
+      [line(e.sub, e.date), ...(list === "experience" ? e.lines : e.lines.map((l) => (e.lines.length > 1 ? `• ${l}` : l)))].filter(Boolean).join("\n"),
+      e.url,
+    ),
   );
 }
 
